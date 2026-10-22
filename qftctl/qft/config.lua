@@ -80,6 +80,25 @@ function config.checkValues(components, recipes)
         if #outputs == 0 then
             add('recipes.%s: no outputs', id)
         end
+        local trigger = recipe.trigger
+        if trigger ~= 'deficit' and trigger ~= 'surplus' then
+            add("recipes.%s: trigger must be 'deficit' or 'surplus'", id)
+        end
+        local inputs = recipe.inputs
+        if inputs ~= nil then
+            if type(inputs) ~= 'table' or #inputs == 0 then
+                add('recipes.%s: inputs must be a list of { item|fluid = <label>, amount = n }', id)
+            else
+                for i, input in ipairs(inputs) do
+                    if not (type(input.amount) == 'number' and input.amount > 0) then
+                        add('recipes.%s.inputs[%d]: amount must be a number > 0', id, i)
+                    end
+                end
+            end
+        elseif trigger == 'surplus' then
+            add('recipes.%s: a surplus recipe needs inputs: they decide when it runs', id)
+        end
+        local targets = 0
         local seen = {}
         for i, out in ipairs(outputs) do
             if not isInt(out.circuit, 1) then
@@ -100,25 +119,44 @@ function config.checkValues(components, recipes)
             if out.priority ~= nil and not (type(out.priority) == 'number' and out.priority > 0) then
                 add('recipes.%s.outputs[%d]: priority must be a number > 0 or absent', id, i)
             end
+            if out.weight ~= nil and not (type(out.weight) == 'number' and out.weight >= 0) then
+                add('recipes.%s.outputs[%d]: weight must be a number >= 0 or absent', id, i)
+            end
+            if out.target ~= nil then
+                targets = targets + 1
+            end
+            -- Each field belongs to one trigger; a stray one means the trigger is wrong.
+            if trigger == 'surplus' and (out.target ~= nil or out.priority ~= nil) then
+                add('recipes.%s.outputs[%d]: target/priority are for deficit recipes, use weight',
+                    id, i)
+            elseif trigger == 'deficit' and out.weight ~= nil then
+                add('recipes.%s.outputs[%d]: weight is for surplus recipes, use target/priority',
+                    id, i)
+            end
+        end
+        if trigger == 'deficit' and targets == 0 then
+            add('recipes.%s: a deficit recipe needs a target on some output', id)
         end
     end
     table.sort(problems)
     return problems
 end
 
----Turns every output entry (`item = <label>` or `fluid = <label>`) into a qft.Resource,
----stored as `out.resource`; the rest of the program works with that only.
+---Turns every output and input entry (`item = <label>` or `fluid = <label>`) into a
+---qft.Resource, stored as `entry.resource`; the rest of the program works with that only.
 ---@param recipes table<string, qft.Recipe>
 ---@return string[] problems
 function config.normalize(recipes)
     local problems = {}
     for id, recipe in pairs(recipes) do
-        for i, out in ipairs(recipe.outputs or {}) do
-            local res, err = resource.fromSpec(out)
-            if res then
-                out.resource = res
-            else
-                problems[#problems + 1] = ('recipes.%s.outputs[%d]: %s'):format(id, i, err)
+        for _, field in ipairs({ 'outputs', 'inputs' }) do
+            for i, entry in ipairs(recipe[field] or {}) do
+                local res, err = resource.fromSpec(entry)
+                if res then
+                    entry.resource = res
+                else
+                    problems[#problems + 1] = ('recipes.%s.%s[%d]: %s'):format(id, field, i, err)
+                end
             end
         end
     end

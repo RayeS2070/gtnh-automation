@@ -20,12 +20,12 @@ end
 
 local function recipes()
     local r = {
-        rubber = { outputs = {
+        rubber = { trigger = 'deficit', outputs = {
             { fluid = 'A', circuit = 1, target = 100 },
             { fluid = 'U', circuit = 2 }, -- not tracked
             { fluid = 'B', circuit = 3, target = 100, priority = 2 },
         } },
-        untracked = { outputs = { { fluid = 'X', circuit = 1 } } },
+        untracked = { trigger = 'deficit', outputs = { { fluid = 'X', circuit = 1 } } },
     }
     assert(#config.normalize(r) == 0)
     return r
@@ -98,8 +98,9 @@ do
     check(want(100, 100, nil) == nil, 'untracked recipe never starts')
 
     local _, states = want(50, 50, nil)
-    -- A: 1 - 0.5 = 0.5; B: 1 - 0.25 = 0.75 -> B is the focus
-    check(states.rubber.focus == 3, 'focus is the most urgent output')
+    -- A: 1 - 0.5 = 0.5; B: 1 - 0.25 = 0.75
+    check(states.rubber.weights[1] == 0.5 and states.rubber.weights[3] == 0.75
+        and states.rubber.weights[2] == nil, 'deficit weights are urgencies of tracked outputs')
     check(math.abs(states.rubber.urgency - 0.75) < 1e-9, 'urgency uses priority exponent')
 
     local _, _, missing = plan.evaluate(recipes(), fluids({}))
@@ -123,8 +124,119 @@ do
         { { label = 'Indalloy', name = 'indalloy', amount = 1000 } })
     local states = plan.evaluate(r, snap)
     check(states.glue.low and not states.glue.done, 'item output below target starts the recipe')
-    check(states.glue.focus == 1, 'the item output can be the focus')
+    check(states.glue.weights[1] > 0 and states.glue.weights[2] == 0,
+        'the item output weighs for the focus')
     check(plan.choose(states, nil) == 'glue', 'mixed recipe is chosen')
+end
+
+-- config: each trigger has its own fields
+do
+    local function problems(recipe)
+        recipe.tier, recipe.catalysts = recipe.tier or 1, recipe.catalysts or 1
+        local list = config.checkValues({ shieldingTier = 1 }, { r = recipe })
+        return table.concat(list, '\n')
+    end
+    local out = function(extra)
+        local o = { fluid = 'A', circuit = 1 }
+        for k, v in pairs(extra or {}) do o[k] = v end
+        return { o }
+    end
+    local input = { { item = 'Dust', amount = 32 } }
+    check(problems({ trigger = 'deficit', outputs = out({ target = 1 }) }) == '', 'valid deficit')
+    check(problems({ trigger = 'surplus', inputs = input, outputs = out({ weight = 2 }) }) == '',
+        'valid surplus')
+    check(problems({ outputs = out({ target = 1 }) }):find('trigger'), 'trigger is required')
+    check(problems({ trigger = 'deficit', outputs = out() }):find('needs a target'),
+        'deficit without a target refused')
+    check(problems({ trigger = 'deficit', outputs = out({ target = 1, weight = 1 }) })
+        :find('weight is for surplus'), 'weight on deficit refused')
+    check(problems({ trigger = 'surplus', inputs = input, outputs = out({ target = 1 }) })
+        :find('use weight'), 'target on surplus refused')
+    check(problems({ trigger = 'surplus', outputs = out({ weight = 1 }) }):find('needs inputs'),
+        'surplus without inputs refused')
+    check(problems({ trigger = 'surplus', inputs = { item = 'Dust', amount = 32 },
+        outputs = out() }):find('must be a list'), 'old single-input format refused')
+    check(problems({ trigger = 'surplus', inputs = { { item = 'Dust' } }, outputs = out() })
+        :find('amount'), 'input without amount refused')
+    check(problems({ trigger = 'surplus', inputs = input, outputs = out({ weight = -1 }) })
+        :find('weight must be'), 'negative weight refused')
+    local r = { r = { inputs = { { circuit = 1, amount = 1 } }, outputs = {} } }
+    local np = config.normalize(r)
+    check(#np == 1 and np[1]:find('inputs%[1%]'), 'normalize reports a bad input')
+end
+
+-- two triggers: deficit maintains products, surplus processes raw materials
+local function twoModes()
+    local r = {
+        glue = { trigger = 'deficit', catalysts = 1, outputs = {
+            { fluid = 'Glue', circuit = 1, target = 100 },
+        } },
+        plat = { trigger = 'surplus', catalysts = 2, inputs = {
+            { item = 'Dust', amount = 10 }, -- 20 per cycle
+            { fluid = 'Acid', amount = 50 }, -- 100 per cycle
+        }, outputs = {
+            { fluid = 'Pt', circuit = 1, weight = 3 },
+            { fluid = 'Pd', circuit = 2 },
+        } },
+        ore = { trigger = 'surplus', catalysts = 1, inputs = { { item = 'Ore', amount = 10 } },
+            outputs = { { fluid = 'Os', circuit = 1, weight = 1 } } },
+    }
+    assert(#config.normalize(r) == 0)
+    return r
+end
+
+local function states(glue, dust, acid, ore)
+    local source = resource.snapshot({
+        { label = 'Dust', name = 'dust', damage = 0, size = dust },
+        { label = 'Ore', name = 'ore', damage = 0, size = ore or 0 },
+    }, { { label = 'Acid', name = 'acid', amount = acid } })
+    return (plan.evaluate(twoModes(), fluids({ Glue = glue }), source))
+end
+
+do
+    local st = states(100, 60, 1000)
+    check(st.plat.cycles == 3, 'cycles: the scarcest input decides (dust 60/20 = 3, acid 10)')
+    check(st.plat.weights[1] == 3 and st.plat.weights[2] == 0, 'surplus weights, absent = 0')
+    check(plan.choose(st, nil) == 'plat', 'no product short: surplus runs')
+    check(plan.choose(states(100, 39, 1000), nil) == nil, 'below start cycles: does not start')
+    check(plan.choose(states(100, 39, 1000), 'plat') == 'plat', 'running: keeps above stop cycles')
+    check(plan.choose(states(100, 19, 1000), 'plat') == nil, 'below one cycle: stops')
+    check(plan.choose(states(100, 60, 50), nil) == nil, 'any scarce input blocks the start')
+
+    check(plan.choose(states(70, 60, 1000), nil) == 'glue', 'deficit comes first')
+    check(plan.choose(states(70, 60, 1000), 'plat') == 'glue', 'surplus yields to a deficit')
+    check(plan.choose(states(90, 60, 1000), 'glue') == 'glue', 'deficit keeps going until done')
+    check(plan.choose(states(100, 60, 1000), 'glue') == 'plat', 'deficit done: surplus takes over')
+
+    -- plat 3 cycles, ore 5 then 6: switching needs 2x the running recipe's cycles
+    check(plan.choose(states(100, 60, 1000, 50), 'plat') == 'plat', 'surplus switch: hysteresis')
+    check(plan.choose(states(100, 60, 1000, 60), 'plat') == 'ore', 'surplus switch: 2x more stock')
+    check(plan.choose(states(100, 60, 1000, 60), nil) == 'ore', 'idle: most cycles in stock wins')
+
+    local deficitOnly, surplusOnly = { mode = 'deficit' }, { mode = 'surplus' }
+    check(plan.choose(states(100, 60, 1000), nil, deficitOnly) == nil, 'deficit mode: no surplus')
+    check(plan.choose(states(70, 60, 1000), nil, deficitOnly) == 'glue', 'deficit mode: deficit runs')
+    check(plan.choose(states(70, 60, 1000), nil, surplusOnly) == 'plat', 'surplus mode: no deficit')
+    check(plan.choose(states(70, 60, 1000), 'plat', surplusOnly) == 'plat',
+        'surplus mode: running surplus does not yield to a deficit')
+    check(plan.choose(states(70, 60, 1000), 'glue', surplusOnly) == 'plat',
+        'surplus mode: a running deficit is not kept')
+    check(plan.choose(states(100, 60, 1000), 'plat', deficitOnly) == nil,
+        'deficit mode: a running surplus is not kept')
+
+    local _, problems = plan.evaluate(twoModes(), fluids({ Glue = 100 }), nil)
+    check(#problems == 2 and problems[1]:find('not read'), 'unread source network is an error')
+
+    local r = { glue = { trigger = 'deficit', catalysts = 1,
+        inputs = { { item = 'Dust', amount = 10 } },
+        outputs = { { fluid = 'Glue', circuit = 1, target = 100 } } } }
+    assert(#config.normalize(r) == 0)
+    local function deficit(dust, current)
+        local source = resource.snapshot({ { label = 'Dust', name = 'd', damage = 0, size = dust } })
+        return plan.choose((plan.evaluate(r, fluids({ Glue = 10 }), source)), current)
+    end
+    check(deficit(10) == 'glue', 'deficit with inputs: one cycle is enough to start')
+    check(deficit(9) == nil and deficit(9, 'glue') == nil, 'deficit without raw materials: never runs')
 end
 
 -- runner with fakes

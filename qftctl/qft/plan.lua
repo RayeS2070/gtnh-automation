@@ -54,6 +54,13 @@ function plan.usePlasma(a)
         verdict, a.stock, need, rate, seconds)
 end
 
+-- Surplus recipes run on raw materials: they may start with stock for startCycles cycles and
+-- stop below stopCycles. A running one hands the machine to another surplus recipe only when
+-- that one has surplusSwitchRatio times more cycles in stock: every switch costs a stop.
+plan.defaults.startCycles = 2
+plan.defaults.stopCycles = 1
+plan.defaults.surplusSwitchRatio = 2
+
 ---@class qft.OutputState
 ---@field resource qft.Resource
 ---@field circuit integer
@@ -62,54 +69,122 @@ end
 ---@field urgency number # 1 - ratio^priority: 0 when full, 1 when empty.
 
 ---@class qft.RecipeState
----@field outputs qft.OutputState[] # Tracked outputs only (the ones with a target).
----@field urgency number # Max urgency over the tracked outputs; 0 when nothing is tracked.
----@field low boolean # Some tracked output is below startRatio * target: the recipe may start.
----@field done boolean # Every tracked output reached its target: a running recipe stops.
----@field focus integer? # Circuit of the most urgent output, the Neptunium target later on.
+---@field trigger qft.Trigger
+---@field outputs qft.OutputState[] # Tracked outputs only (deficit recipes, the ones with a target).
+---@field urgency number # Deficit: max urgency over the tracked outputs; 0 when nothing is tracked.
+---@field cycles number? # Cycles the raw materials in stock cover; nil when inputs are not tracked.
+---@field low boolean # The recipe may start.
+---@field done boolean # A running recipe stops.
+---@field weights table<integer, number> # Per circuit: how much each output is wanted (Neptunium).
 
----@param recipes table<string, qft.Recipe> # Outputs carry `resource` (see config.normalize).
----@param snap qft.Snapshot # The products network.
----@param opts { startRatio: number }?
+---How many cycles the stock of every input covers: the scarcest input decides.
+---@param recipe qft.Recipe
+---@param source qft.Snapshot?
+---@return number? cycles # nil on error.
+---@return string? err
+---@return string[] missing # Inputs absent from the network (counted as 0).
+local function inputCycles(recipe, source)
+    local missing = {}
+    if not source then
+        return nil, 'source network was not read', missing
+    end
+    local cycles = math.huge
+    for _, input in ipairs(recipe.inputs) do
+        local amount, err, absent = resource.amount(source, input.resource)
+        if not amount then
+            return nil, err, missing
+        end
+        if absent then
+            missing[#missing + 1] = resource.describe(input.resource)
+        end
+        cycles = math.min(cycles, amount / (input.amount * recipe.catalysts))
+    end
+    return cycles, nil, missing
+end
+
+---@param recipe qft.Recipe
+---@param production qft.Snapshot
+---@param st qft.RecipeState
+---@param startRatio number
+---@param missing string[] # Appended to.
+---@return string? err
+local function evaluateOutputs(recipe, production, st, startRatio, missing)
+    for _, out in ipairs(recipe.outputs) do
+        if out.target then
+            local amount, err, absent = resource.amount(production, out.resource)
+            if not amount then
+                return err
+            end
+            if absent then
+                missing[#missing + 1] = resource.describe(out.resource)
+            end
+            local ratio = math.min(amount / out.target, 1)
+            local urgency = 1 - ratio ^ (out.priority or 1)
+            st.outputs[#st.outputs + 1] = {
+                resource = out.resource, circuit = out.circuit,
+                amount = amount, target = out.target, urgency = urgency,
+            }
+            st.weights[out.circuit] = urgency
+            if amount < out.target then
+                st.done = false
+            end
+            if amount < startRatio * out.target then
+                st.low = true
+            end
+            st.urgency = math.max(st.urgency, urgency)
+        end
+    end
+    return nil
+end
+
+---Two kinds of recipes (`trigger`):
+---  deficit: maintains stock of products. Starts when a tracked output fell below
+---           startRatio * target, runs until every tracked output reached its target.
+---           If it has inputs, it needs raw materials for one cycle to start and to keep going.
+---  surplus: processes raw materials. Starts with stock for startCycles cycles, runs until
+---           less than stopCycles is left. Output `weight` says what Neptunium should favour.
+---@param recipes table<string, qft.Recipe> # Outputs and inputs carry `resource` (config.normalize).
+---@param production qft.Snapshot # The products network.
+---@param source qft.Snapshot? # The raw materials network; needed by recipes with inputs.
+---@param opts table?
 ---@return table<string, qft.RecipeState> states
----@return string[] problems # Ambiguous labels; such a recipe is treated as done.
----@return string[] missing # Tracked resources absent from the network (counted as 0).
-function plan.evaluate(recipes, snap, opts)
-    local startRatio = (opts and opts.startRatio) or plan.defaults.startRatio
+---@return string[] problems # Ambiguous labels and the like; such a recipe never runs.
+---@return string[] missing # Tracked resources absent from a network (counted as 0).
+function plan.evaluate(recipes, production, source, opts)
+    opts = opts or plan.defaults
+    local startRatio = opts.startRatio or plan.defaults.startRatio
+    local startCycles = opts.startCycles or plan.defaults.startCycles
+    local stopCycles = opts.stopCycles or plan.defaults.stopCycles
     local states, problems, missing = {}, {}, {}
 
     for id, recipe in pairs(recipes) do
-        local st = { outputs = {}, urgency = 0, low = false, done = true }
-        local broken = false
-        for _, out in ipairs(recipe.outputs) do
-            if out.target then
-                local amount, err, absent = resource.amount(snap, out.resource)
-                if not amount then
-                    problems[#problems + 1] = ('%s: %s'):format(id, err)
-                    broken = true
-                else
-                    if absent then
-                        missing[#missing + 1] = resource.describe(out.resource)
-                    end
-                    local ratio = math.min(amount / out.target, 1)
-                    local urgency = 1 - ratio ^ (out.priority or 1)
-                    st.outputs[#st.outputs + 1] = {
-                        resource = out.resource, circuit = out.circuit,
-                        amount = amount, target = out.target, urgency = urgency,
-                    }
-                    if amount < out.target then
-                        st.done = false
-                    end
-                    if amount < startRatio * out.target then
-                        st.low = true
-                    end
-                    if urgency > st.urgency or not st.focus then
-                        st.urgency, st.focus = urgency, out.circuit
-                    end
-                end
+        local trigger = recipe.trigger or 'deficit'
+        local st = { trigger = trigger, outputs = {}, urgency = 0, low = false, done = true,
+            weights = {} }
+        local err
+        if recipe.inputs then
+            local inputMissing
+            st.cycles, err, inputMissing = inputCycles(recipe, source)
+            for _, m in ipairs(inputMissing) do
+                missing[#missing + 1] = m
             end
         end
-        if broken then
+        if not err and trigger == 'surplus' then
+            for _, out in ipairs(recipe.outputs) do
+                st.weights[out.circuit] = out.weight or 0
+            end
+            -- Inputs are required for surplus recipes (config.checkValues).
+            st.low = (st.cycles or 0) >= startCycles
+            st.done = (st.cycles or 0) < stopCycles
+        elseif not err then
+            err = evaluateOutputs(recipe, production, st, startRatio, missing)
+            if st.cycles and st.cycles < stopCycles then
+                -- Nothing to make it from: a start would only stall the machine.
+                st.low, st.done = false, true
+            end
+        end
+        if err then
+            problems[#problems + 1] = ('%s: %s'):format(id, err)
             -- Wrong numbers are worse than none: never start it, stop it if it runs.
             st.low, st.done = false, true
         end
@@ -120,25 +195,67 @@ function plan.evaluate(recipes, snap, opts)
     return states, problems, missing
 end
 
----Which recipe should run now; nil means stop the QFT.
----The running recipe keeps going until done; otherwise the most urgent low recipe wins.
+---The low recipe of a trigger with the highest score; ties go to the smaller id,
+---so pairs() order never decides.
 ---@param states table<string, qft.RecipeState>
----@param current string? # Recipe running now.
+---@param trigger qft.Trigger
 ---@return string?
-function plan.choose(states, current)
-    local cur = current and states[current]
-    if cur and not cur.done then
-        return current
-    end
-    local best, bestUrgency
+local function best(states, trigger)
+    local bestId, bestScore
     for id, st in pairs(states) do
-        -- Ties go to the smaller id: pairs() order must not decide.
-        if st.low and (best == nil or st.urgency > bestUrgency
-                or (st.urgency == bestUrgency and id < best)) then
-            best, bestUrgency = id, st.urgency
+        if st.low and st.trigger == trigger then
+            local score = trigger == 'surplus' and st.cycles or st.urgency
+            if bestId == nil or score > bestScore or (score == bestScore and id < bestId) then
+                bestId, bestScore = id, score
+            end
         end
     end
-    return best
+    return bestId
+end
+
+---Which triggers a mode lets run: 'auto' maintains products first and processes raw materials
+---when nothing is short; 'deficit' and 'surplus' run only recipes of that trigger.
+---@alias qft.Mode 'auto' | 'deficit' | 'surplus'
+plan.modes = {
+    auto = { deficit = true, surplus = true },
+    deficit = { deficit = true },
+    surplus = { surplus = true },
+}
+
+---Which recipe should run now; nil means stop the QFT.
+---Maintaining products comes first: the most urgent low deficit recipe wins, and a running
+---deficit recipe keeps going until done. Only when no product is short, surplus recipes
+---process raw materials; a running one yields to any deficit, or to a surplus recipe with
+---far more stock (surplusSwitchRatio). `opts.mode` limits which triggers may run.
+---@param states table<string, qft.RecipeState>
+---@param current string? # Recipe running now.
+---@param opts { mode: qft.Mode?, surplusSwitchRatio: number? }?
+---@return string?
+function plan.choose(states, current, opts)
+    local switchRatio = (opts and opts.surplusSwitchRatio) or plan.defaults.surplusSwitchRatio
+    local allowed = plan.modes[(opts and opts.mode) or 'auto']
+    local cur = current and states[current]
+    if cur and not allowed[cur.trigger] then
+        cur = nil
+    end
+    if cur and not cur.done and cur.trigger ~= 'surplus' then
+        return current
+    end
+    local deficit = allowed.deficit and best(states, 'deficit') or nil
+    if deficit then
+        return deficit
+    end
+    if not allowed.surplus then
+        return nil
+    end
+    local surplus = best(states, 'surplus')
+    if cur and not cur.done then
+        if surplus and surplus ~= current and states[surplus].cycles >= cur.cycles * switchRatio then
+            return surplus
+        end
+        return current
+    end
+    return surplus
 end
 
 plan.defaults.focusOnGain = 0.10 -- enable Neptunium when the best focus beats no focus by 10%

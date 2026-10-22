@@ -3,9 +3,8 @@
 An OpenComputers program that controls a **Quantum Force Transformer** (QFT) in the
 GregTech: New Horizons modpack.
 
-> **Status:** the foundation is in place — configuration and setup mode work. The control loop
-> itself (watching stock levels and switching recipes) is not written yet; `main` without
-> arguments only checks that everything is configured.
+> **Status:** setup, both modes (maintaining products and processing raw materials) and plasma
+> focusing are written and tested locally. See [Not verified in game yet](#not-verified-in-game-yet).
 
 ## Why setup is needed
 
@@ -53,20 +52,37 @@ the current directory.
 | --- | --- |
 | `main setup` | Binds every component that is not bound yet, or whose saved address is gone. Already bound components are kept. |
 | `main setup --all` | Binds every component again from scratch, ignoring saved addresses. |
-| `main` | Normal mode. Checks the configuration and the saved addresses (if something is not bound, lists it and asks you to run `main setup`), then maintains the targets until Ctrl+C. |
-| `main --debug` | Normal mode with per-tick output: the fill level of every tracked output. |
+| `main` | Normal mode (`--mode=auto`): maintains products first and processes raw materials when nothing is short. Checks the configuration and the saved addresses (if something is not bound, lists it and asks you to run `main setup`), then runs the QFT until Ctrl+C. |
+| `main --mode=deficit` | Only maintains products: surplus recipes never run. |
+| `main --mode=surplus` | Only processes raw materials: deficit recipes never run, a running surplus recipe never yields. |
+| `main --debug` | Normal mode with per-tick output: the fill level of every tracked output and the cycles of raw materials in stock. |
 
 ### How normal mode works
 
-Every 10 seconds the program reads the fluids of the products network and decides which recipe
-should run:
+Every 10 seconds the program reads the products and raw materials networks and decides which
+recipe should run. Each recipe has a `trigger`, and the program works in one of two modes:
+
+**Maintaining products** (`trigger = 'deficit'`) comes first:
 
 - A recipe **starts** when one of its tracked outputs fell below 80% of its `target`.
 - A running recipe **keeps going** until every tracked output reaches its `target`. Without
   this gap the QFT would switch on and off around the target on every poll.
 - If several recipes are low, the most urgent one wins. Urgency of an output is
   `1 - (amount / target) ^ priority`.
-- If nothing is needed, the QFT stops.
+- If the recipe has `inputs`, it needs raw materials for one cycle to start and to keep going.
+
+**Processing raw materials** (`trigger = 'surplus'`) takes the machine while no product is short:
+
+- A recipe **starts** when its inputs in the raw materials network cover 2 cycles, and
+  **stops** when less than 1 cycle is left. A cycle takes `amount × catalysts` of every input;
+  the scarcest input decides.
+- If several recipes can start, the one with the most cycles in stock wins. A running one
+  hands the machine to another surplus recipe only when that one has twice as many cycles:
+  each switch costs a stop.
+- As soon as some product is short, the running surplus recipe finishes its cycle and the
+  machine switches to maintaining products.
+
+If nothing is needed, the QFT stops. The log says when the mode changes.
 
 Switching is safe for plasma. The program stops the controller (`setWorkAllowed(false)`: the
 current cycle finishes, no new one starts) and waits until the machine is inactive. Only
@@ -85,7 +101,9 @@ When the stock gets too low, the recipe finishes its cycle and restarts without 
 QFT never runs dry mid-cycle, because that would shut it down until a manual restart.
 **Neptunium Plasma.** Neptunium moves probability between outputs, it adds none, so it
 pays only when the outputs are needed unequally. For every option (no focus, focus on each
-output) the program computes `Σ urgency × chance`, with the chances ported from the QFT source.
+output) the program computes `Σ weight × chance`, with the chances ported from the QFT source.
+The weight of an output is its urgency when maintaining products, and its `weight` from the
+config when processing raw materials.
 Neptunium goes on when the best focus beats no focus by 10% and the stock is enough (same
 rule as Fermium). It stays on while the focus still beats no focus by 5%. The focus moves
 to another output when that output beats it by 10%.
@@ -146,7 +164,7 @@ The configuration is split into three files. You edit them by hand; the program 
 | --- | --- |
 | `config/ids.lua` | Recipe identifiers. They link the two files below. |
 | `config/components.lua` | Which components the setup needs and how to find them. |
-| `config/recipes.lua` | Recipe data for craft calculations: outputs and target amounts. |
+| `config/recipes.lua` | Recipe data: trigger, inputs, outputs, targets and weights. |
 
 ### Components
 
@@ -168,14 +186,37 @@ network = {
 
 ### Recipes
 
+A recipe that maintains products:
+
 ```lua
 [RecipeId.RubberPolymer] = {
     name = 'Rubber Polymer',
+    trigger = 'deficit',
     tier = 1,      -- recipe tier (pulse manipulator tier that unlocks it)
     catalysts = 8, -- catalysts in the bulk catalyst housing = parallels
     outputs = {
         { fluid = 'Molten Silicone Rubber', circuit = 1, target = 10e9, priority = 1 }, -- 10e9 mB
         { fluid = 'Molten Rubber',          circuit = 4 },                -- no target: not tracked
+    },
+},
+```
+
+A recipe that processes raw materials:
+
+```lua
+[RecipeId.PlatinumGroup] = {
+    name = 'Platinum Group',
+    trigger = 'surplus',
+    tier = 1,
+    catalysts = 1,
+    inputs = {
+        { item = 'Platinum Metallic Powder Dust', amount = 32 }, -- per parallel per cycle
+    },
+    outputs = {
+        { fluid = 'Molten Platinum',  circuit = 1, weight = 2 },
+        { fluid = 'Molten Palladium', circuit = 2, weight = 1 },
+        { fluid = 'Molten Iridium',   circuit = 3 },             -- no weight: not wanted
+        -- ... every output, see `circuit` below
     },
 },
 ```
@@ -187,10 +228,20 @@ only by NBT are reported as ambiguous. AE2FC fluid drops are ignored. The produc
 is asked for items only when some tracked output is an item.
 
 `circuit` is the position of the output in NEI: the programmed circuit number that focuses it
-with Neptunium. An output without `target` is not tracked. `priority` (default 1) shapes how
-urgent a tracked output is at the same fill level: higher means more urgent.
+with Neptunium.
 
-A recipe without `inputs` is treated as supplied without limit — its inputs are not tracked.
+| Field | Trigger | Meaning |
+| --- | --- | --- |
+| `target` | deficit | Amount to keep in the products network. An output without `target` is not tracked; at least one output needs it. |
+| `priority` | deficit | Default 1. Shapes how urgent a tracked output is at the same fill level: higher means more urgent. |
+| `weight` | surplus | How much the output is wanted, for Neptunium. Only the ratio between outputs matters; absent means 0. Equal weights mean Neptunium never pays. |
+
+A field of the other trigger is an error: it usually means the trigger is wrong.
+
+`inputs` is a list of raw materials in the source network, described like outputs plus
+`amount`: how much one parallel takes per cycle, in pieces or mB as in NEI. A surplus recipe
+needs `inputs`. For a deficit recipe they are optional: without them it is treated as
+supplied without limit.
 
 ### Adding a recipe
 
@@ -199,7 +250,7 @@ A recipe goes into three places:
 1. `config/ids.lua` — add an id: `MyRecipe = 'my_recipe'`.
 2. `config/components.lua` — under `recipes`, add `[RecipeId.MyRecipe] = { bus = bind.manual{...} }`
    (plus `hatch = bind.manual{...}` if the recipe has fluid inputs).
-3. `config/recipes.lua` — add `[RecipeId.MyRecipe] = { name, tier, catalysts, outputs = { ... } }`.
+3. `config/recipes.lua` — add `[RecipeId.MyRecipe] = { name, trigger, tier, catalysts, inputs, outputs }`.
 
 Then run `main setup` to bind the new bus/hatch. If you forget one of the files, the program
 tells you which recipe is missing where; a mistyped `RecipeId.X` stops it with
@@ -225,6 +276,9 @@ tells you which recipe is missing where; a mistyped `RecipeId.X` stops it with
 - Whether a stocking bus/hatch starts supplying fast enough after `setWorkAllowed(true)` for
   the QFT to pick the recipe up. The program warns if the machine stays inactive for 2 minutes
   while a recipe should run.
+- Both modes, and switching between them. In particular that the stock in the raw materials
+  network drops while a surplus recipe runs: the stocking bus pulls from it.
+- Whether `amount × catalysts` per cycle matches what the QFT really takes for Platinum Group.
 
 ## Development
 
