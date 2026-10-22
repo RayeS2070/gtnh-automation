@@ -1,0 +1,10 @@
+# IDE
+.vscode/
+
+# AI agents (instructions are kept locally, not published)
+AGENTS.md
+CLAUDE.md
+
+# Python (maintainer)
+.venv/
+__pycache__/

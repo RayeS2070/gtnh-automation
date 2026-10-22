@@ -1,0 +1,6 @@
+[submodule "assets"]
+	path = assets
+	url = https://github.com/ShadowTheAge/gtnh.git
+[submodule "gtnh"]
+	path = gtnh
+	url = https://github.com/Navatusein/GTNH-OC-Lua-Documentation.git
