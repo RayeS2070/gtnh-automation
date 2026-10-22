@@ -42,21 +42,23 @@ and tries again at the next check.
 
 ## Installation
 
-With an internet card, in the OpenOS shell:
+Install with the [repository installer](../README.md#installing-in-game) and start the program:
 
 ```sh
-wget https://raw.githubusercontent.com/RayeS2070/gtnh-automation/devel/nanoresinctl/main.lua nanoresinctl.lua
-nanoresinctl
+gtnh-install nanoresinctl
+cd /home/nanoresinctl
+main
 ```
 
 Without an internet card, copy `main.lua` into the computer's folder in your world save
-(`saves/<world>/opencomputers/<disk address>/home/`).
+(`saves/<world>/opencomputers/<disk address>/home/nanoresinctl/`).
 
 Press **Ctrl+C** to stop the program.
 
 ## Configuration
 
-Edit the top of `main.lua`.
+Edit the top of `main.lua`. The installer replaces `main.lua` on every update, so your
+changes are lost after `gtnh-install nanoresinctl`.
 
 ### Settings
 

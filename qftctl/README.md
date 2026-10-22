@@ -26,20 +26,14 @@ to know which is which, and which stocking hatch holds which plasma. So you tell
 
 ## Installation
 
-The computer needs an **Internet Card**, and the server must allow HTTP in the OpenComputers
-config (it does by default). Download the installer once and run it:
+Install with the [repository installer](../README.md#installing-in-game):
 
 ```
-wget -f https://raw.githubusercontent.com/RayeS2070/gtnh-automation/devel/qftctl/tools/install.lua /home/install.lua
-/home/install.lua
+gtnh-install qftctl
 ```
 
-| Command | What it does |
-| --- | --- |
-| `install` | Installs into `/home/qftctl`, or updates an existing installation. |
-| `install <dir>` | Installs into another directory. |
-| `install --config` | Also overwrites the files in `config/` with the ones from the repository. |
-| `install --branch=<name>` | Downloads from another branch instead of `devel`. |
+This installs into `/home/qftctl`, or updates an existing installation. `gtnh-install qftctl --config`
+also overwrites the files in `config/` with the ones from the repository.
 
 The program code is always replaced. The files in `config/` are downloaded only when they are
 missing: they hold your setup, so an update does not touch them unless you pass `--config`.
@@ -47,9 +41,6 @@ If a kept file differs from the repository version, the installer says so
 (`kept config/components.lua (DIFFERS from the repository, ...)`) — check what changed
 upstream before replacing it, your own edits would be lost.
 Saved component addresses (`/etc/qftctl.bindings`) are never touched by the installer.
-
-GitHub caches downloaded files for a few minutes, so an update right after a push may still
-fetch the old version.
 
 Without an Internet Card, copy `main.lua`, `config/` and `qft/` into one directory by hand.
 

@@ -12,6 +12,45 @@
 
 Each project has its own README with installation and usage.
 
+## Installing in game
+
+The computer needs an **Internet Card**, and the server must allow HTTP in the OpenComputers
+config (it does by default). Copy [tools/gtnh-install.lua](tools/gtnh-install.lua) once to
+`/home/bin/gtnh-install.lua` on the computer: `/home/bin` is on the OpenOS `PATH`. It is called
+`gtnh-install`, because `install` is a built-in OpenOS command.
+
+### Private repository
+
+While the repository is private, GitHub needs a token. Create a fine-grained personal access
+token with access to this repository only and the single permission **Contents: Read-only**.
+Put it on the computer as the only line of `/etc/gtnh-install.token` (`edit` the file and paste
+with Insert). The installer sends it with every request.
+
+Anyone who can open this computer can read the token, so give it nothing beyond read access
+and a short expiration.
+
+### Usage
+
+Install or update any project that has a `manifest.lua`:
+
+| Command | What it does |
+| --- | --- |
+| `gtnh-install <project>` | Installs into `/home/<project>`, or updates an existing installation. |
+| `gtnh-install <project> <dir>` | Installs into another directory. |
+| `gtnh-install <project> --config` | Also overwrites the project's config files with the ones from the repository. |
+| `gtnh-install <project> --branch=<name>` | Downloads from another branch instead of `devel`. |
+
+The program code is always replaced. Config files are downloaded only when they are missing,
+so an update keeps your edits unless you pass `--config`. If a kept file differs from the
+repository version, the installer says so — check what changed upstream before replacing it.
+
+GitHub caches downloaded files for a few minutes, so an update right after a push may still
+fetch the old version.
+
+Each project lists its files in `<project>/manifest.lua`: `code` (replaced on every install),
+`config` (kept) and `run` (the command printed at the end). A new `.lua` file must be added to
+the manifest, or it will not be installed. Check locally with `lua tools/check-manifests.lua`.
+
 ## Known issues
 
 - **pumpingctl does not run.** The script reads `threshold`, `maxBatchSize` and `color` as
