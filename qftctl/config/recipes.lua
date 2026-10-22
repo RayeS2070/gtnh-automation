@@ -78,12 +78,12 @@ return {
         },
         -- TODO: weights are placeholders. Equal weights mean Neptunium never pays.
         outputs = {
-            { fluid = 'Molten Platinum',  circuit = 1, weight = 1 },
-            { fluid = 'Molten Palladium', circuit = 2, weight = 1 },
-            { fluid = 'Molten Iridium',   circuit = 3, weight = 1 },
-            { fluid = 'Molten Osmium',    circuit = 4, weight = 1 },
-            { fluid = 'Molten Rhodium',   circuit = 5, weight = 1 },
-            { fluid = 'Molten Ruthenium', circuit = 6, weight = 1 }
+            { fluid = 'Molten Platinum',  circuit = 1, weight = 100 },
+            { fluid = 'Molten Palladium', circuit = 2, weight = 100 },
+            { fluid = 'Molten Iridium',   circuit = 3, weight = 200 },
+            { fluid = 'Molten Osmium',    circuit = 4, weight = 200 },
+            { fluid = 'Molten Rhodium',   circuit = 5, weight = 50 },
+            { fluid = 'Molten Ruthenium', circuit = 6, weight = 50 }
         }
     }
 }
