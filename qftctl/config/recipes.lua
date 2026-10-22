@@ -38,8 +38,8 @@ return {
             { item = 'Hyper-Stable Self-Healing Adhesive', circuit = 1, target = 4096, priority = 3 },
             { fluid = 'Ethyl Cyanoacrylate (Super Glue)',  circuit = 2, priority = 1 },
             { fluid = 'Advanced Glue',                     circuit = 3, priority = 1 },
-            { fluid = 'Molten Indalloy 140',               circuit = 4, target = 10e6, priority = 2 },
-            { fluid = 'Molten Soldering Alloy',            circuit = 5, target = 10e6, priority = 1 }
+            { fluid = 'Molten Indalloy 140',               circuit = 4, target = 1e8, priority = 2 },
+            { fluid = 'Molten Soldering Alloy',            circuit = 5, target = 1e7, priority = 1 }
         }
     },
     [RecipeId.RubberPolymer] = {
