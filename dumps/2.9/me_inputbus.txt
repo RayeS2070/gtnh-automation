@@ -1,0 +1,26 @@
+type	me_inputbus	(ME Advanced Stocking Input Bus)
+setConfiguration	function(slot:number[, detail:table]):boolean -- Configures the ME input bus.
+getConfiguration	function(slot:number):table -- Returns the item configured for the specified slot.
+getSlotSize	function():number -- Returns the number of slots this input bus can be configured for.
+setAutoPull	function(enabled:boolean):boolean -- Sets whether this input bus enables the auto-pull feature.
+getAutoPull	function():boolean -- Returns whether this input bus enables the auto-pull feature.
+setMinAmount	function(min:number):boolean -- Sets the minimum amount of this input bus.
+getMinAmount	function():number -- Returns the minimum amount of this input bus.
+setRefreshTime	function(ticks:number):boolean -- Sets the slot refresh time of this input bus.
+getRefreshTime	function():number -- Returns the slot refresh time of this input bus.
+setAdditionalConnection	function(enabled:boolean):boolean -- Sets whether ME channels can connect to any side.
+getAdditionalConnection	function():boolean -- Returns whether ME channels can connect to any side.
+isAdvanced	function():boolean -- Returns whether this is the advanced variant of the input bus.
+setCircuitConfiguration	function(config:number):boolean or (nil, string); Sets the circuit configuration. Use -1 to remove circuit. Returns true on success.
+getCircuitConfiguration	function():number; Gets the circuit configuration. Returns -1 if no circuit or not applicable.
+setWorkAllowed	function(work:boolean); Sets whether this block is currently allowed to work
+isWorkAllowed	function():boolean; Returns whether this block is currently allowed to work
+isMachineActive	function():boolean; Returns whether the machine is currently active
+hasWork	function():boolean; Returns true if the machine currently has work to do
+getWorkProgress	function():number; Returns the current progress of this block
+getWorkMaxProgress	function():number; Returns the max progress of this block
+getName	function():string; Returns the machine's name
+getCoordinates	function():table; Returns machine coordinates
+getOwnerName	function():string; Returns the name of this block's owner
+getSensorInformation	function():table; Returns sensor information about this block
+(+ the usual gt_machine energy/steam getters)
