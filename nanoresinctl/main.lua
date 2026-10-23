@@ -12,7 +12,7 @@ local const = {
     Event = {
         kInterrupted = 'interrupted'
     },
-    kBunledOutSide = sides.down,
+    kBundledOutSide = sides.down,
     kBundledOff = 0,
     kBundledOn = 255,
     Colors = {
@@ -23,13 +23,21 @@ local const = {
     }
 }
 
-local function log_debug(...)
+local function logDebug(...)
     if const.kDebug then
         print(...)
     end
 end
 
+---@class nanoresin.Fluid
+---@field label string # Exactly as getFluidsInNetwork reports it.
+---@field target number # mB to keep in stock.
+---@field priority number # Urgency exponent: higher = more urgent at the same fill level.
+---@field color integer # Bundled redstone color that turns its production on.
+---@field amount number? # mB in the network, set by the program on every check.
+
 -- The order of this list is the order of the dashboard rows
+---@type nanoresin.Fluid[]
 local fluids = {
     { label = 'Molten Samarium', target = 1e10, priority = 1, color = colors.white },
     { label = 'Molten Lanthanum', target = 1e10, priority = 2, color = colors.orange },
@@ -42,115 +50,143 @@ local fluids = {
     { label = 'Molten Europium', target = 1e10, priority = 2, color = colors.silver },
 }
 
-local fluids_by_label = {}
+---@type table<string, nanoresin.Fluid>
+local fluidsByLabel = {}
 for _, fluid in ipairs(fluids) do
     fluid.amount = 0
-    fluids_by_label[fluid.label] = fluid
+    fluidsByLabel[fluid.label] = fluid
 end
 
 local me = component.me_controller
 local rs = component.redstone
 
-local function fill_ratio(fluid)
+---@param fluid nanoresin.Fluid
+---@return number
+local function fillRatio(fluid)
     return fluid.amount / fluid.target
 end
 
-local function is_low(fluid)
-    return fill_ratio(fluid) < const.kThreshold
+---@param fluid nanoresin.Fluid
+---@return boolean
+local function isLow(fluid)
+    return fillRatio(fluid) < const.kThreshold
 end
 
+---@param fluid nanoresin.Fluid
+---@return number
 local function urgency(fluid)
-    return 1 - fill_ratio(fluid) ^ fluid.priority
+    return 1 - fillRatio(fluid) ^ fluid.priority
 end
 
+---@param fluid nanoresin.Fluid
+---@return number
 local function emptiness(fluid)
-    return 1 - fill_ratio(fluid)
+    return 1 - fillRatio(fluid)
 end
 
--- Returns the fluid with the highest rate among those passing the filter (all fluids if there is no filter)
-local function select_best(rate, filter)
-    local best, best_rate
+---Returns the fluid with the highest rate among those passing the filter (all fluids if there is no filter).
+---@param rate fun(fluid: nanoresin.Fluid): number
+---@param filter (fun(fluid: nanoresin.Fluid): boolean)?
+---@return nanoresin.Fluid?
+local function selectBest(rate, filter)
+    local best, bestRate
     for _, fluid in ipairs(fluids) do
         if filter == nil or filter(fluid) then
-            local fluid_rate = rate(fluid)
-            log_debug(fluid.label, fluid.amount, fluid_rate)
-            if best == nil or fluid_rate > best_rate then
-                best, best_rate = fluid, fluid_rate
+            local fluidRate = rate(fluid)
+            logDebug(fluid.label, fluid.amount, fluidRate)
+            if best == nil or fluidRate > bestRate then
+                best, bestRate = fluid, fluidRate
             end
         end
     end
     return best
 end
 
-local function reload_fluids()
-    log_debug('reload_fluids')
-    for _, fluid in ipairs(fluids) do fluid.amount = 0 end
+local function reloadFluids()
+    logDebug('reloadFluids')
+    for _, fluid in ipairs(fluids) do
+        fluid.amount = 0
+    end
 
     for _, stack in ipairs(me.getFluidsInNetwork()) do
-        local fluid = fluids_by_label[stack.label]
+        local fluid = fluidsByLabel[stack.label]
         if fluid then
             fluid.amount = stack.amount
         end
     end
 end
 
-local function set_redstone(color)
+---@param color integer
+local function setRedstone(color)
     -- with the side only it returns all colors of the side, the stubs miss this overload
-    local outputs = rs.getBundledOutput(const.kBunledOutSide) --[[@as table<integer, integer>]]
+    local outputs = rs.getBundledOutput(const.kBundledOutSide) --[[@as table<integer, integer>]]
 
     -- turn the others off first, so two fluids are never enabled at once
     for clr, value in pairs(outputs) do
         if clr ~= color and value ~= const.kBundledOff then
-            rs.setBundledOutput(const.kBunledOutSide, clr, const.kBundledOff)
+            rs.setBundledOutput(const.kBundledOutSide, clr, const.kBundledOff)
         end
     end
     if outputs[color] ~= const.kBundledOn then
-        rs.setBundledOutput(const.kBunledOutSide, color, const.kBundledOn)
+        rs.setBundledOutput(const.kBundledOutSide, color, const.kBundledOn)
     end
 
-    log_debug('Selected color: ', colors[color])
+    logDebug('Selected color: ', colors[color])
 end
 
-local function format_amount(amount)
+---@param amount number
+---@return string
+local function formatAmount(amount)
     local kSuffixes = { '', 'k', 'M', 'G', 'T', 'P', 'E' }
     local i = 1
     while amount >= 1000 and i < #kSuffixes do
         amount = amount / 1000
         i = i + 1
     end
-    return string.format('%.1f%s', amount, kSuffixes[i])
+    return ('%.1f%s'):format(amount, kSuffixes[i])
 end
 
-local function pad_left(str, width)
-    return string.rep(' ', width - unicode.len(str)) .. str
+---@param str string
+---@param width integer
+---@return string
+local function padLeft(str, width)
+    return (' '):rep(width - unicode.len(str)) .. str
 end
 
-local function pad_right(str, width)
-    return str .. string.rep(' ', width - unicode.len(str))
+---@param str string
+---@param width integer
+---@return string
+local function padRight(str, width)
+    return str .. (' '):rep(width - unicode.len(str))
 end
 
-local function make_bar(ratio, width, color)
+---@param ratio number
+---@param width integer
+---@param color string # ANSI color sequence.
+---@return string
+local function makeBar(ratio, width, color)
     local filled = math.min(width, math.ceil(width * ratio))
-    return color .. string.rep('■', filled) .. string.rep('□', width - filled) .. const.Colors.kNone
+    return color .. ('■'):rep(filled) .. ('□'):rep(width - filled) .. const.Colors.kNone
 end
 
-local function print_dashboard(active_fluid)
-    local _, _, screen_width = term.getGlobalArea()
+---@param activeFluid nanoresin.Fluid
+local function printDashboard(activeFluid)
+    local _, _, screenWidth = term.getGlobalArea()
 
     local kPercentWidth = 7
     local kAmountWidth = 7
-    local label_width = unicode.len('Fluid')
+    local labelWidth = unicode.len('Fluid')
     for _, fluid in ipairs(fluids) do
-        label_width = math.max(label_width, unicode.len(fluid.label))
+        labelWidth = math.max(labelWidth, unicode.len(fluid.label))
     end
     -- a row is '│' plus ' <cell> │' per column, the bar takes the rest of the screen
-    local bar_width = math.max(5, screen_width - 16 - label_width - kPercentWidth - 2 * kAmountWidth)
-    local widths = { label_width, bar_width, kPercentWidth, kAmountWidth, kAmountWidth }
+    local barWidth = math.max(5, screenWidth - 16 - labelWidth - kPercentWidth - 2 * kAmountWidth)
+    local widths = { labelWidth, barWidth, kPercentWidth, kAmountWidth, kAmountWidth }
 
     local function rule(left, middle, right)
         local parts = {}
         for i, width in ipairs(widths) do
-            parts[i] = string.rep('─', width + 2)
+            parts[i] = ('─'):rep(width + 2)
         end
         return left .. table.concat(parts, middle) .. right
     end
@@ -162,40 +198,40 @@ local function print_dashboard(active_fluid)
     local lines = {
         rule('┌', '┬', '┐'),
         row({
-            pad_right('Fluid', label_width),
-            pad_right('Stock', bar_width),
-            pad_left('%', kPercentWidth),
-            pad_left('Amount', kAmountWidth),
-            pad_left('Target', kAmountWidth),
+            padRight('Fluid', labelWidth),
+            padRight('Stock', barWidth),
+            padLeft('%', kPercentWidth),
+            padLeft('Amount', kAmountWidth),
+            padLeft('Target', kAmountWidth),
         }),
         rule('├', '┼', '┤'),
     }
 
-    local low_count = 0
+    local lowCount = 0
     for _, fluid in ipairs(fluids) do
         local color = const.Colors.kGreen
-        if fluid == active_fluid then
+        if fluid == activeFluid then
             color = const.Colors.kYellow
-        elseif is_low(fluid) then
+        elseif isLow(fluid) then
             color = const.Colors.kCyan
         end
-        if is_low(fluid) then
-            low_count = low_count + 1
+        if isLow(fluid) then
+            lowCount = lowCount + 1
         end
 
-        local ratio = fill_ratio(fluid)
+        local ratio = fillRatio(fluid)
         lines[#lines + 1] = row({
-            pad_right(fluid.label, label_width),
-            make_bar(ratio, bar_width, color),
-            pad_left(string.format('%.1f%%', ratio * 100), kPercentWidth),
-            pad_left(format_amount(fluid.amount), kAmountWidth),
-            pad_left(format_amount(fluid.target), kAmountWidth),
+            padRight(fluid.label, labelWidth),
+            makeBar(ratio, barWidth, color),
+            padLeft(('%.1f%%'):format(ratio * 100), kPercentWidth),
+            padLeft(formatAmount(fluid.amount), kAmountWidth),
+            padLeft(formatAmount(fluid.target), kAmountWidth),
         })
     end
 
     lines[#lines + 1] = rule('└', '┴', '┘')
-    lines[#lines + 1] = string.format(' Producing: %s%s%s   Low: %d/%d   Amounts in mB',
-        const.Colors.kYellow, active_fluid.label, const.Colors.kNone, low_count, #fluids)
+    lines[#lines + 1] = (' Producing: %s%s%s   Low: %d/%d   Amounts in mB'):format(
+        const.Colors.kYellow, activeFluid.label, const.Colors.kNone, lowCount, #fluids)
 
     term.clear()
     for y, line in ipairs(lines) do
@@ -206,14 +242,15 @@ local function print_dashboard(active_fluid)
 end
 
 local function update()
-    reload_fluids()
+    reloadFluids()
 
     -- produce the most urgent low fluid, or the least stocked one when nothing is low
-    local fluid = select_best(urgency, is_low) or select_best(emptiness)
-    set_redstone(fluid.color)
+    local fluid = selectBest(urgency, isLow) or selectBest(emptiness)
+    ---@cast fluid nanoresin.Fluid
+    setRedstone(fluid.color)
 
     if not const.kDebug then
-        print_dashboard(fluid)
+        printDashboard(fluid)
     end
 end
 

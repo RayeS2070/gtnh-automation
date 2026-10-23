@@ -66,7 +66,7 @@ changes are lost after `gtnh-install nanoresinctl`.
 | --- | --- | --- |
 | `kDuration` | `600` | Seconds between checks |
 | `kThreshold` | `0.8` | A fluid counts as low below this share of its target |
-| `kBunledOutSide` | `sides.down` | Side where the bundled redstone output is |
+| `kBundledOutSide` | `sides.down` | Side where the bundled redstone output is |
 | `kDebug` | `false` | Print debug logs instead of the dashboard |
 
 ### Fluids
