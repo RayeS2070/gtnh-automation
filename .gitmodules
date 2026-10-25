@@ -4,3 +4,6 @@
 [submodule "gtnh"]
 	path = gtnh
 	url = https://github.com/Navatusein/GTNH-OC-Lua-Documentation.git
+[submodule "gt5unofficial"]
+	path = gt5unofficial
+	url = https://github.com/GTNewHorizons/GT5-Unofficial.git
