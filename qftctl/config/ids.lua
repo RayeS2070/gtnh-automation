@@ -5,7 +5,8 @@
 local RecipeId = {
     RubberPolymer = 'rubber_polymer',
     PlatinumGroup = 'platinum_group',
-    AdhesionPromoter = 'adhesion_promoter'
+    AdhesionPromoter = 'adhesion_promoter',
+    SimpleNaquadah = 'simple_naquadah'
 }
 
 -- A missing key in Lua is a silent nil; make a typo like RecipeId.RubberPolymr fail loudly.

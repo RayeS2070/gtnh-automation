@@ -51,8 +51,8 @@ return {
             { item = 'Hyper-Stable Self-Healing Adhesive', circuit = 1, target = 4096, priority = 3 },
             { fluid = 'Ethyl Cyanoacrylate (Super Glue)',  circuit = 2, priority = 1 },
             { fluid = 'Advanced Glue',                     circuit = 3, priority = 1 },
-            { fluid = 'Molten Indalloy 140',               circuit = 4, target = 1e8, priority = 2 },
-            { fluid = 'Molten Soldering Alloy',            circuit = 5, target = 1e7, priority = 1 }
+            { fluid = 'Molten Indalloy 140',               circuit = 4, target = 1e8,  priority = 2 },
+            { fluid = 'Molten Soldering Alloy',            circuit = 5, target = 1e7,  priority = 1 }
         }
     },
     [RecipeId.RubberPolymer] = {
@@ -76,7 +76,6 @@ return {
         inputs = {
             { item = 'Platinum Metallic Powder Dust', amount = 32 },
         },
-        -- TODO: weights are placeholders. Equal weights mean Neptunium never pays.
         outputs = {
             { fluid = 'Molten Platinum',  circuit = 1, weight = 100 },
             { fluid = 'Molten Palladium', circuit = 2, weight = 100 },
@@ -84,6 +83,23 @@ return {
             { fluid = 'Molten Osmium',    circuit = 4, weight = 200 },
             { fluid = 'Molten Rhodium',   circuit = 5, weight = 50 },
             { fluid = 'Molten Ruthenium', circuit = 6, weight = 50 }
+        }
+    },
+    [RecipeId.SimpleNaquadah] = {
+        name = 'Simple Naquadah',
+        trigger = 'surplus',
+        tier = 2, -- wiki
+        catalysts = 1,
+        inputs = {
+            { item = 'Naquadah Oxide Mixture Dust', amount = 32 },
+            { item = 'Sodium Dust',                 amount = 64 },
+            { item = 'Carbon Dust',                 amount = 1 }
+        },
+        outputs = {
+            { item = 'Inert Naquadah Dust', circuit = 1, weight = 500 },
+            { fluid = 'Molten Titanium',    circuit = 2, weight = 100 },
+            { fluid = 'Molten Adamantium',  circuit = 3, weight = 100 },
+            { fluid = 'Molten Gallium',     circuit = 4, weight = 200 },
         }
     }
 }

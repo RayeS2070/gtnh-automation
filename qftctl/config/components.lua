@@ -38,5 +38,9 @@ return {
         [RecipeId.PlatinumGroup] = {
             bus = bind.manual { type = 'gt_machine', prompt = 'Stocking input bus for Platinum Group' },
         },
+        [RecipeId.SimpleNaquadah] = {
+            bus = bind.manual { type = 'gt_machine', prompt = 'Stocking input bus for Simple Naquadah Group' },
+            hatch = bind.manual { type = 'gt_machine', prompt = 'Stocking input hatch for Simple Naquadah Group' },
+        }
     },
 }
