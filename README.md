@@ -8,6 +8,7 @@
 | [qftctl](qftctl/) | Controls a Quantum Force Transformer: picks recipes by stock levels, manages Neptunium/Fermium plasma focusing. |
 | [nanoresinctl](nanoresinctl/) | Keeps molten rare-earth metals stocked in an ME network by switching bundled redstone colors. |
 | [pumpingctl](pumpingctl/) | Space Elevator pump module control (third-party script, being reworked). **Does not run yet**, see below. |
+| [space-mining-calc](space-mining-calc/) | C++ calculator of the best Space Elevator mining module settings. Not an in-game program. |
 | [maintainer](maintainer/) | Work in progress: keeping item stock via AE2 crafting with an external checker service. |
 
 Each project has its own README with installation and usage.
@@ -78,6 +79,8 @@ Submodules (read-only references, not edited here):
   LuaLS type stubs for OpenComputers and GTNH components, plus real component dumps from the game.
   It targets GTNH 2.9.
 - `assets/` — [GTNH Calculator](https://github.com/ShadowTheAge/gtnh): recipe data of the modpack.
+- `gt5unofficial/` — [GT5-Unofficial](https://github.com/GTNewHorizons/GT5-Unofficial): mod sources,
+  read to learn game mechanics.
 
 `.luarc.json` points the Lua language server (the VS Code `Lua` extension by sumneko) at
 `gtnh/lua`, so autocomplete for `component`, `event` and component proxies works in every

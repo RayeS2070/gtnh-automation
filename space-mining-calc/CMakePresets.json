@@ -1,0 +1,178 @@
+{
+  "version": 9,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 30,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CPM_SOURCE_CACHE": "$env{HOME}/.cache/CPM"
+      }
+    },
+    {
+      "name": "ccache",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build_debug/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build_release/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "asan",
+      "hidden": true,
+      "description": "AddressSanitizer + UBSan. The environment reaches build and test runs made through presets, not a binary started by hand.",
+      "binaryDir": "${sourceDir}/build_debug/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SMC_SANITIZE": true
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1",
+        "LSAN_OPTIONS": "verbosity=1:log_threads=1"
+      }
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
+      "inherits": [
+        "base",
+        "ccache"
+      ],
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "inherits": [
+        "base",
+        "ccache"
+      ],
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_LINKER_TYPE": "LLD"
+      }
+    },
+    {
+      "name": "emscripten",
+      "hidden": true,
+      "inherits": [
+        "base"
+      ],
+      "description": "Emscripten toolchain; set EMSCRIPTEN_ROOT to the emscripten directory (/usr/lib/emscripten on Arch, <emsdk>/upstream/emscripten with emsdk).",
+      "toolchainFile": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake"
+    },
+    {
+      "name": "gcc_debug",
+      "displayName": "gcc-debug",
+      "inherits": [
+        "gcc",
+        "debug"
+      ]
+    },
+    {
+      "name": "gcc_release",
+      "displayName": "gcc-release",
+      "inherits": [
+        "gcc",
+        "release"
+      ]
+    },
+    {
+      "name": "clang_debug",
+      "displayName": "clang-debug",
+      "inherits": [
+        "clang",
+        "debug"
+      ]
+    },
+    {
+      "name": "clang_release",
+      "displayName": "clang-release",
+      "inherits": [
+        "clang",
+        "release"
+      ]
+    },
+    {
+      "name": "clang_asan",
+      "displayName": "clang-asan",
+      "inherits": [
+        "clang",
+        "asan"
+      ]
+    },
+    {
+      "name": "wasm_debug",
+      "displayName": "wasm-debug",
+      "inherits": [
+        "emscripten",
+        "debug"
+      ]
+    },
+    {
+      "name": "wasm_release",
+      "displayName": "wasm-release",
+      "inherits": [
+        "emscripten",
+        "release"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "gcc_debug",
+      "configurePreset": "gcc_debug"
+    },
+    {
+      "name": "gcc_release",
+      "configurePreset": "gcc_release"
+    },
+    {
+      "name": "clang_debug",
+      "configurePreset": "clang_debug"
+    },
+    {
+      "name": "clang_release",
+      "configurePreset": "clang_release"
+    },
+    {
+      "name": "clang_asan",
+      "configurePreset": "clang_asan"
+    },
+    {
+      "name": "wasm_debug",
+      "configurePreset": "wasm_debug"
+    },
+    {
+      "name": "wasm_release",
+      "configurePreset": "wasm_release"
+    }
+  ]
+}
