@@ -38,9 +38,13 @@ return {
         [RecipeId.PlatinumGroup] = {
             bus = bind.manual { type = 'gt_machine', prompt = 'Stocking input bus for Platinum Group' },
         },
-        [RecipeId.SimpleNaquadah] = {
-            bus = bind.manual { type = 'gt_machine', prompt = 'Stocking input bus for Simple Naquadah Group' },
-            hatch = bind.manual { type = 'gt_machine', prompt = 'Stocking input hatch for Simple Naquadah Group' },
+        [RecipeId.InertNaquadah] = {
+            bus = bind.manual { type = 'gt_machine', prompt = 'Stocking input bus for Inert Naquadah' },
+            hatch = bind.manual { type = 'gt_machine', prompt = 'Stocking input hatch for Inert Naquadah' },
+        },
+        [RecipeId.InertEnrichedNaquadah] = {
+            bus = bind.manual { type = 'gt_machine', prompt = 'Stocking input bus for Inert Enriched Naquadah' },
+            hatch = bind.manual { type = 'gt_machine', prompt = 'Stocking input hatch for Inert Enriched Naquadah' },
         }
     },
 }

@@ -85,7 +85,7 @@ return {
             { fluid = 'Molten Ruthenium', circuit = 6, weight = 50 }
         }
     },
-    [RecipeId.SimpleNaquadah] = {
+    [RecipeId.InertNaquadah] = {
         name = 'Simple Naquadah',
         trigger = 'surplus',
         tier = 2, -- wiki
@@ -96,10 +96,26 @@ return {
             { item = 'Carbon Dust',                 amount = 1 }
         },
         outputs = {
-            { item = 'Inert Naquadah Dust', circuit = 1, weight = 500 },
+            { item = 'Inert Naquadah Dust', circuit = 1, weight = 600 },
             { fluid = 'Molten Titanium',    circuit = 2, weight = 100 },
             { fluid = 'Molten Adamantium',  circuit = 3, weight = 100 },
             { fluid = 'Molten Gallium',     circuit = 4, weight = 200 },
+        }
+    },
+    [RecipeId.InertEnrichedNaquadah] = {
+        name = 'Inert Enriched Naquadah',
+        trigger = 'surplus',
+        tier = 2, -- wiki
+        catalysts = 1,
+        inputs = {
+            { item = 'Enriched-Naquadah Oxide Mixture Dust', amount = 32 },
+            { item = 'Zinc Dust',                            amount = 64 },
+            { item = 'Carbon Dust',                          amount = 1 }
+        },
+        outputs = {
+            { item = 'Inert Enriched Naquadah Dust', circuit = 1, weight = 900 },
+            { fluid = 'Molten Trinium',              circuit = 2, weight = 100 },
+            { fluid = 'Waste Liquid',                circuit = 3, weight = 0 },
         }
     }
 }
