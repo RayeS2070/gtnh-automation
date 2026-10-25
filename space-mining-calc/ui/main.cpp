@@ -3,8 +3,12 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl3.h>
+#include <spdlog/spdlog.h>
 
-#include <print>
+#include <expected>
+#include <format>
+#include <memory>
+#include <string>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -23,39 +27,74 @@ constexpr auto kGlslVersion = "#version 130";
 constexpr int kGlProfile = SDL_GL_CONTEXT_PROFILE_CORE;
 #endif
 
-struct App {
-  SDL_Window* window = nullptr;
-  SDL_GLContext gl = nullptr;
-  bool done = false;
-  bool showDemo = false;
+// Window, GL context and ImGui of the application. SDL and ImGui are C-style
+// APIs with paired init/shutdown calls; the destructor makes them in reverse.
+class App {
+ public:
+  App() = default;
+  App(const App&) = delete;
+  auto operator=(const App&) -> App& = delete;
+  ~App();
+
+  auto init() -> std::expected<void, std::string>;
+  auto frame() -> void;
+  auto done() const -> bool { return done_; }
+
+ private:
+  struct WindowDeleter {
+    auto operator()(SDL_Window* w) const -> void { SDL_DestroyWindow(w); }
+  };
+  struct GlContextDeleter {
+    auto operator()(SDL_GLContext c) const -> void { SDL_GL_DestroyContext(c); }
+  };
+
+  auto drawUi() -> void;
+
+  bool sdl_ = false;  // SDL_Init succeeded
+  std::unique_ptr<SDL_Window, WindowDeleter> window_;
+  std::unique_ptr<SDL_GLContextState, GlContextDeleter> gl_;
+  bool imgui_ = false;  // ImGui context and both backends are up
+  bool done_ = false;
+  bool showDemo_ = false;
 };
 
-auto init(App& app) -> bool {
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    std::println(stderr, "SDL_Init: {}", SDL_GetError());
-    return false;
+App::~App() {
+  if (imgui_) {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
   }
+  // Explicitly, since SDL_Quit() below must come after them.
+  gl_.reset();
+  window_.reset();
+  if (sdl_) SDL_Quit();
+}
+
+auto App::init() -> std::expected<void, std::string> {
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+    return std::unexpected(std::format("SDL_Init: {}", SDL_GetError()));
+  }
+  sdl_ = true;
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, kGlProfile);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-  float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-  app.window = SDL_CreateWindow(
-      "Space mining calculator", static_cast<int>(1280 * scale),
-      static_cast<int>(800 * scale),
-      SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-          SDL_WINDOW_HIGH_PIXEL_DENSITY);
-  if (app.window == nullptr) {
-    std::println(stderr, "SDL_CreateWindow: {}", SDL_GetError());
-    return false;
+  const float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+  window_.reset(SDL_CreateWindow("Space mining calculator",
+                                 static_cast<int>(1280 * scale),
+                                 static_cast<int>(800 * scale),
+                                 SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
+                                     SDL_WINDOW_HIGH_PIXEL_DENSITY));
+  if (!window_) {
+    return std::unexpected(std::format("SDL_CreateWindow: {}", SDL_GetError()));
   }
-  app.gl = SDL_GL_CreateContext(app.window);
-  if (app.gl == nullptr) {
-    std::println(stderr, "SDL_GL_CreateContext: {}", SDL_GetError());
-    return false;
+  gl_.reset(SDL_GL_CreateContext(window_.get()));
+  if (!gl_) {
+    return std::unexpected(
+        std::format("SDL_GL_CreateContext: {}", SDL_GetError()));
   }
-  SDL_GL_MakeCurrent(app.window, app.gl);
+  SDL_GL_MakeCurrent(window_.get(), gl_.get());
   SDL_GL_SetSwapInterval(1);
 
   IMGUI_CHECKVERSION();
@@ -70,31 +109,32 @@ auto init(App& app) -> bool {
   ImGui::GetStyle().ScaleAllSizes(scale);
   ImGui::GetStyle().FontScaleDpi = scale;
 
-  ImGui_ImplSDL3_InitForOpenGL(app.window, app.gl);
+  ImGui_ImplSDL3_InitForOpenGL(window_.get(), gl_.get());
   ImGui_ImplOpenGL3_Init(kGlslVersion);
-  return true;
+  imgui_ = true;
+  return {};
 }
 
-auto drawUi(App& app) -> void {
+auto App::drawUi() -> void {
   ImGui::Begin("Space mining");
-  ImGui::Text("%.*s", static_cast<int>(core::kName.size()),
-              core::kName.data());
-  ImGui::Checkbox("ImGui demo", &app.showDemo);
+  ImGui::TextUnformatted(core::kName.data(),
+                         core::kName.data() + core::kName.size());
+  ImGui::Checkbox("ImGui demo", &showDemo_);
   ImGui::End();
-  if (app.showDemo) ImGui::ShowDemoWindow(&app.showDemo);
+  if (showDemo_) ImGui::ShowDemoWindow(&showDemo_);
 }
 
-auto frame(App& app) -> void {
+auto App::frame() -> void {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     ImGui_ImplSDL3_ProcessEvent(&event);
-    if (event.type == SDL_EVENT_QUIT) app.done = true;
+    if (event.type == SDL_EVENT_QUIT) done_ = true;
   }
 
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplSDL3_NewFrame();
   ImGui::NewFrame();
-  drawUi(app);
+  drawUi();
   ImGui::Render();
 
   const ImGuiIO& io = ImGui::GetIO();
@@ -103,34 +143,28 @@ auto frame(App& app) -> void {
   glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-  SDL_GL_SwapWindow(app.window);
+  SDL_GL_SwapWindow(window_.get());
 }
-
-#ifndef __EMSCRIPTEN__
-// The browser never returns from its loop, so nothing to tear down there.
-auto shutdown(App& app) -> void {
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplSDL3_Shutdown();
-  ImGui::DestroyContext();
-  SDL_GL_DestroyContext(app.gl);
-  SDL_DestroyWindow(app.window);
-  SDL_Quit();
-}
-#endif
 
 }  // namespace
 
 auto main() -> int {
-  static App app;  // outlives main() in the browser, see below
-  if (!init(app)) return 1;
 #ifdef __EMSCRIPTEN__
-  // The browser owns the loop: frame() runs once per animation frame, and
-  // main() returns without unwinding, so `app` must not live on its stack.
-  emscripten_set_main_loop_arg(
-      [](void* arg) { frame(*static_cast<App*>(arg)); }, &app, 0, true);
+  // The browser keeps calling frame() after main() returns, and static
+  // destructors never run there: the app lives for the whole page.
+  static App app;
 #else
-  while (!app.done) frame(app);
-  shutdown(app);
+  App app;
+#endif
+  if (auto ok = app.init(); !ok) {
+    spdlog::error("{}", ok.error());
+    return 1;
+  }
+#ifdef __EMSCRIPTEN__
+  emscripten_set_main_loop_arg(
+      [](void* arg) { static_cast<App*>(arg)->frame(); }, &app, 0, true);
+#else
+  while (!app.done()) app.frame();
 #endif
   return 0;
 }

@@ -44,6 +44,7 @@ target_link_libraries(space_mining_calc_ui
         smc_warnings
         smc_core
         imgui
+        spdlog::spdlog
 )
 
 if(EMSCRIPTEN)
