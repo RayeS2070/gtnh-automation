@@ -95,11 +95,15 @@ CMake ≥ 3.30, Ninja and a compiler with C++26 and modules support. Dependencie
 [CPM](https://github.com/cpm-cmake/CPM.cmake), SDL3 included; the desktop UI also needs OpenGL and
 the development files SDL builds against (X11 and/or Wayland).
 
+Build trees go to `build/<platform>/<preset>`, installs to `install/<platform>/<preset>`.
+Native presets are named after their platform (`linux_*`) and show up only on that host.
+
 ```sh
-cmake --preset clang_debug        # or gcc_debug, clang_release, gcc_release, clang_asan
-cmake --build --preset clang_debug
-./build_debug/clang_debug/space_mining_calc         # command line tool
-./build_debug/clang_debug/ui/space_mining_calc_ui   # desktop UI
+cmake --list-presets             # the presets for this host
+cmake --preset linux_clang_debug
+cmake --build --preset linux_clang_debug
+./build/linux/linux_clang_debug/space_mining_calc         # command line tool
+./build/linux/linux_clang_debug/ui/space_mining_calc_ui   # desktop UI
 ```
 
 ### Browser (WebAssembly)
@@ -111,7 +115,7 @@ Needs [Emscripten](https://emscripten.org). Point `EMSCRIPTEN_ROOT` at its direc
 export EMSCRIPTEN_ROOT=/usr/lib/emscripten
 cmake --preset wasm_release       # or wasm_debug
 cmake --build --preset wasm_release
-python3 -m http.server -d build_release/wasm_release/ui
+python3 -m http.server -d build/wasm/wasm_release/ui
 # open http://localhost:8000/space_mining_calc_ui.html
 ```
 

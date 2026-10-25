@@ -1,6 +1,5 @@
 # Build trees and installs made by CMakePresets.json
-build_debug/
-build_release/
+build/
 install/
 
 # Personal presets (local compilers), by CMake convention not shared

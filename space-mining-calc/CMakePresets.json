@@ -10,7 +10,6 @@
       "name": "base",
       "hidden": true,
       "generator": "Ninja",
-      "installDir": "${sourceDir}/install/${presetName}",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CPM_SOURCE_CACHE": "$env{HOME}/.cache/CPM"
@@ -27,7 +26,6 @@
     {
       "name": "debug",
       "hidden": true,
-      "binaryDir": "${sourceDir}/build_debug/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
@@ -35,7 +33,6 @@
     {
       "name": "release",
       "hidden": true,
-      "binaryDir": "${sourceDir}/build_release/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
@@ -44,7 +41,6 @@
       "name": "asan",
       "hidden": true,
       "description": "AddressSanitizer + UBSan. The environment reaches build and test runs made through presets, not a binary started by hand.",
-      "binaryDir": "${sourceDir}/build_debug/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "SMC_SANITIZE": true
@@ -55,12 +51,35 @@
       }
     },
     {
-      "name": "gcc",
+      "name": "linux",
       "hidden": true,
       "inherits": [
         "base",
         "ccache"
       ],
+      "description": "Native Linux build; shown only on a Linux host.",
+      "binaryDir": "${sourceDir}/build/linux/${presetName}",
+      "installDir": "${sourceDir}/install/linux/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "wasm",
+      "hidden": true,
+      "inherits": [
+        "base"
+      ],
+      "description": "WebAssembly through Emscripten, from any host. Set EMSCRIPTEN_ROOT to the emscripten directory: /usr/lib/emscripten on Arch, <emsdk>/upstream/emscripten with emsdk.",
+      "binaryDir": "${sourceDir}/build/wasm/${presetName}",
+      "installDir": "${sourceDir}/install/wasm/${presetName}",
+      "toolchainFile": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake"
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
       "cacheVariables": {
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++"
@@ -69,10 +88,6 @@
     {
       "name": "clang",
       "hidden": true,
-      "inherits": [
-        "base",
-        "ccache"
-      ],
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
@@ -80,50 +95,46 @@
       }
     },
     {
-      "name": "emscripten",
-      "hidden": true,
+      "name": "linux_gcc_debug",
+      "displayName": "linux-gcc-debug",
       "inherits": [
-        "base"
-      ],
-      "description": "Emscripten toolchain; set EMSCRIPTEN_ROOT to the emscripten directory (/usr/lib/emscripten on Arch, <emsdk>/upstream/emscripten with emsdk).",
-      "toolchainFile": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake"
-    },
-    {
-      "name": "gcc_debug",
-      "displayName": "gcc-debug",
-      "inherits": [
+        "linux",
         "gcc",
         "debug"
       ]
     },
     {
-      "name": "gcc_release",
-      "displayName": "gcc-release",
+      "name": "linux_gcc_release",
+      "displayName": "linux-gcc-release",
       "inherits": [
+        "linux",
         "gcc",
         "release"
       ]
     },
     {
-      "name": "clang_debug",
-      "displayName": "clang-debug",
+      "name": "linux_clang_debug",
+      "displayName": "linux-clang-debug",
       "inherits": [
+        "linux",
         "clang",
         "debug"
       ]
     },
     {
-      "name": "clang_release",
-      "displayName": "clang-release",
+      "name": "linux_clang_release",
+      "displayName": "linux-clang-release",
       "inherits": [
+        "linux",
         "clang",
         "release"
       ]
     },
     {
-      "name": "clang_asan",
-      "displayName": "clang-asan",
+      "name": "linux_clang_asan",
+      "displayName": "linux-clang-asan",
       "inherits": [
+        "linux",
         "clang",
         "asan"
       ]
@@ -132,7 +143,7 @@
       "name": "wasm_debug",
       "displayName": "wasm-debug",
       "inherits": [
-        "emscripten",
+        "wasm",
         "debug"
       ]
     },
@@ -140,31 +151,55 @@
       "name": "wasm_release",
       "displayName": "wasm-release",
       "inherits": [
-        "emscripten",
+        "wasm",
         "release"
       ]
     }
   ],
   "buildPresets": [
     {
-      "name": "gcc_debug",
-      "configurePreset": "gcc_debug"
+      "name": "linux",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     },
     {
-      "name": "gcc_release",
-      "configurePreset": "gcc_release"
+      "name": "linux_gcc_debug",
+      "configurePreset": "linux_gcc_debug",
+      "inherits": [
+        "linux"
+      ]
     },
     {
-      "name": "clang_debug",
-      "configurePreset": "clang_debug"
+      "name": "linux_gcc_release",
+      "configurePreset": "linux_gcc_release",
+      "inherits": [
+        "linux"
+      ]
     },
     {
-      "name": "clang_release",
-      "configurePreset": "clang_release"
+      "name": "linux_clang_debug",
+      "configurePreset": "linux_clang_debug",
+      "inherits": [
+        "linux"
+      ]
     },
     {
-      "name": "clang_asan",
-      "configurePreset": "clang_asan"
+      "name": "linux_clang_release",
+      "configurePreset": "linux_clang_release",
+      "inherits": [
+        "linux"
+      ]
+    },
+    {
+      "name": "linux_clang_asan",
+      "configurePreset": "linux_clang_asan",
+      "inherits": [
+        "linux"
+      ]
     },
     {
       "name": "wasm_debug",
