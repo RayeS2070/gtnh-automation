@@ -22,6 +22,7 @@ components_manager:
 
         dynamic-config:
             defaults:
+                # handler-static answers HTTP 500 for a file type missing here.
                 USERVER_FILES_CONTENT_TYPE_MAP:
                     .html: "text/html; charset=utf-8"
                     .js: "text/javascript"
@@ -31,6 +32,9 @@ components_manager:
                     .png: "image/png"
                     .webp: "image/webp"
                     .ico: "image/x-icon"
+                    .txt: "text/plain; charset=utf-8"
+                    .map: "application/json"
+                    .woff2: "font/woff2"
                 # Our queries take milliseconds, but a COMMIT waits for fsync, which on the
                 # dev machine's btrfs sometimes takes over a second: with userver's 750 ms
                 # the poll failed with HTTP 500 (4 of 1209 polls). A timeout on COMMIT also

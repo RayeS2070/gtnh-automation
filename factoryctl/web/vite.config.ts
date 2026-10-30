@@ -5,6 +5,12 @@ import { defineConfig } from 'vite'
 // developing, `npm run dev` serves them and passes the API through to the server.
 export default defineConfig({
   plugins: [svelte()],
+  build: {
+    // Write over dist/ instead of deleting it: the server watches dist/ with inotify, and a
+    // deleted directory ends the watch, so later builds went unseen until a restart. Old bundles
+    // pile up in dist/assets (tens of KB each); `npm run clean` and a restart clear them.
+    emptyOutDir: false,
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:8080',
