@@ -45,6 +45,8 @@ RUN --mount=type=cache,target=/root/.cache \
 
 # --- what runs -----------------------------------------------------------------------------------
 FROM ubuntu:26.04
+# deploy.sh removes old images of factoryctl by it, and nothing else.
+LABEL factoryctl=server
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
