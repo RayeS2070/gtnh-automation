@@ -1,13 +1,20 @@
 ---Scans the items of an ME network and reports how items are identified: how many share a
 ---name (told apart by damage), how many carry NBT, which labels collide.
 ---Safe for a big network: stacks are never collected, only counted.
----  items [filter] [--byid] [--max=<id>] [--chunk=<n>] [--addr=<prefix>] [--out=<file>]
----        [--top=<n>] [--labels]
+---  items [filter] [--byid] [--max=<id>] [--chunk=<n>] [--slow=<from>-<to>] [--slow-chunk=<n>]
+---        [--addr=<prefix>] [--out=<file>] [--top=<n>] [--labels]
 ---    filter   case-insensitive substring of name or label: matching stacks are listed
 ---    --byid   read with getItemsInNetworkById over numeric ids 0..max, chunk ids per call,
 ---             instead of the allItems() iterator
----    --max    highest numeric item id to ask for with --byid (default 32000)
----    --chunk  ids per call with --byid (default 256)
+---    --max    highest numeric item id to ask for with --byid (default 11500)
+---    --chunk  ids per call with --byid (default 1000)
+---    --slow   ids asked for in small chunks (default 250-320)
+---    --slow-chunk  ids per call inside --slow (default 5)
+---
+---The --byid chunks follow the InfluxDB exporter, which runs on the server without trouble:
+---ids 250..320 hold items with a great many NBT variants (damaged/enchanted items from EECs),
+---and a big chunk over them ran the server out of memory. Our old default (256 ids per call)
+---covered them in one call, and a scan with it brought the server down.
 ---    --addr   only the interface/controller whose address starts with this
 ---    --out    write the whole report to a file instead of the screen
 ---    --top    how many entries of each top list to show (default 15)
@@ -24,8 +31,15 @@ local shell = require('shell')
 local args, opts = shell.parse(...)
 local filter = args[1] and args[1]:lower()
 local top = tonumber(opts.top) or 15
-local maxId = tonumber(opts.max) or 32000
-local chunk = tonumber(opts.chunk) or 256
+local maxId = tonumber(opts.max) or 11500
+local chunk = tonumber(opts.chunk) or 1000
+local slowFrom, slowTo = 250, 320
+if type(opts.slow) == 'string' then
+    slowFrom, slowTo = opts.slow:match('^(%d+)%-(%d+)$')
+    slowFrom, slowTo = tonumber(slowFrom), tonumber(slowTo)
+    assert(slowFrom and slowTo and slowFrom <= slowTo, '--slow must look like 250-320')
+end
+local slowChunk = tonumber(opts['slow-chunk']) or 5
 
 local kYieldEvery = 200 -- stacks between yields: avoids "too long without yielding"
 local kMinFree = 64 * 1024 -- stop before the computer runs out of memory (bytes)
@@ -65,13 +79,28 @@ local function viaIterator(proxy, visit)
     end
 end
 
----Same, through getItemsInNetworkById over ids 0..maxId, `chunk` ids per call.
+---The last id of the chunk that starts at `first`: small chunks inside the slow range, and a
+---big chunk stops short of it.
+local function chunkEnd(first)
+    if first >= slowFrom and first <= slowTo then
+        return math.min(first + slowChunk - 1, slowTo, maxId)
+    end
+    local last = math.min(first + chunk - 1, maxId)
+    if first < slowFrom and last >= slowFrom then
+        last = slowFrom - 1
+    end
+    return last
+end
+
+---Same, through getItemsInNetworkById over ids 0..maxId, chunk by chunk (see chunkEnd).
 ---Also reports the first id of the last chunk that returned anything: if it is close to
 ---maxId, items with higher ids may exist and --max should be raised.
 local function viaIds(proxy, visit, info)
-    for first = 0, maxId, chunk do
+    local first = 0
+    while first <= maxId do
+        local last = chunkEnd(first)
         local ids = {}
-        for id = first, math.min(first + chunk - 1, maxId) do
+        for id = first, last do
             ids[#ids + 1] = id
         end
         local ok, stacks = pcall(proxy.getItemsInNetworkById, ids)
@@ -87,6 +116,7 @@ local function viaIds(proxy, visit, info)
             end
         end
         os.sleep(0) -- one call per chunk: yield between them as well
+        first = last + 1
     end
     return nil
 end
@@ -176,8 +206,8 @@ local function scan(address)
     say('== %s via %s, %.0fs%s', address, opts.byid and 'getItemsInNetworkById' or 'allItems',
         computer.uptime() - started, stopped and ('  STOPPED: ' .. stopped) or '')
     if opts.byid then
-        say('ids 0..%d by %d; last chunk with items starts at %s%s', maxId, chunk,
-            tostring(info.lastChunk),
+        say('ids 0..%d by %d (%d..%d by %d); last chunk with items starts at %s%s', maxId, chunk,
+            slowFrom, slowTo, slowChunk, tostring(info.lastChunk),
             info.lastChunk and info.lastChunk + 2 * chunk > maxId and '  (near the limit: raise --max)' or '')
     end
     say('stacks %d, names %d, damage ~= 0: %d, with NBT: %d', total, names, damaged, tagged)
