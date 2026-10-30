@@ -60,10 +60,18 @@ struct Probe {
   std::optional<std::int64_t> size;
 };
 
+// A line of the agent's log; `t` is its computer.uptime() (it has no clock).
+struct AgentLogLine {
+  double t = 0;
+  std::string level;  // dbg | inf | wrn | err
+  std::string text;
+};
+
 struct PollReport {
   std::vector<Cpu> cpus;
   std::vector<AgentResult> results;
   std::vector<Probe> stock;
+  std::vector<AgentLogLine> log;
 };
 
 // What a probe tells about the stock: its size; "found nothing" is 0 only if

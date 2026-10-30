@@ -80,6 +80,32 @@ TEST(PollProtocol, StockProbeErrors) {
             std::string::npos);
 }
 
+TEST(PollProtocol, AgentLog) {
+  const auto r = poll(R"({"cpus": [], "log": [
+      {"t": 12155.1, "level": "wrn", "text": "poll: HTTP 500"},
+      {"t": 12183.7, "level": "inf", "text": "order 40: 100 x §arod"}]})");
+  ASSERT_TRUE(r.has_value()) << r.error();
+  ASSERT_EQ(r->log.size(), 2);
+  EXPECT_DOUBLE_EQ(r->log[0].t, 12155.1);
+  EXPECT_EQ(r->log[0].level, "wrn");
+  EXPECT_EQ(r->log[0].text, "poll: HTTP 500");
+  EXPECT_EQ(r->log[1].text, "order 40: 100 x §arod");
+}
+
+TEST(PollProtocol, AgentLogErrors) {
+  EXPECT_NE(error(R"({"cpus": [], "log": [{"t": 1, "level": "wrn"}]})")
+                .find("log[0].text"),
+            std::string::npos);
+  EXPECT_NE(
+      error(R"({"cpus": [], "log": [{"t": 1, "level": "loud", "text": "x"}]})")
+          .find("log[0].level"),
+      std::string::npos);
+  EXPECT_NE(
+      error(R"({"cpus": [], "log": [{"t": "1", "level": "inf", "text": "x"}]})")
+          .find("log[0].t"),
+      std::string::npos);
+}
+
 TEST(PollProtocol, EveryStatus) {
   const std::pair<const char*, AgentStatus> cases[] = {
       {"computing", AgentStatus::kComputing},

@@ -38,7 +38,9 @@ suite('json', function()
     eq(json.encode({ b = 1, a = 2 }), '{"a":2,"b":1}', 'keys sorted: stable output')
     eq(json.encode({ cpus = {}, results = { { order = 1, status = 'done' } } }),
         '{"cpus":[],"results":[{"order":1,"status":"done"}]}', 'nested')
-    check(not pcall(json.encode, 0.5), 'a fraction is refused: sizes are integers')
+    eq(json.encode(12155.1), '12155.1', 'a fraction: computer.uptime() in the log')
+    check(not pcall(json.encode, 0 / 0), 'nan is refused')
+    check(not pcall(json.encode, math.huge), 'inf is refused')
     check(not pcall(json.encode, function() end), 'a function is refused')
 end)
 
@@ -520,6 +522,92 @@ suite('agent probes', function()
     check(srv.requests[2].body:find('{"damage":0,"name":"minecraft:stick","size":7}', 1, true) ~= nil,
         'measured stock goes with the next poll')
     eq(table.concat(calls, ' '), 'getCpus getItemInNetwork', 'measured after the CPUs were read')
+end)
+
+-- log forwarding: the agent's log goes to the server with the polls --------------------------------
+suite('logbuf', function()
+    local logbuf = require('fc.logbuf')
+    local b = logbuf.new({ capacity = 3, maxLength = 10 })
+    b:push(1.5, 'inf', 'scan 42')
+    b:push(2.0, 'wrn', 'a line that is far too long')
+    local e = b:entries()
+    eq(#e, 2, 'entries in order')
+    eq(e[1].t, 1.5, 'uptime kept')
+    eq(e[1].level, 'inf', 'level kept')
+    eq(e[2].text, 'a line tha…', 'long lines cut')
+    eq(b:entries()[1].seq, nil, 'nothing but the protocol fields goes out')
+
+    -- cut by characters: a byte cut inside § would break the JSON of the whole poll
+    b = logbuf.new({ capacity = 3, maxLength = 3 })
+    b:push(1, 'inf', '§a§b§c')
+    eq(b:entries()[1].text, '§a§…', 'UTF-8 cut on a character')
+
+    -- a poll takes them; lines logged meanwhile stay for the next one
+    b = logbuf.new({ capacity = 3, maxLength = 100 })
+    b:push(1, 'inf', 'sent')
+    b:entries()
+    b:push(2, 'inf', 'during the poll')
+    b:confirm()
+    e = b:entries()
+    eq(#e, 1, 'only what was sent is dropped')
+    eq(e[1].text, 'during the poll', 'the newer line stays')
+
+    -- the buffer overflows during the poll: what was sent is gone anyway, nothing else is lost
+    b = logbuf.new({ capacity = 2, maxLength = 100 })
+    b:push(1, 'inf', 'a')
+    b:entries()
+    b:push(2, 'inf', 'b')
+    b:push(3, 'inf', 'c')
+    b:confirm()
+    e = b:entries()
+    eq(#e, 2, 'b and c, no note: a was sent before it was pushed out')
+    eq(e[#e].text, 'c', 'c kept')
+
+    -- overflow: the oldest go, one line says how many
+    b = logbuf.new({ capacity = 3, maxLength = 100 })
+    for i = 1, 5 do b:push(i, 'inf', 'line ' .. i) end
+    e = b:entries()
+    eq(#e, 4, 'capacity lines and a note')
+    eq(e[1].level, 'wrn', 'the note is a warning')
+    check(e[1].text:find('dropped 2') ~= nil, 'the note counts the dropped: ' .. e[1].text)
+    eq(e[2].text, 'line 3', 'the newest are kept')
+    b:confirm()
+    eq(#b:entries(), 0, 'all confirmed')
+    b:push(9, 'inf', 'x')
+    eq(#b:entries(), 1, 'no stale note after a confirm')
+end)
+
+suite('log forward', function()
+    local log = require('fc.log')
+    local got = {}
+    log.forward = function(level, text) got[#got + 1] = level .. ':' .. text end
+    log.setForwardLevel(log.Level.Inf)
+    log.setLevel(log.Level.Err) -- the screen shows less than what is forwarded
+    log.dbg('debug %d', 1)
+    log.inf('order %d', 18)
+    log.wrn('poll: %s', 'HTTP 500')
+    eq(table.concat(got, ' | '), 'inf:order 18 | wrn:poll: HTTP 500', 'inf and up go, whatever the screen shows')
+    log.forward = nil
+    log.setLevel(log.Level.Err + 1)
+end)
+
+suite('agent log', function()
+    local agent = require('fc.agent')
+    local logbuf = require('fc.logbuf')
+    local logs = logbuf.new({ capacity = 10, maxLength = 100 })
+    logs:push(5, 'wrn', 'poll: HTTP 500')
+    logs:push(12155.1, 'inf', 'uptime is a float')
+    local srv = fake.server({ false, '{poll=10,orders={},cancel={}}', '{poll=10,orders={},cancel={}}' })
+    local a = agent.new({ me = fake.cpus({}), post = srv.post, decode = decode, logs = logs })
+    a:poll()
+    eq(#logs:entries(), 2, 'a failed poll keeps the lines')
+    a:poll()
+    check(srv.requests[2].body:find('"log":[{"level":"wrn","t":5,"text":"poll: HTTP 500"},'
+        .. '{"level":"inf","t":12155.1,"text":"uptime is a float"}]', 1, true) ~= nil,
+        'lines go with the poll: ' .. srv.requests[2].body)
+    eq(#logs:entries(), 0, 'confirmed lines are gone')
+    a:poll()
+    check(srv.requests[3].body:find('"log":[]', 1, true) ~= nil, 'and sent once')
 end)
 
 for _, s in ipairs(suites) do

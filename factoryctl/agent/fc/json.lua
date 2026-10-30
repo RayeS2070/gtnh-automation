@@ -1,6 +1,7 @@
 ---JSON encoder for the agent's reports; the server's answers are Lua tables, so no decoder.
 ---A table is an array when it is empty or has [1], an object otherwise (string keys, sorted
----for stable output). Numbers must be integers: every number we send is a count or an id.
+---for stable output). Counts and ids are integers (an integral float is written as one);
+---fractions are only times (computer.uptime()). nan and inf are refused.
 local json = {}
 
 local kNamed = { ['"'] = '\\"', ['\\'] = '\\\\', ['\n'] = '\\n', ['\r'] = '\\r', ['\t'] = '\\t' }
@@ -47,10 +48,13 @@ encode = function(v)
         if math.type(v) == 'integer' then
             return tostring(v)
         end
+        if v ~= v or v == math.huge or v == -math.huge then
+            error('json: not a finite number: ' .. tostring(v), 0)
+        end
         if v == math.floor(v) and v >= -2 ^ 63 and v < 2 ^ 63 then
             return ('%d'):format(v)
         end
-        error('json: not an integer: ' .. tostring(v), 0)
+        return ('%.14g'):format(v)
     elseif t == 'table' then
         return encodeTable(v)
     end

@@ -36,11 +36,13 @@ auto parseScan(const userver::formats::json::Value& body)
 //   {"cpus": [{"name": "CPU_022", "busy": true,
 //              "output": {"name", "damage", "label", "size", "fluid"}}],
 //    "results": [{"order": 17, "status": "accepted", "message": "..."}],
-//    "stock": [{"name", "damage", "fluid", "size"}]}
+//    "stock": [{"name", "damage", "fluid", "size"}],
+//    "log": [{"t": <uptime>, "level": "inf", "text": "..."}]}
 // `output` is finalOutput(), left out for a free CPU; it is keyed like a
 // scanned stack, its size is what is left to deliver. `stock` measures the
 // probe list of the last reply, after the CPUs were read; no size: not found.
-// `results`, `stock` and `message` may be left out. Statuses: computing,
+// `log` is the agent's log since the last poll that got through.
+// `results`, `stock`, `log` and `message` may be left out. Statuses: computing,
 // accepted, failed, canceled, done.
 auto parsePoll(const userver::formats::json::Value& body)
     -> std::expected<domain::PollReport, std::string>;

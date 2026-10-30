@@ -16,6 +16,7 @@ agent.__index = agent
 ---@field yield fun()? # between scan chunks; os.sleep(0) in game
 ---@field warn fun(fmt: string, ...)?
 ---@field info fun(fmt: string, ...)?
+---@field logs table? # fc.logbuf: the agent's log lines, sent with every poll
 
 ---@param deps fc.AgentDeps
 function agent.new(deps)
@@ -25,6 +26,7 @@ function agent.new(deps)
     a.warn = deps.warn or function() end
     a.info = deps.info or function() end
     a.jobs = jobs.new(a.warn)
+    a.logs = deps.logs
     return a
 end
 
@@ -81,12 +83,16 @@ function agent:poll()
     end
     -- After the CPUs: a craft that has just left its CPU is in these numbers.
     local stock = probe.measure(self.me, self.probes, self.warn)
+    local lines = self.logs and self.logs:entries() or {}
     local reply, err = self:call('/agent/v1/poll',
-        { cpus = cpus, results = self.jobs:results(), stock = stock })
+        { cpus = cpus, results = self.jobs:results(), stock = stock, log = lines })
     if not reply then
         return nil, err
     end
     self.jobs:confirm()
+    if self.logs then
+        self.logs:confirm()
+    end
     self.probes = reply.probe -- measured in the next poll
     for _, task in ipairs(reply.orders or {}) do
         self.info('order %d: %d x %s', task.id, task.amount, task.filter.label or task.filter.name)

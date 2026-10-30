@@ -186,6 +186,29 @@ auto probe(const json::Value& v, std::string_view path)
   return p;
 }
 
+auto logLine(const json::Value& v, std::string_view path)
+    -> Result<domain::AgentLogLine> {
+  if (!v.IsObject()) return fail(path, "not an object");
+  domain::AgentLogLine l;
+  const auto& t = v["t"];
+  if (t.IsMissing() || !t.IsDouble()) {
+    return fail(std::format("{}.t", path), "not a number");
+  }
+  l.t = t.As<double>();
+  const auto level = text(v["level"], std::format("{}.level", path));
+  if (!level) return std::unexpected(level.error());
+  if (*level != "dbg" && *level != "inf" && *level != "wrn" &&
+      *level != "err") {
+    return fail(std::format("{}.level", path),
+                std::format("unknown '{}'", *level));
+  }
+  l.level = *level;
+  const auto body = text(v["text"], std::format("{}.text", path));
+  if (!body) return std::unexpected(body.error());
+  l.text = *body;
+  return l;
+}
+
 auto filter(const domain::OrderState& o) -> json::ValueBuilder {
   json::ValueBuilder f;
   f["name"] = o.item.name;
@@ -222,6 +245,16 @@ auto parsePoll(const json::Value& body) -> Result<domain::PollReport> {
       report.results.push_back(*std::move(r));
     }
   }
+  const auto& log = body["log"];
+  if (!log.IsMissing()) {
+    if (!log.IsArray()) return fail("log", "not an array");
+    for (std::size_t i = 0; i < log.GetSize(); ++i) {
+      auto l = logLine(log[i], std::format("log[{}]", i));
+      if (!l) return std::unexpected(l.error());
+      report.log.push_back(*std::move(l));
+    }
+  }
+
   const auto& stock = body["stock"];
   if (!stock.IsMissing()) {
     if (!stock.IsArray()) return fail("stock", "not an array");

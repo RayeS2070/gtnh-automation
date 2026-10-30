@@ -10,4 +10,6 @@ return {
     interface = nil,
     -- 'dbg' shows every poll; 'inf' only what happens.
     logLevel = 'inf',
+    -- What also goes to the server's log, with the polls ('inf', 'wrn' or 'err').
+    forwardLevel = 'inf',
 }

@@ -15,6 +15,7 @@ local serialization = require('serialization')
 local agent = require('fc.agent')
 local http = require('fc.http')
 local log = require('fc.log')
+local logbuf = require('fc.logbuf')
 local trigger = require('fc.trigger')
 local config = require('config')
 
@@ -40,8 +41,13 @@ end
 
 local function main()
     log.clock = computer.uptime
-    local levels = { dbg = log.Level.Dbg, inf = log.Level.Inf, wrn = log.Level.Wrn }
+    local levels = { dbg = log.Level.Dbg, inf = log.Level.Inf, wrn = log.Level.Wrn,
+        err = log.Level.Err }
     log.setLevel(levels[config.logLevel] or log.Level.Inf)
+    -- The log also goes to the server, with the polls: there it is kept next to its own.
+    local logs = logbuf.new()
+    log.setForwardLevel(levels[config.forwardLevel] or log.Level.Inf)
+    log.forward = function(level, text) logs:push(computer.uptime(), level, text) end
     if not component.isAvailable('internet') then
         log.err('no Internet Card')
         return 1
@@ -59,6 +65,7 @@ local function main()
         yield = function() os.sleep(0) end,
         warn = log.wrn,
         info = log.inf,
+        logs = logs,
     })
     log.inf('agent for %s, ME %s; Ctrl+C to stop', config.server, proxy.address:sub(1, 8))
 

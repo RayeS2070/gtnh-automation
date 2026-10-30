@@ -8,6 +8,7 @@ return {
         'agent/fc/jobs.lua',
         'agent/fc/json.lua',
         'agent/fc/log.lua',
+        'agent/fc/logbuf.lua',
         'agent/fc/me.lua',
         'agent/fc/probe.lua',
         'agent/fc/scan.lua',

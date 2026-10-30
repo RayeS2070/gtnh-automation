@@ -1,6 +1,7 @@
 #include "agent/poll_handler.hpp"
 
 #include <algorithm>
+#include <format>
 #include <userver/components/component_config.hpp>
 #include <userver/components/component_context.hpp>
 #include <userver/formats/json/exception.hpp>
@@ -160,6 +161,15 @@ auto PollHandler::HandleRequestThrow(
   }
   tx.Commit();
 
+  // The agent's own log, after the commit: a poll that failed sends it again.
+  for (const auto& l : report->log) {
+    using userver::logging::Level;
+    const auto level = l.level == "err"   ? Level::kError
+                       : l.level == "wrn" ? Level::kWarning
+                       : l.level == "dbg" ? Level::kDebug
+                                          : Level::kInfo;
+    LOG(level) << "agent [" << std::format("{:.1f}", l.t) << "] " << l.text;
+  }
   for (const auto& e : out.errors) LOG_WARNING() << "poll: " << e;
   for (const auto& a : out.alarms) {
     LOG_ERROR() << "order " << a.order << ": " << alarmName(a.kind);

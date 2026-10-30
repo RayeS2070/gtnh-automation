@@ -3,6 +3,7 @@
 ---  cd agent && lua tests/live.lua [http://localhost:8080] [polls]
 package.path = './?.lua;' .. package.path
 local agent = require('fc.agent')
+local logbuf = require('fc.logbuf')
 local server, polls = arg[1] or 'http://localhost:8080', tonumber(arg[2]) or 3
 
 local function post(path, body)
@@ -58,9 +59,15 @@ function me.getCraftables(filter)
     end } }
 end
 
-local function say(fmt, ...) print(fmt:format(...)) end
+local logs, clock = logbuf.new(), 0
+local function say(fmt, ...)
+    clock = clock + 0.7 -- a float uptime, as computer.uptime() gives
+    logs:push(clock, fmt:sub(1, 3) == 'WRN' and 'wrn' or 'inf', fmt:sub(5):format(...))
+    print(fmt:format(...))
+end
 local a = agent.new({ me = me, post = post, decode = function(t) return load('return ' .. t, '=r', 't', {})() end,
-    warn = function(fmt, ...) say('WRN ' .. fmt, ...) end, info = function(fmt, ...) say('INF ' .. fmt, ...) end })
+    warn = function(fmt, ...) say('WRN ' .. fmt, ...) end, info = function(fmt, ...) say('INF ' .. fmt, ...) end,
+    logs = logs })
 for i = 1, polls do
     local reply, err = a:poll()
     say('poll %d: %s', i, reply and ('ok, poll=' .. tostring(reply.poll)) or ('ERROR ' .. tostring(err)))
