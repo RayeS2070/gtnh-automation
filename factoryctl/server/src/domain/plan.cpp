@@ -7,18 +7,11 @@ namespace factoryctl::domain {
 
 namespace {
 
-auto isTarget(std::span<const Target> targets, const ItemKey& item) -> bool {
-  return std::ranges::contains(targets, item, &Target::item);
-}
-
-// Low priority may use the CPUs only when no CPU does foreign work. A busy
-// CPU without a visible output counts as foreign: we cannot tell. An output
-// counts even without `busy` (see Cpu).
-auto cpusFreeForLow(const PlanInput& in) -> bool {
-  return std::ranges::none_of(in.cpus, [&](const Cpu& cpu) {
-    if (cpu.crafting) return !isTarget(in.targets, *cpu.crafting);
-    return cpu.busy;
-  });
+// Idle: not busy and showing no output (an output with busy=false is a craft
+// that has just started). An empty report has no idle CPUs.
+auto idleCpus(const PlanInput& in) -> std::int64_t {
+  return std::ranges::count_if(
+      in.cpus, [](const Cpu& cpu) { return !cpu.busy && !cpu.crafting; });
 }
 
 auto inProgress(const PlanInput& in, const ItemKey& item) -> bool {
@@ -57,7 +50,7 @@ auto isOpen(OrderStatus status) -> bool {
 auto plan(const PlanInput& in) -> std::vector<NewOrder> {
   std::vector<NewOrder> out;
   if (in.stock == nullptr) return out;
-  const bool lowAllowed = cpusFreeForLow(in);
+  const bool lowAllowed = idleCpus(in) >= in.lowFreeCpus;
 
   for (const auto& t : in.targets) {
     if (t.batch <= 0) continue;

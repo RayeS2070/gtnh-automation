@@ -146,6 +146,19 @@ TEST(Poll, OpenOrderStillBlocksPlanning) {
   EXPECT_TRUE(tick(orders, in, kSettings).created.empty());
 }
 
+TEST(Poll, LowPriorityReserveIsASetting) {
+  std::vector<OrderState> orders;
+  const Stock stock{};
+  const TickInput in{.report = {.cpus = {Cpu{}, Cpu{}}},
+                     .targets = {{kStick, 100, 1000, Priority::kLow}},
+                     .stock = &stock,
+                     .now = t0};
+  EXPECT_TRUE(tick(orders, in, kSettings).created.empty()) << "default: 8 idle";
+  Settings two;
+  two.lowFreeCpus = 2;
+  EXPECT_EQ(tick(orders, in, two).created.size(), 1);
+}
+
 TEST(Poll, NewOrdersWaitForTheNextPoll) {
   std::vector<OrderState> orders;
   const Stock stock{};

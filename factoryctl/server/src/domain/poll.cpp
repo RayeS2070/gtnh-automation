@@ -40,7 +40,8 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
 
   std::vector<Order> open;
   for (const auto& o : orders) open.push_back({o.item, o.status});
-  out.created = plan({in.targets, in.stock, open, in.report.cpus});
+  out.created =
+      plan({in.targets, in.stock, open, in.report.cpus, settings.lowFreeCpus});
   return out;
 }
 

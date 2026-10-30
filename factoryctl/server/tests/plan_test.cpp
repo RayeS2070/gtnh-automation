@@ -85,14 +85,6 @@ TEST(Plan, CraftingByCpuBlocksEvenIfNotBusy) {
   EXPECT_TRUE(run({{kDust, 100, 500}}, &stock, {}, {{false, kDust}}).empty());
 }
 
-TEST(Plan, LowPriorityWaitsForForeignWorkEvenIfNotBusy) {
-  const ItemKey foreign{"minecraft:diamond", 0, ""};
-  const Stock stock{};
-  EXPECT_TRUE(
-      run({{kDust, 100, 500, Priority::kLow}}, &stock, {}, {{false, foreign}})
-          .empty());
-}
-
 TEST(Plan, DropsAreToldApartByFluid) {
   const ItemKey otherDrop{"ae2fc:fluid_drop", 0, "molten.iridium"};
   const Stock stock{{otherDrop, 1'000'000}};
@@ -112,42 +104,60 @@ TEST(Plan, KeepsTheOrderOfTargets) {
             (std::vector<NewOrder>{{kRod, 2}, {kDust, 3}}));
 }
 
-// Low priority runs only when the CPUs are free of other work: idle, or
-// busy with items we keep stocked ourselves.
-TEST(Plan, LowPriorityWithIdleCpus) {
-  const Stock stock{};
-  EXPECT_EQ(run({{kDust, 100, 500, Priority::kLow}}, &stock, {}, {{false, {}}})
-                .size(),
-            1);
+// Low priority takes only idle CPUs and leaves a reserve of them for
+// everything else (the maintainer's rule, "no CPU does foreign work", never
+// let it run in a busy network: 11 of 32 CPUs were always busy).
+const ItemKey kForeign{"minecraft:diamond", 0, ""};
+
+auto cpus(int idle, int busy) -> std::vector<Cpu> {
+  std::vector<Cpu> out(idle);
+  for (int i = 0; i < busy; ++i) out.push_back({true, kForeign});
+  return out;
 }
 
-TEST(Plan, LowPriorityWithCpusOnOurTargets) {
-  const Stock stock{{kRod, 1'000}};
-  const std::vector<Target> targets{{kRod, 100, 10},
-                                    {kDust, 100, 500, Priority::kLow}};
-  EXPECT_EQ(run(targets, &stock, {}, {{true, kRod}}),
-            (std::vector<NewOrder>{{kDust, 500}}));
+auto runLow(const std::vector<Cpu>& cpus, std::int32_t reserve) {
+  const Stock stock{};
+  const std::vector<Target> targets{{kDust, 100, 500, Priority::kLow}};
+  return plan({targets, &stock, {}, cpus, reserve});
 }
 
-TEST(Plan, LowPriorityWaitsForForeignWork) {
-  const ItemKey foreign{"minecraft:diamond", 0, ""};
-  const Stock stock{};
-  EXPECT_TRUE(
-      run({{kDust, 100, 500, Priority::kLow}}, &stock, {}, {{true, foreign}})
-          .empty());
+TEST(Plan, LowPriorityWithEnoughIdleCpus) {
+  EXPECT_EQ(runLow(cpus(8, 24), 8).size(), 1) << "8 idle, reserve 8";
 }
 
-TEST(Plan, LowPriorityWaitsForBusyCpuThatHidesItsWork) {
-  // Busy without a crafting monitor: we cannot tell what it does.
-  const Stock stock{};
-  EXPECT_TRUE(run({{kDust, 100, 500, Priority::kLow}}, &stock, {}, {{true, {}}})
-                  .empty());
+TEST(Plan, LowPriorityWaitsBelowTheReserve) {
+  EXPECT_TRUE(runLow(cpus(7, 25), 8).empty());
 }
 
-TEST(Plan, HighPriorityIgnoresForeignWork) {
-  const ItemKey foreign{"minecraft:diamond", 0, ""};
+TEST(Plan, LowPriorityDoesNotCareWhatBusyCpusDo) {
+  EXPECT_EQ(runLow(cpus(21, 11), 8).size(), 1) << "the case seen in game";
+}
+
+TEST(Plan, CpuShowingAnOutputIsNotIdle) {
+  // busy=false with an output: a craft just started (the race seen in game).
+  std::vector<Cpu> c = cpus(8, 0);
+  c[0].crafting = kForeign;
+  EXPECT_TRUE(runLow(c, 8).empty());
+}
+
+TEST(Plan, BusyCpuWithoutAnOutputIsNotIdle) {
+  // No crafting monitor: busy all the same.
+  std::vector<Cpu> c = cpus(8, 0);
+  c[0].busy = true;
+  EXPECT_TRUE(runLow(c, 8).empty());
+}
+
+TEST(Plan, NoCpusReportedMeansNoneIdle) {
+  // getCpus() failed on the agent: an empty list is not "all idle".
+  EXPECT_TRUE(runLow({}, 1).empty());
+}
+
+TEST(Plan, ReserveZeroAlwaysAllowsLow) { EXPECT_EQ(runLow({}, 0).size(), 1); }
+
+TEST(Plan, HighPriorityIgnoresTheReserve) {
   const Stock stock{};
-  EXPECT_EQ(run({{kDust, 100, 500}}, &stock, {}, {{true, foreign}}).size(), 1);
+  const std::vector<Target> targets{{kDust, 100, 500}};
+  EXPECT_EQ(plan({targets, &stock, {}, cpus(0, 32), 8}).size(), 1);
 }
 
 }  // namespace

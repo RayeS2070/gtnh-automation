@@ -114,7 +114,7 @@ TEST(Order, NoWayBackToComputing) {
 }
 
 TEST(Order, CraftingEndsByResult) {
-  for (const auto [result, expected] :
+  for (const auto& [result, expected] :
        {std::pair{AgentStatus::kDone, OrderStatus::kDone},
         std::pair{AgentStatus::kCanceled, OrderStatus::kCanceled}}) {
     auto o = order(OrderStatus::kCrafting);

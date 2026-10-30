@@ -34,6 +34,7 @@ struct Settings {
       600};  // a scan not finished by then is abandoned
   Timeouts timeouts;
   ScanParams scan;
+  std::int32_t lowFreeCpus = 8;  // low priority needs this many idle CPUs
 };
 
 struct ScanState {

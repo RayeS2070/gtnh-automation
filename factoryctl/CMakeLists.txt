@@ -31,6 +31,9 @@ userver_setup_environment()
 add_library(fctl_warnings INTERFACE)
 target_compile_options(fctl_warnings INTERFACE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -pedantic>
+        # Leaving out fields that have default member initializers, as in
+        # {.busy = true, .name = "CPU_022"}, is how we build aggregates.
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-missing-field-initializers>
 )
 
 add_subdirectory(server)

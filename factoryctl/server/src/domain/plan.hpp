@@ -74,6 +74,9 @@ struct PlanInput {
   const Stock* stock = nullptr;  // nullptr: no complete scan yet
   std::span<const Order> orders;
   std::span<const Cpu> cpus;
+  // Low priority runs only while at least this many CPUs are idle: it takes
+  // idle CPUs and leaves a reserve for everything else.
+  std::int32_t lowFreeCpus = 0;
 };
 
 struct NewOrder {

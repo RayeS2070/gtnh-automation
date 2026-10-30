@@ -50,6 +50,7 @@ auto settingsFrom(const userver::components::ComponentConfig& config)
       config["computing-timeout"].As<seconds>(s.timeouts.computing);
   s.timeouts.stalled =
       config["stalled-timeout"].As<seconds>(s.timeouts.stalled);
+  s.lowFreeCpus = config["low-free-cpus"].As<std::int32_t>(s.lowFreeCpus);
   auto& p = s.scan;
   p.threshold = config["scan-threshold"].As<std::int64_t>(p.threshold);
   p.maxId = config["scan-max-id"].As<std::int32_t>(p.maxId);
@@ -83,6 +84,7 @@ properties:
     sent-timeout: {type: string, description: a sent order without a result becomes lost}
     computing-timeout: {type: string, description: alarm when AE computes longer}
     stalled-timeout: {type: string, description: alarm when a craft does not progress}
+    low-free-cpus: {type: integer, description: low priority needs this many idle CPUs}
     scan-threshold: {type: integer, description: smaller stacks are scanned only if craftable}
     scan-max-id: {type: integer, description: highest item id the agent asks for}
     scan-chunk: {type: integer, description: ids per getItemsInNetworkById call}

@@ -78,6 +78,7 @@ components_manager:
             sent-timeout: $sent-timeout
             computing-timeout: $computing-timeout
             stalled-timeout: $stalled-timeout
+            low-free-cpus: $low-free-cpus
             scan-threshold: $scan-threshold
             scan-max-id: $scan-max-id
             scan-chunk: $scan-chunk

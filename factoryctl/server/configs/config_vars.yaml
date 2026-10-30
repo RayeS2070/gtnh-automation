@@ -12,6 +12,8 @@ scan-give-up: 10m
 sent-timeout: 2m       # a sent order without a result becomes lost
 computing-timeout: 2m  # alarm in the log
 stalled-timeout: 10m   # alarm in the log: remaining does not go down
+# Low-priority targets order only while at least this many crafting CPUs are idle.
+low-free-cpus: 8
 # Scan: stacks below the threshold go only if craftable. Ids 250..320 hold items with
 # a great many NBT variants: small chunks there, or the game server runs out of memory.
 scan-threshold: 500
