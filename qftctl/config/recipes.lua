@@ -35,7 +35,7 @@ local RecipeId = require('config.ids')
 ---@field name string # Display name.
 ---@field trigger qft.Trigger
 ---@field tier integer # Recipe tier (1..4): the pulse manipulator tier that unlocks it.
----@field catalysts integer # Catalysts in the bulk catalyst housing = parallels.
+---@field catalysts integer # Catalysts in the bulk catalyst housing = parallels; 0 = recipe disabled.
 ---@field inputs qft.RecipeInput[]? # Raw materials in the source network; required for surplus.
 ---                                 # Deficit: optional, nil means supplied without limit.
 ---@field outputs qft.RecipeOutput[]

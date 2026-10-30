@@ -73,8 +73,8 @@ function config.checkValues(components, recipes)
         if not isInt(recipe.tier, 1, kMaxTier) then
             add('recipes.%s: tier must be an integer 1..%d', id, kMaxTier)
         end
-        if not isInt(recipe.catalysts, 1) then
-            add('recipes.%s: catalysts must be an integer >= 1', id)
+        if not isInt(recipe.catalysts, 0) then
+            add('recipes.%s: catalysts must be an integer >= 0', id)
         end
         local outputs = recipe.outputs or {}
         if #outputs == 0 then

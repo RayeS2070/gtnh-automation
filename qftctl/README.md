@@ -193,7 +193,7 @@ A recipe that maintains products:
     name = 'Rubber Polymer',
     trigger = 'deficit',
     tier = 1,      -- recipe tier (pulse manipulator tier that unlocks it)
-    catalysts = 8, -- catalysts in the bulk catalyst housing = parallels
+    catalysts = 8, -- catalysts in the bulk catalyst housing = parallels; 0 = never run it
     outputs = {
         { fluid = 'Molten Silicone Rubber', circuit = 1, target = 10e9, priority = 1 }, -- 10e9 mB
         { fluid = 'Molten Rubber',          circuit = 4 },                -- no target: not tracked

@@ -76,6 +76,7 @@ plan.defaults.surplusSwitchRatio = 2
 ---@field low boolean # The recipe may start.
 ---@field done boolean # A running recipe stops.
 ---@field weights table<integer, number> # Per circuit: how much each output is wanted (Neptunium).
+---@field disabled boolean? # No catalysts: the recipe never runs.
 
 ---How many cycles the stock of every input covers: the scarcest input decides.
 ---@param recipe qft.Recipe
@@ -162,14 +163,19 @@ function plan.evaluate(recipes, production, source, opts)
         local st = { trigger = trigger, outputs = {}, urgency = 0, low = false, done = true,
             weights = {} }
         local err
-        if recipe.inputs then
+        if recipe.catalysts == 0 then
+            -- No catalyst housing for it yet: the QFT would refuse to start it.
+            st.disabled, st.low, st.done = true, false, true
+        elseif recipe.inputs then
             local inputMissing
             st.cycles, err, inputMissing = inputCycles(recipe, source)
             for _, m in ipairs(inputMissing) do
                 missing[#missing + 1] = m
             end
         end
-        if not err and trigger == 'surplus' then
+        if st.disabled then
+            -- Nothing else to evaluate.
+        elseif not err and trigger == 'surplus' then
             for _, out in ipairs(recipe.outputs) do
                 st.weights[out.circuit] = out.weight or 0
             end

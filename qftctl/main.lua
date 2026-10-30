@@ -192,7 +192,9 @@ local function tick(ctx, now)
             logOnce(ctx, 'wrn', ('%s is not in its network, counted as 0'):format(label))
         end
         for id, st in pairs(states) do
-            if #st.outputs > 0 or st.cycles then
+            if st.disabled then
+                logOnce(ctx, 'inf', ('%s: no catalysts, skipped'):format(id))
+            elseif #st.outputs > 0 or st.cycles then
                 log.dbg('%s: %s', id, describe(st))
             end
         end

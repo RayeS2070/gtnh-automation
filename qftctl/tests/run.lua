@@ -239,6 +239,31 @@ do
     check(deficit(9) == nil and deficit(9, 'glue') == nil, 'deficit without raw materials: never runs')
 end
 
+-- catalysts = 0: the recipe stays in the config but never runs
+do
+    local r = twoModes()
+    r.ore.catalysts = 0
+    r.glue.catalysts = 0
+    local source = resource.snapshot({
+        { label = 'Dust', name = 'dust', damage = 0, size = 60 },
+        { label = 'Ore', name = 'ore', damage = 0, size = 1000 },
+    }, { { label = 'Acid', name = 'acid', amount = 1000 } })
+    local st, problems = plan.evaluate(r, fluids({ Glue = 0 }), source)
+    check(#problems == 0, 'no catalysts is not a problem')
+    check(st.ore.disabled and not st.ore.low and st.ore.done and st.ore.cycles == nil,
+        'no catalysts: disabled, no division by zero')
+    check(plan.choose(st, nil) == 'plat', 'disabled recipes do not block the others')
+    check(plan.choose(st, 'ore') == 'plat' and plan.choose(st, 'glue') == 'plat',
+        'a running disabled recipe is stopped')
+
+    local function problemsOf(catalysts)
+        return config.checkValues({ shieldingTier = 1 }, { r = { tier = 1, catalysts = catalysts,
+            trigger = 'deficit', outputs = { { fluid = 'A', circuit = 1, target = 1 } } } })
+    end
+    check(#problemsOf(0) == 0, 'config: catalysts = 0 allowed')
+    check(#problemsOf(-1) == 1, 'config: negative catalysts refused')
+end
+
 -- runner with fakes
 local function fakeMachine(active)
     local m = { allowed = true, active = active or false, calls = 0 }
