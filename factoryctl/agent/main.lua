@@ -40,8 +40,8 @@ end
 
 local function main()
     log.clock = computer.uptime
-    log.setLevel(({ dbg = log.Level.Dbg, inf = log.Level.Inf, wrn = log.Level.Wrn })[config.logLevel]
-        or log.Level.Inf)
+    local levels = { dbg = log.Level.Dbg, inf = log.Level.Inf, wrn = log.Level.Wrn }
+    log.setLevel(levels[config.logLevel] or log.Level.Inf)
     if not component.isAvailable('internet') then
         log.err('no Internet Card')
         return 1

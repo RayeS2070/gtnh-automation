@@ -21,12 +21,22 @@ function me.item(stack)
     }
 end
 
----Whether a scanned stack goes to the server: enough of it, or craftable (orders need it even
----when nothing is stored).
+---The item a stack belongs to, as the server keys it: a fluid drop by its fluid.
 ---@param stack table
+---@return string
+function me.key(stack)
+    if stack.fluidDrop then
+        return 'fluid:' .. tostring(stack.fluidDrop.name)
+    end
+    return ('%s:%d'):format(stack.name, stack.damage or 0)
+end
+
+---Whether an item (its stacks summed) goes to the server: enough of it, or craftable (orders need
+---it even when nothing is stored).
+---@param item { size: number?, isCraftable: boolean? }
 ---@param threshold integer
-function me.keep(stack, threshold)
-    return (stack.size or 0) >= threshold or stack.isCraftable == true
+function me.keep(item, threshold)
+    return (item.size or 0) >= threshold or item.isCraftable == true
 end
 
 ---Ids first..last in one getItemsInNetworkById call, as items worth sending.
@@ -42,9 +52,20 @@ function me.chunk(proxy, first, last, threshold)
     if not ok then
         return nil, ('getItemsInNetworkById(%d..%d): %s'):format(first, last, tostring(stacks))
     end
+    -- Kept or left out per item, not per stack: one item may come as several stacks (in game:
+    -- a stored MFE with NBT, not craftable, next to its craftable entry of size 0). Deciding per
+    -- stack sent only the 0.
+    local sums = {}
+    for _, s in ipairs(stacks or {}) do
+        local k = me.key(s)
+        local sum = sums[k] or { size = 0, isCraftable = false }
+        sum.size = sum.size + (s.size or 0)
+        sum.isCraftable = sum.isCraftable or s.isCraftable == true
+        sums[k] = sum
+    end
     local items = {}
     for _, s in ipairs(stacks or {}) do
-        if me.keep(s, threshold) then
+        if me.keep(sums[me.key(s)], threshold) then
             items[#items + 1] = me.item(s)
         end
     end

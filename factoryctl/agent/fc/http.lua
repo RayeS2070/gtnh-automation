@@ -10,7 +10,8 @@ local http = {}
 ---@return string? err
 function http.post(url, body)
     local ok, res = pcall(function()
-        local handle = internet.request(url, body, { ['Content-Type'] = 'application/json' }, 'POST')
+        local headers = { ['Content-Type'] = 'application/json' }
+        local handle = internet.request(url, body, headers, 'POST')
         local parts = {}
         for chunk in handle do
             parts[#parts + 1] = chunk

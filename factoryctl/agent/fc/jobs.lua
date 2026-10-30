@@ -136,7 +136,8 @@ function jobs:cancel(proxy, task)
         if meta.name == task.cpu then
             local okOut, final = pcall(meta.cpu.finalOutput)
             if not (okOut and matches(final, task.filter)) then
-                self.warn('cancel %d: %s crafts something else now; left alone', task.order, task.cpu)
+                self.warn('cancel %d: %s crafts something else now; left alone', task.order,
+                    task.cpu)
                 return
             end
             local okCancel, done = pcall(meta.cpu.cancel)

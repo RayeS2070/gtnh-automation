@@ -38,6 +38,16 @@ function me.getCpus()
     end
     return out
 end
+function me.getItemInNetwork(name, damage, nbt)
+    local fluid = nbt and nbt:match('^{Fluid:"(.*)"}$')
+    for _, st in ipairs(stacks) do
+        if st.name == name and (fluid and st.fluidDrop and st.fluidDrop.name == fluid
+                or not fluid and st.damage == damage) then
+            return st
+        end
+    end
+    return nil
+end
 function me.getCraftables(filter)
     print(('  getCraftables{name=%s, damage=%s, label=%s}'):format(filter.name, tostring(filter.damage),
         tostring(filter.label)))

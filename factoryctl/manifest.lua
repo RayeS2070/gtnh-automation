@@ -9,6 +9,7 @@ return {
         'agent/fc/json.lua',
         'agent/fc/log.lua',
         'agent/fc/me.lua',
+        'agent/fc/probe.lua',
         'agent/fc/scan.lua',
         'agent/fc/trigger.lua',
     },

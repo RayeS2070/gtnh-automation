@@ -3,6 +3,7 @@
 local json = require('fc.json')
 local jobs = require('fc.jobs')
 local me = require('fc.me')
+local probe = require('fc.probe')
 local scan = require('fc.scan')
 
 local agent = {}
@@ -56,7 +57,8 @@ function agent:scan(task)
         end
         local final = last >= task.maxId
         if #items > 0 or final then
-            local _, perr = self:call('/agent/v1/scan', { scan = task.id, last = final, items = items })
+            local _, perr = self:call('/agent/v1/scan',
+                { scan = task.id, last = final, items = items })
             if perr then
                 self.warn('scan %d stopped: %s', task.id, perr)
                 return
@@ -77,11 +79,15 @@ function agent:poll()
         self.warn('getCpus: %s', tostring(cpus))
         cpus = {}
     end
-    local reply, err = self:call('/agent/v1/poll', { cpus = cpus, results = self.jobs:results() })
+    -- After the CPUs: a craft that has just left its CPU is in these numbers.
+    local stock = probe.measure(self.me, self.probes, self.warn)
+    local reply, err = self:call('/agent/v1/poll',
+        { cpus = cpus, results = self.jobs:results(), stock = stock })
     if not reply then
         return nil, err
     end
     self.jobs:confirm()
+    self.probes = reply.probe -- measured in the next poll
     for _, task in ipairs(reply.orders or {}) do
         self.info('order %d: %d x %s', task.id, task.amount, task.filter.label or task.filter.name)
         self.jobs:start(self.me, task)

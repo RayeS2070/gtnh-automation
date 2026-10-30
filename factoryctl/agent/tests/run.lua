@@ -149,6 +149,26 @@ suite('me', function()
             end
         end
     end
+    -- One item as two stacks (in game: IC2:blockElectric:1, MFE): the stored one has NBT (its
+    -- charge) and is not craftable, the craftable entry has size 0. Deciding per stack sent only
+    -- the 0 and the server saw MFE = 0: the item is kept or left out as a whole.
+    local mfe = { getItemsInNetworkById = function()
+        return {
+            { name = 'IC2:blockElectric', damage = 1, label = 'MFE', size = 1, isCraftable = false },
+            { name = 'IC2:blockElectric', damage = 1, label = 'MFE', size = 0, isCraftable = true },
+            { name = 'IC2:blockElectric', damage = 2, label = 'MFSU', size = 1, isCraftable = false },
+            { name = 'IC2:blockElectric', damage = 2, label = 'MFSU', size = 1, isCraftable = false },
+            { name = 'ae2fc:fluid_drop', damage = 0, label = 'drop of A', size = 300, isCraftable = false,
+                fluidDrop = { name = 'a' } },
+            { name = 'ae2fc:fluid_drop', damage = 0, label = 'drop of B', size = 300, isCraftable = false,
+                fluidDrop = { name = 'b' } },
+        }
+    end }
+    local kept = me.chunk(mfe, 0, 0, 500)
+    local sizes = {}
+    for _, i in ipairs(kept) do sizes[#sizes + 1] = i.label .. '=' .. i.size end
+    eq(table.concat(sizes, ' '), 'MFE=1 MFE=0', 'both MFE stacks go: one of them is craftable')
+    -- Drops share name and damage: they are told apart by their fluid, not lumped together.
     local broken = { getItemsInNetworkById = function() error('chunk unloaded') end }
     local none, why = me.chunk(broken, 0, 9, 500)
     check(none == nil and tostring(why):find('chunk unloaded') ~= nil, 'a failed call is an error, no throw')
@@ -439,6 +459,67 @@ suite('trigger', function()
     clock.events = { { at = 1.5, name = 'interrupted' } }
     t = trigger.polling({ jobs = j, pull = clock.pull, time = clock.time, step = 1, minGap = 2 })
     eq(t:wait(10), 'interrupted', 'interrupted')
+end)
+
+-- probe: the targets' stock, by point lookups -----------------------------------------------------
+---getItemInNetwork over a table: items by "name:damage", drops by their NBT {Fluid:"x"}.
+function fake.lookup(items, drops, calls)
+    return function(name, damage, nbt)
+        calls[#calls + 1] = 'getItemInNetwork'
+        if name == 'boom:item' then error('lookup failed') end
+        local size
+        if nbt then
+            size = drops[nbt:match('^{Fluid:"(.*)"}$')]
+        else
+            size = items[name .. ':' .. tostring(damage)]
+        end
+        return size and { name = name, damage = damage, size = size } or nil
+    end
+end
+
+suite('probe', function()
+    local probe = require('fc.probe')
+    local calls = {}
+    local me = { getItemInNetwork = fake.lookup(
+        { ['bartworks:gt.bwMetaGeneratedstickLong:11358'] = 61097 }, { water = 4503599627370495.0 }, calls) }
+    local warned = {}
+    local out = probe.measure(me, {
+        { name = 'bartworks:gt.bwMetaGeneratedstickLong', damage = 11358 },
+        { name = 'ae2fc:fluid_drop', fluid = 'water', label = 'drop of Water' },
+        { name = 'minecraft:stick', damage = 0 },
+        { name = 'boom:item', damage = 0 },
+    }, function(fmt, ...) warned[#warned + 1] = fmt:format(...) end)
+    eq(#calls, 4, 'one point lookup per target')
+    eq(#out, 3, 'a failed lookup is left out')
+    eq(out[1].size, 61097, 'item size')
+    eq(out[1].damage, 11358, 'item key')
+    eq(out[2].fluid, 'water', 'drop keyed by its fluid')
+    eq(out[2].size, 4503599627370495.0, 'drop size')
+    check(out[3].size == nil, 'not found: no size (the server decides)')
+    check(warned[1] and warned[1]:find('boom:item') ~= nil, 'a failed lookup is logged')
+    eq(#probe.measure(me, nil, function() end), 0, 'no probe list yet')
+    check(probe.nbt('a"b\\c') == '{Fluid:"a\\"b\\\\c"}', 'quotes in a fluid name are escaped')
+end)
+
+suite('agent probes', function()
+    local agent = require('fc.agent')
+    local calls = {}
+    local me = fake.cpus({ { name = 'CPU_001', busy = false } })
+    local getCpus = me.getCpus
+    me.getCpus = function() calls[#calls + 1] = 'getCpus'; return getCpus() end
+    me.getItemInNetwork = fake.lookup({ ['minecraft:stick:0'] = 7 }, {}, calls)
+    local srv = fake.server({
+        '{poll=10,orders={},cancel={},probe={{name="minecraft:stick",damage=0}}}',
+        '{poll=10,orders={},cancel={},probe={}}',
+    })
+    local a = agent.new({ me = me, post = srv.post, decode = decode })
+    a:poll()
+    check(srv.requests[1].body:find('"stock":[]', 1, true) ~= nil, 'first poll: nothing to measure yet')
+    for i = #calls, 1, -1 do calls[i] = nil end -- in place: the fakes hold this table
+    a:poll()
+    check(srv.requests[2].body:find('{"damage":0,"name":"minecraft:stick","size":7}', 1, true) ~= nil,
+        'measured stock goes with the next poll')
+    eq(table.concat(calls, ' '), 'getCpus getItemInNetwork', 'measured after the CPUs were read')
 end)
 
 for _, s in ipairs(suites) do
