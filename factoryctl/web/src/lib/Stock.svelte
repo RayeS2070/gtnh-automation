@@ -1,19 +1,28 @@
 <script lang="ts">
-  import { fetchStock, fetchTargets, type StockItem, type Target } from './api'
-  import { amount, isDrop, plainLabel, unit } from './format'
+  import { fetchStock, fetchTargets, type StockItem, type StockQuery, type Target } from './api'
+  import { amount, compact, isDrop, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import OrderForm from './OrderForm.svelte'
   import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
 
-  let query = $state('')
+  const kLimit = 200
+  const kinds = { all: 'All', items: 'Items', fluids: 'Fluids' } as const
+
+  let text = $state('')
+  let kind = $state<StockQuery['kind']>('all')
+  let sort = $state<StockQuery['sort']>('label')
+  let dir = $state<StockQuery['dir']>('asc')
+  const query = (): StockQuery => ({ text, kind, sort, dir })
+
   let items = $state<StockItem[]>([])
   let targets = $state(new Map<number, Target>())
-  // The row whose form is open, and which form.
-  let editing = $state<{ id: number; form: 'target' | 'order' } | null>(null)
+  // The goods whose forms are open above the grid. A search that leaves them out keeps them;
+  // a list that has them refreshes their amount.
+  let selected = $state<StockItem | null>(null)
+  // Bumped to start the forms over: after a save or an order.
+  let formsVersion = $state(0)
   let placed = $state('')
-  const toggle = (id: number, form: 'target' | 'order') =>
-    (editing = editing?.id === id && editing.form === form ? null : { id, form })
   let error = $state('')
   let loading = $state(false)
 
@@ -28,14 +37,16 @@
 
   // Answers to older queries are dropped: typing fast must not show a stale list.
   let asked = 0
-  async function loadStock(q: string) {
+  async function loadStock(q: StockQuery) {
     const n = ++asked
     loading = true
     try {
-      const found = await fetchStock(q)
+      const found = await fetchStock(q, kLimit)
       if (n === asked) {
         items = found
         error = ''
+        const id = selected?.goodsId
+        selected = found.find((i) => i.goodsId === id) ?? selected
       }
     } catch (e) {
       if (n === asked) error = String(e)
@@ -44,119 +55,236 @@
     }
   }
 
-  // A moment after typing stops.
+  // A moment after typing or switching stops.
   $effect(() => {
-    const q = query
+    const q = query()
     const timer = setTimeout(() => loadStock(q), 250)
     return () => clearTimeout(timer)
   })
 
   // And again on its own: stock and targets change while the page is open. Open forms keep what
-  // is typed in them: rows are keyed by goods, and a form reads its values once.
+  // is typed in them: they read their values once.
   $effect(() =>
     every(kRefreshMs, () => {
-      loadStock(query)
+      loadStock(query())
       loadTargets()
     }),
   )
+
+  function select(item: StockItem) {
+    selected = selected?.goodsId === item.goodsId ? null : item
+    placed = ''
+  }
+
+  const keyOf = (item: StockItem) => `${item.name}:${item.damage}${isDrop(item) ? ` · ${item.variant}` : ''}`
 </script>
 
-<section>
-  <input class="search" type="search" placeholder="Search by name" bind:value={query} />
-  {#if placed}<p class="ok">{placed}</p>{/if}
-  {#if error}
-    <p class="error">{error}</p>
-  {:else if !loading && items.length === 0}
-    <p class="muted">Nothing found{query ? '' : ': no finished scan yet?'}</p>
-  {/if}
-  <table>
-    <tbody>
-      {#each items as item (item.goodsId)}
-        {@const target = targets.get(item.goodsId)}
-        <tr>
-          <td>
-            <div class="goods">
-              <Icon goods={item} />
-              <div>
-                <div>{plainLabel(item.label)}</div>
-                <div class="key">{item.name}:{item.damage}{isDrop(item) ? ` · ${item.variant}` : ''}</div>
-              </div>
-            </div>
-          </td>
-          <td class="num" class:zero={item.amount === 0}>{amount(item.amount)}{unit(item)}</td>
-          <td class="actions">
-            <button onclick={() => toggle(item.goodsId, 'order')}>Order…</button>
-            <button class:set={target} onclick={() => toggle(item.goodsId, 'target')}>
-              {target ? `≥ ${amount(target.threshold)}` : 'Target…'}
-            </button>
-          </td>
-        </tr>
-        {#if editing?.id === item.goodsId && editing.form === 'order'}
-          <tr>
-            <td colspan="3">
-              <OrderForm
-                goods={item}
-                onplaced={(id) => {
-                  editing = null
-                  placed = `Order #${id} queued: see Orders.`
-                }}
-                oncancel={() => (editing = null)}
-              />
-            </td>
-          </tr>
-        {/if}
-        {#if editing?.id === item.goodsId && editing.form === 'target'}
-          <tr>
-            <td colspan="3">
-              <TargetForm
-                goods={item}
-                current={target}
-                onsaved={() => {
-                  editing = null
-                  loadTargets()
-                }}
-                oncancel={() => (editing = null)}
-              />
-            </td>
-          </tr>
-        {/if}
-      {/each}
-    </tbody>
-  </table>
-</section>
+<div class="controls">
+  <input class="search" type="search" placeholder="Search: words in any order, e.g. al cab" bind:value={text} />
+  <div class="switch">
+    {#each Object.entries(kinds) as [key, title] (key)}
+      <button class:on={kind === key} onclick={() => (kind = key as StockQuery['kind'])}>{title}</button>
+    {/each}
+  </div>
+  <select bind:value={sort}>
+    <option value="label">by name</option>
+    <option value="amount">by amount</option>
+  </select>
+  <button onclick={() => (dir = dir === 'asc' ? 'desc' : 'asc')}>
+    {dir === 'asc' ? '↑ ascending' : '↓ descending'}
+  </button>
+</div>
+
+{#if selected}
+  {@const target = targets.get(selected.goodsId)}
+  <section class="selected">
+    <div class="head">
+      <Icon goods={selected} />
+      <div class="name">
+        <div class="label">{shownLabel(selected)}</div>
+        <div class="key">{keyOf(selected)}</div>
+      </div>
+      <div class="num">{amount(selected.amount)}{unit(selected)}</div>
+      <button class="close" title="Close" onclick={() => (selected = null)}>✕</button>
+    </div>
+    {#if placed}<p class="ok">{placed}</p>{/if}
+    {#key `${selected.goodsId}:${formsVersion}`}
+      <div class="forms">
+        <TargetForm
+          goods={selected}
+          current={target}
+          onsaved={async () => {
+            await loadTargets()
+            formsVersion++
+          }}
+          oncancel={() => (selected = null)}
+        />
+        <OrderForm
+          goods={selected}
+          onplaced={(id) => {
+            placed = `Order #${id} queued: see Orders.`
+            formsVersion++
+          }}
+          oncancel={() => (selected = null)}
+        />
+      </div>
+    {/key}
+  </section>
+{/if}
+
+{#if error}
+  <p class="error">{error}</p>
+{:else if !loading && items.length === 0}
+  <p class="muted">Nothing found{text || kind !== 'all' ? '' : ': no finished scan yet?'}</p>
+{/if}
+
+<div class="grid">
+  {#each items as item (item.goodsId)}
+    {@const target = targets.get(item.goodsId)}
+    <button
+      class="tile"
+      class:current={selected?.goodsId === item.goodsId}
+      title={`${shownLabel(item)}\n${amount(item.amount)}${unit(item)}\n${keyOf(item)}`}
+      onclick={() => select(item)}
+    >
+      <Icon goods={item} />
+      <span class="text">
+        <span class="label">{shownLabel(item)}</span>
+        <span class="amount" class:zero={item.amount === 0}>
+          {compact(item.amount)}{unit(item)}
+          {#if target}
+            <span class="target" class:off={!target.enabled}>≥ {compact(target.threshold)}</span>
+          {/if}
+        </span>
+      </span>
+    </button>
+  {/each}
+</div>
+{#if items.length === kLimit}
+  <p class="muted">The first {kLimit} only: narrow the search.</p>
+{/if}
 
 <style>
-  .search {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.5rem 0.75rem;
-    font-size: 1rem;
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-bottom: 0.75rem;
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
+  .search {
+    flex: 1 1 16rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
   }
-  td {
+  .switch {
+    display: flex;
+  }
+  .switch button {
+    border-radius: 0;
+  }
+  .switch button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+  .switch button:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+  .switch button.on {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  .selected {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin-bottom: 0.75rem;
+    padding: 0.6rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--bg);
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .name {
+    flex: 1;
+    min-width: 0;
+  }
+  .head .label {
+    font-weight: 600;
+  }
+  .forms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1rem;
+  }
+  .forms > :global(form) {
+    flex: 1 1 26rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0.4rem;
+  }
+  .tile {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid var(--line);
-    vertical-align: top;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
+  .tile:hover {
+    border-color: var(--muted);
+  }
+  .tile.current {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .tile .label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    line-height: 1.25;
+  }
+  .amount {
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .target {
+    margin-left: 0.3rem;
+    color: var(--accent);
+  }
+  .target.off {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+
   .key {
     font-size: 0.75rem;
     color: var(--muted);
   }
   .num {
-    text-align: right;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-  .actions {
-    width: 1%;
-    white-space: nowrap;
-  }
-  button.set {
-    font-variant-numeric: tabular-nums;
+  .close {
+    padding: 0.2rem 0.5rem;
   }
   .zero,
   .muted {
@@ -166,6 +294,7 @@
     color: var(--error);
   }
   .ok {
+    margin: 0.3rem 0;
     color: var(--accent);
   }
 </style>

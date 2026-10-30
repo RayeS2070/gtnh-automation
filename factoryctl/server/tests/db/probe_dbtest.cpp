@@ -26,7 +26,7 @@ class ProbeTest : public DbTest {
     scan({{kRod, "Long Lanthanum Hexaboride Rod", 55'452},
           {kPersulfate, "drop of Sodium Persulfate", 1'366'000}},
          t0);
-    rod = findStock(db(), "lanthanum", 1).at(0).goodsId;
+    rod = findStock(db(), {.text = "lanthanum", .limit = 1}).at(0).goodsId;
   }
 
   auto scan(std::vector<ScannedGoods> goods, TimePoint at) -> void {

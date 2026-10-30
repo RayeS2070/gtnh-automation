@@ -42,8 +42,21 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T
 }
 
-export async function fetchStock(query: string, limit = 200): Promise<StockItem[]> {
-  const params = new URLSearchParams({ q: query, limit: String(limit) })
+export type StockQuery = {
+  text: string // words, all found in the label in any order
+  kind: 'all' | 'items' | 'fluids'
+  sort: 'label' | 'amount'
+  dir: 'asc' | 'desc'
+}
+
+export async function fetchStock(query: StockQuery, limit = 200): Promise<StockItem[]> {
+  const params = new URLSearchParams({
+    q: query.text,
+    kind: query.kind,
+    sort: query.sort,
+    dir: query.dir,
+    limit: String(limit),
+  })
   return (await call<{ items: StockItem[] }>('GET', `/api/v1/stock?${params}`)).items
 }
 

@@ -27,8 +27,8 @@ class SettlingTest : public DbTest {
         {kRod, "Long Lanthanum Hexaboride Rod", 5}, {kStick, "Stick", 5}};
     (void)storeBatch(db(), id, goods);
     (void)finishScan(db(), id, t0);
-    rod = findStock(db(), "lanthanum", 1).at(0).goodsId;
-    stick = findStock(db(), "stick", 1).at(0).goodsId;
+    rod = findStock(db(), {.text = "lanthanum", .limit = 1}).at(0).goodsId;
+    stick = findStock(db(), {.text = "stick", .limit = 1}).at(0).goodsId;
   }
 
   // An order that closed with `status` at `at`.

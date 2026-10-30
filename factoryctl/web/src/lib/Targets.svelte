@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deleteTarget, fetchTargets, putTarget, type Target } from './api'
-  import { amount, plainLabel, unit } from './format'
+  import { amount, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
@@ -55,7 +55,7 @@
             <div class="goods">
               <Icon goods={t} />
               <div>
-                <div>{plainLabel(t.label)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}
+                <div>{shownLabel(t)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}
                   {#if t.fill}<span class="tag">fill</span>{/if}</div>
                 {#if t.note}<div class="note">{t.note}</div>{/if}
               </div>
@@ -71,7 +71,7 @@
             </button>
             <button
               onclick={() => {
-                if (confirm(`Delete the target for ${plainLabel(t.label)}?`)) act(() => deleteTarget(t.goodsId))
+                if (confirm(`Delete the target for ${shownLabel(t)}?`)) act(() => deleteTarget(t.goodsId))
               }}>Delete</button>
           </td>
         </tr>

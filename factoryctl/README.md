@@ -45,7 +45,8 @@ The schema is one file, `server/schema/schema.sql`, versioned; there are no migr
 server finding another version refuses to start and says how to drop the old schema.
 Periods and scan parameters are in `server/configs/config_vars.yaml`.
 
-**Web client** (`web/`, Svelte + TypeScript). Stock search; targets (threshold, batch,
+**Web client** (`web/`, Svelte + TypeScript). Stock as a grid of tiles with search by words,
+items or fluids, by name or amount; the chosen goods' target and order forms above it; targets (threshold, batch,
 priority, fill, pause); one-off orders and cancel; the order list with status, CPU and
 progress. Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
 Item icons come from the GTNH Calculator's export (`../assets/data`, served at `/data/`): the
@@ -57,7 +58,7 @@ is of another game version, so a few goods have no icon.
 | Path | |
 |---|---|
 | `POST /agent/v1/poll`, `POST /agent/v1/scan` | the agent; answers are Lua tables, always HTTP 200 with `ok` |
-| `GET /api/v1/stock?q=&limit=` | stock by label |
+| `GET /api/v1/stock?q=&kind=&sort=&dir=&limit=` | stock: every word of `q` in the label, any order; `kind` all/items/fluids; `sort` label/amount; `dir` asc/desc |
 | `GET /api/v1/targets`, `PUT|DELETE /api/v1/targets/{goods_id}` | targets |
 | `GET|POST /api/v1/orders`, `POST /api/v1/orders/{order_id}/cancel` | orders |
 | `GET /health`, `GET /ping` | |

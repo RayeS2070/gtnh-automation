@@ -30,8 +30,8 @@ class ManualTest : public DbTest {
          1'366'000}};
     (void)storeBatch(db(), id, goods);
     (void)finishScan(db(), id, t0);
-    casing = findStock(db(), "casing", 1).at(0).goodsId;
-    persulfate = findStock(db(), "persulfate", 1).at(0).goodsId;
+    casing = findStock(db(), {.text = "casing", .limit = 1}).at(0).goodsId;
+    persulfate = findStock(db(), {.text = "persulfate", .limit = 1}).at(0).goodsId;
   }
 
   // Moves an order as a poll would.

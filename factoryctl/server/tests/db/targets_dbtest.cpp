@@ -25,8 +25,8 @@ class TargetsTest : public DbTest {
         {{"ae2fc:fluid_drop", 0, "xenoxene"}, "drop of Xenoxene", 1000}};
     (void)storeBatch(db(), id, goods);
     (void)finishScan(db(), id, t0);
-    stick = findStock(db(), "stick", 1).at(0).goodsId;
-    xenoxene = findStock(db(), "xenoxene", 1).at(0).goodsId;
+    stick = findStock(db(), {.text = "stick", .limit = 1}).at(0).goodsId;
+    xenoxene = findStock(db(), {.text = "xenoxene", .limit = 1}).at(0).goodsId;
   }
 
   std::int64_t stick = 0, xenoxene = 0;

@@ -32,6 +32,22 @@ auto limitOf(const std::string& arg) -> std::int64_t {
   return std::min(n, kMaxLimit);
 }
 
+// Unknown values mean the default, as an unusable limit does.
+auto queryOf(const userver::server::http::HttpRequest& request)
+    -> db::StockQuery {
+  const auto& kind = request.GetArg("kind");
+  return {
+      .text = request.GetArg("q"),
+      .kind = kind == "items"    ? db::GoodsKind::kItems
+              : kind == "fluids" ? db::GoodsKind::kFluids
+                                 : db::GoodsKind::kAll,
+      .order = request.GetArg("sort") == "amount" ? db::StockOrder::kAmount
+                                                  : db::StockOrder::kLabel,
+      .descending = request.GetArg("dir") == "desc",
+      .limit = limitOf(request.GetArg("limit")),
+  };
+}
+
 }  // namespace
 
 StockHandler::StockHandler(const userver::components::ComponentConfig& config,
@@ -46,8 +62,7 @@ auto StockHandler::HandleRequestThrow(
     const userver::server::http::HttpRequest& request,
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
-  const auto rows = db::findStock(*db_, request.GetArg("q"),
-                                  limitOf(request.GetArg("limit")));
+  const auto rows = db::findStock(*db_, queryOf(request));
   json::ValueBuilder items(userver::formats::common::Type::kArray);
   for (const auto& r : rows) items.PushBack(toJson(r));
   json::ValueBuilder body;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { putTarget, type Priority, type TargetSettings } from './api'
-  import { amount, parseAmount, plainLabel, unit } from './format'
+  import { amount, parseAmount, shownLabel, unit } from './format'
 
   type Props = {
     goods: { goodsId: number; label: string; variant: string }
@@ -50,7 +50,7 @@
 </script>
 
 <form onsubmit={save}>
-  <div class="title">Target for {plainLabel(goods.label)}</div>
+  <div class="title">Target for {shownLabel(goods)}</div>
   <label>
     Keep at least
     <input bind:value={threshold} placeholder="0 = always" inputmode="numeric" />

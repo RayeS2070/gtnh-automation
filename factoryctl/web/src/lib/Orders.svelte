@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cancelOrder, fetchOrders, openStatuses, type Order } from './api'
-  import { amount, plainLabel, unit } from './format'
+  import { amount, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
 
@@ -21,7 +21,7 @@
   $effect(() => every(kRefreshMs, load))
 
   async function cancel(o: Order) {
-    if (!confirm(`Cancel the order of ${amount(o.amount)} ${plainLabel(o.goods.label)}?`)) return
+    if (!confirm(`Cancel the order of ${amount(o.amount)} ${shownLabel(o.goods)}?`)) return
     try {
       await cancelOrder(o.id)
       await load()
@@ -56,7 +56,7 @@
             <div class="goods">
               <Icon goods={o.goods} />
               <div>
-                <div>{plainLabel(o.goods.label)}</div>
+                <div>{shownLabel(o.goods)}</div>
                 <div class="small">#{o.id} · {o.source === 'auto' ? 'target' : o.requestedBy || 'one-off'}</div>
               </div>
             </div>

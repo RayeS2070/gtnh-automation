@@ -7,6 +7,12 @@ export function isDrop(item: { variant: string }): boolean {
   return item.variant !== ''
 }
 
+// What to show for goods: the label without formatting codes; a drop without "drop of ".
+export function shownLabel(goods: { label: string; variant: string }): string {
+  const label = plainLabel(goods.label)
+  return isDrop(goods) ? label.replace(/^drop of /, '') : label
+}
+
 const kGroups = new Intl.NumberFormat('en-US')
 
 export function amount(n: number): string {
@@ -15,6 +21,13 @@ export function amount(n: number): string {
 
 export function unit(item: { variant: string }): string {
   return isDrop(item) ? ' mB' : ''
+}
+
+const kCompact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
+
+// Short, for tight places: 1.5K, 23M.
+export function compact(n: number): string {
+  return kCompact.format(n)
 }
 
 const kSuffixes: Record<string, number> = { k: 1e3, m: 1e6, g: 1e9 }

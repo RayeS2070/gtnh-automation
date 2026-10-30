@@ -27,7 +27,7 @@
     {/each}
   </nav>
 </header>
-<main>
+<main class:wide={page === 'stock'}>
   {#if page === 'targets'}
     <Targets />
   {:else if page === 'orders'}
@@ -65,5 +65,9 @@
     max-width: 60rem;
     margin: 0 auto;
     padding: 1rem;
+  }
+  /* The stock grid uses what the screen has. */
+  main.wide {
+    max-width: 110rem;
   }
 </style>

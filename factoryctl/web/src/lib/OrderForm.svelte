@@ -1,6 +1,6 @@
 <script lang="ts">
   import { placeOrder } from './api'
-  import { amount as format, parseAmount, plainLabel, unit } from './format'
+  import { amount as format, parseAmount, shownLabel, unit } from './format'
   import { loadName, saveName } from './who'
 
   type Props = {
@@ -34,7 +34,7 @@
 </script>
 
 <form onsubmit={submit}>
-  <div class="title">Order {plainLabel(goods.label)} once</div>
+  <div class="title">Order {shownLabel(goods)} once</div>
   <label>
     Amount
     <input bind:value={count} placeholder="e.g. 128, 10k" inputmode="numeric" />
