@@ -39,9 +39,14 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
   }
 
   std::vector<Order> open;
-  for (const auto& o : orders) open.push_back({o.item, o.status});
-  out.created =
-      plan({in.targets, in.stock, open, in.report.cpus, settings.lowFreeCpus});
+  auto settling = in.settling;
+  for (const auto& o : orders) {
+    open.push_back({o.item, o.status});
+    // Closed in this tick: what it made is in no scan yet.
+    if (!isOpen(o.status)) settling.push_back(o.item);
+  }
+  out.created = plan({in.targets, in.stock, open, in.report.cpus,
+                      settings.lowFreeCpus, settling});
   return out;
 }
 

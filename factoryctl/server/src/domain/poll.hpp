@@ -76,6 +76,9 @@ struct TickInput {
   PollReport report;
   std::vector<Target> targets;  // enabled ones
   const Stock* stock = nullptr;
+  // Goods with an order closed since the last finished scan started (from
+  // the database); orders that close in this tick are added to them.
+  std::vector<ItemKey> settling;
   TimePoint now;
 };
 

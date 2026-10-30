@@ -169,4 +169,21 @@ auto statusOf(std::string_view name) -> OrderStatus {
   throw std::logic_error("unknown order status " + std::string(name));
 }
 
+auto loadSettling(pg::Transaction& tx, domain::TimePoint stockAsOf)
+    -> std::vector<domain::ItemKey> {
+  const auto rows = tx.Execute(
+      "SELECT DISTINCT g.name, g.damage, g.variant "
+      "FROM factoryctl.orders o JOIN factoryctl.goods g ON g.id = o.goods_id "
+      "WHERE o.status IN ('done', 'failed', 'canceled', 'lost')"
+      "  AND o.changed_at >= $1",
+      pg::TimePointTz{stockAsOf});
+  std::vector<domain::ItemKey> keys;
+  for (const auto& row : rows) {
+    keys.push_back({row["name"].As<std::string>(),
+                    row["damage"].As<std::int32_t>(),
+                    row["variant"].As<std::string>()});
+  }
+  return keys;
+}
+
 }  // namespace factoryctl::db

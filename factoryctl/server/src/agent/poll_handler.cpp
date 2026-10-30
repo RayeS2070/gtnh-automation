@@ -118,17 +118,23 @@ auto PollHandler::HandleRequestThrow(
   const auto stock = db::currentStock(*db_);
   auto tx = db_->Begin(pg::ClusterHostType::kMaster, {});
   auto orders = db::loadOpenOrders(tx);
+  const auto scans = db::scanState(tx);
+  // The stock is as of the start of the last finished scan: goods whose order
+  // closed since then wait for the next one.
+  auto settling = scans.lastFinished ? db::loadSettling(tx, *scans.lastFinished)
+                                     : std::vector<domain::ItemKey>{};
   const auto out = domain::tick(orders,
                                 {.report = *report,
                                  .targets = db::loadTargets(tx),
                                  .stock = stock ? &*stock : nullptr,
+                                 .settling = std::move(settling),
                                  .now = now},
                                 settings_);
   db::saveOrders(tx, orders);
   const auto created = db::insertOrders(tx, out.created, now);
   db::saveCpus(tx, report->cpus, now);
   std::optional<ScanTask> scan;
-  if (domain::needScan(db::scanState(tx), settings_, now)) {
+  if (domain::needScan(scans, settings_, now)) {
     scan = ScanTask{db::startScan(tx, now), settings_.scan};
   }
   tx.Commit();

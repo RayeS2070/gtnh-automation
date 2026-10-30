@@ -73,6 +73,16 @@ TEST(Plan, OrderOfAnotherItemDoesNotBlock) {
       1);
 }
 
+TEST(Plan, SettlingGoodsWaitForTheirScan) {
+  // An order of it closed after the stock was measured: the stock does not
+  // show its result yet.
+  const Stock stock{{kDust, 10}};
+  const std::vector<Target> targets{{kDust, 100, 500}, {kRod, 100, 64}};
+  const std::vector<ItemKey> settling{kDust};
+  EXPECT_EQ(plan({targets, &stock, {}, {}, 0, settling}),
+            (std::vector<NewOrder>{{kRod, 64}}));
+}
+
 TEST(Plan, CraftingByCpuBlocks) {
   // A player may have started it by hand: do not order it twice.
   const Stock stock{};

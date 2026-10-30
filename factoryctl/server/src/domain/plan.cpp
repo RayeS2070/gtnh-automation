@@ -56,6 +56,7 @@ auto plan(const PlanInput& in) -> std::vector<NewOrder> {
     if (t.batch <= 0) continue;
     if (t.priority == Priority::kLow && !lowAllowed) continue;
     if (inProgress(in, t.item)) continue;
+    if (std::ranges::contains(in.settling, t.item)) continue;
     const bool always = t.threshold <= 0;
     if (always || stockOf(*in.stock, t.item) < t.threshold) {
       out.push_back({t.item, t.batch});

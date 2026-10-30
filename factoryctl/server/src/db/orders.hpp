@@ -40,6 +40,11 @@ auto saveCpus(pg::Transaction& tx, std::span<const domain::Cpu> cpus,
 
 auto scanState(pg::Transaction& tx) -> domain::ScanState;
 
+// Goods with an order closed at or after `stockAsOf` (the start of the last
+// finished scan): that scan's stock does not show what the order made.
+auto loadSettling(pg::Transaction& tx, domain::TimePoint stockAsOf)
+    -> std::vector<domain::ItemKey>;
+
 // Names of the order_status database enum.
 auto statusName(domain::OrderStatus status) -> std::string;
 auto statusOf(std::string_view name) -> domain::OrderStatus;

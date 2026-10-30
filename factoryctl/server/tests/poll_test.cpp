@@ -124,8 +124,10 @@ TEST(Poll, TimeLimitsGiveAlarms) {
   EXPECT_EQ(orders[0].status, OrderStatus::kLost);
 }
 
-TEST(Poll, PlanSeesTheOrdersAfterTheReport) {
-  // The stick order finishes in this report: a new one may be planned now.
+TEST(Poll, OrderClosedNowSettlesItsGoods) {
+  // The stick order finishes in this report, but the stock is from a scan
+  // made before: ordering again on it ordered 7000 rods in game instead of
+  // ~5000. The goods wait for a scan that sees the result.
   std::vector orders{order(1, OrderStatus::kCrafting)};
   orders[0].cpu = "CPU_022";
   const Stock stock{{kStick, 10}};
@@ -135,7 +137,18 @@ TEST(Poll, PlanSeesTheOrdersAfterTheReport) {
                      .now = t0};
   const auto out = tick(orders, in, kSettings);
   EXPECT_EQ(orders[0].status, OrderStatus::kDone);
-  EXPECT_EQ(out.created, (std::vector<NewOrder>{{kStick, 1000}}));
+  EXPECT_TRUE(out.created.empty());
+}
+
+TEST(Poll, SettlingGoodsFromEarlierPollsWait) {
+  std::vector<OrderState> orders;
+  const Stock stock{{kStick, 10}, {kRod, 10}};
+  const TickInput in{.targets = {{kStick, 100, 1000}, {kRod, 100, 64}},
+                     .stock = &stock,
+                     .settling = {kStick},
+                     .now = t0};
+  EXPECT_EQ(tick(orders, in, kSettings).created,
+            (std::vector<NewOrder>{{kRod, 64}}));
 }
 
 TEST(Poll, OpenOrderStillBlocksPlanning) {

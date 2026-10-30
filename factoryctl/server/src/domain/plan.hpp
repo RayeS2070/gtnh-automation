@@ -77,6 +77,9 @@ struct PlanInput {
   // Low priority runs only while at least this many CPUs are idle: it takes
   // idle CPUs and leaves a reserve for everything else.
   std::int32_t lowFreeCpus = 0;
+  // Goods whose order closed after the stock was measured: the stock does not
+  // show what was made yet, so they wait for the next scan.
+  std::span<const ItemKey> settling;
 };
 
 struct NewOrder {
