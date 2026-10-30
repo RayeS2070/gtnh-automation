@@ -89,7 +89,7 @@ return {
         name = 'Simple Naquadah',
         trigger = 'surplus',
         tier = 2, -- wiki
-        catalysts = 1,
+        catalysts = 16,
         inputs = {
             { item = 'Naquadah Oxide Mixture Dust', amount = 32 },
             { item = 'Sodium Dust',                 amount = 64 },
@@ -106,7 +106,7 @@ return {
         name = 'Inert Enriched Naquadah',
         trigger = 'surplus',
         tier = 2, -- wiki
-        catalysts = 1,
+        catalysts = 4,
         inputs = {
             { item = 'Enriched-Naquadah Oxide Mixture Dust', amount = 32 },
             { item = 'Zinc Dust',                            amount = 64 },
