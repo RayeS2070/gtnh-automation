@@ -15,6 +15,50 @@ agent (OpenComputers, in game) --HTTP poll--> server (C++, userver) --> PostgreS
 
 Replaces `../maintainer/` and, for items and fluids, the InfluxDB exporter.
 
+## How it works
+
+**Agent** (`agent/`, Lua on an OpenComputers computer). It decides nothing; every poll it:
+
+- reports the crafting CPUs (`finalOutput()` of each: what it crafts and what is left), the
+  results of its orders, the stock of the targets the server listed (point lookups,
+  `getItemInNetwork`, measured after the CPUs) and its own log lines;
+- runs what the reply hands out: orders (`getCraftables(filter)`, `request`), cancels (only if
+  the CPU still shows that item) and scans of the whole network (`getItemsInNetworkById` in id
+  chunks; ids 250..320 in chunks of 5, or the game server runs out of memory);
+- polls every `poll-interval`, and at once when one of its crafts ends (it looks at its own jobs
+  every second; on GTNH 2.9 network events can take the place of that).
+
+Results and log lines stay with the agent until a poll gets through. Every order is requested
+at most once: one whose result never comes is marked lost, never sent again by itself.
+
+**Server** (`server/`, C++ with userver). One poll is one transaction:
+
+- results first, then CPUs: orders move `queued → sent → computing/accepted → crafting → done`
+  (or `failed`, `canceled`, `lost`); a craft that left its CPU is done;
+- time limits: lost orders, and alarms in the log for long computing and stalled crafts;
+- targets: an order when the stock is below the threshold, one batch or, with *fill*, what is
+  missing in whole batches; low priority only while enough CPUs are idle (`low-free-cpus`);
+  goods whose order closed wait until their stock is measured again;
+- at most one open order per goods (the database enforces it), automatic or one-off.
+
+The schema is one file, `server/schema/schema.sql`, versioned; there are no migrations: a
+server finding another version refuses to start and says how to drop the old schema.
+Periods and scan parameters are in `server/configs/config_vars.yaml`.
+
+**Web client** (`web/`, Svelte + TypeScript). Stock search; targets (threshold, batch,
+priority, fill, pause); one-off orders and cancel; the order list with status, CPU and
+progress. Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
+
+**HTTP API**
+
+| Path | |
+|---|---|
+| `POST /agent/v1/poll`, `POST /agent/v1/scan` | the agent; answers are Lua tables, always HTTP 200 with `ok` |
+| `GET /api/v1/stock?q=&limit=` | stock by label |
+| `GET /api/v1/targets`, `PUT|DELETE /api/v1/targets/{goods_id}` | targets |
+| `GET|POST /api/v1/orders`, `POST /api/v1/orders/{order_id}/cancel` | orders |
+| `GET /health`, `GET /ping` | |
+
 ## Build
 
 Needs CMake 3.30+, Ninja, clang or gcc, and system packages for userver: boost, c-ares, curl,
