@@ -7,6 +7,7 @@ export type StockItem = {
   variant: string // a fluid drop's fluid, e.g. molten.platinum; '' for other items
   label: string
   amount: number // pieces; mB for a fluid drop
+  craftable: boolean // AE has a pattern for it, when last seen (scan, probe or order)
 }
 
 export type Priority = 'high' | 'low'

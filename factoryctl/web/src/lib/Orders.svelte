@@ -69,6 +69,9 @@
             {/if}
             {#if o.cancelRequested && isOpen(o)}<div class="small">cancel asked</div>{/if}
             {#if o.message}<div class="small error">{o.message}</div>{/if}
+            {#if !o.goods.craftable && (o.status === 'accepted' || o.status === 'crafting')}
+              <div class="small warn">AE can no longer craft it: the craft may hang. Cancel it if it stops.</div>
+            {/if}
           </td>
           <td class="small">{time(o.createdAt)}</td>
           <td class="actions">
@@ -135,6 +138,9 @@
   }
   .muted {
     color: var(--muted);
+  }
+  .warn {
+    color: var(--warn);
   }
   .error {
     color: var(--error);

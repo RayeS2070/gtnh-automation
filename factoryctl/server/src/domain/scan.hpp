@@ -18,6 +18,7 @@ struct ScannedStack {
   std::string label;
   std::int64_t size = 0;
   std::string fluid;  // fluidDrop.name of a fluid drop, else empty
+  bool craftable = true;  // isCraftable: AE has a pattern for it
 };
 
 // What the database keeps per item: stacks of one key summed up.
@@ -25,6 +26,7 @@ struct ScannedGoods {
   ItemKey key;
   std::string label;
   std::int64_t size = 0;
+  bool craftable = true;  // any of its stacks is
 
   auto operator==(const ScannedGoods&) const -> bool = default;
 };

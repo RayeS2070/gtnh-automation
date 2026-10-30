@@ -62,6 +62,7 @@ auto plan(const PlanInput& in) -> std::vector<NewOrder> {
     if (t.priority == Priority::kLow && !lowAllowed) continue;
     if (inProgress(in, t.item)) continue;
     if (std::ranges::contains(in.settling, t.item)) continue;
+    if (std::ranges::contains(in.uncraftable, t.item)) continue;
     const bool always = t.threshold <= 0;
     const auto have = stockOf(*in.stock, t.item);
     if (always || have < t.threshold) {

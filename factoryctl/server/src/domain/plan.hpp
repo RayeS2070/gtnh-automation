@@ -82,6 +82,8 @@ struct PlanInput {
   // Goods whose order closed after the stock was measured: the stock does not
   // show what was made yet, so they wait for the next scan.
   std::span<const ItemKey> settling;
+  // Goods AE cannot craft (no pattern): an order would only fail.
+  std::span<const ItemKey> uncraftable;
 };
 
 struct NewOrder {

@@ -26,8 +26,8 @@ auto storeBatch(pg::Cluster& db, std::int64_t scan,
     -> std::expected<void, std::string>;
 
 // Closes the scan and writes the stock of every target into the history
-// (0 for a target the scan did not see). Refused for an unknown or finished
-// scan.
+// (0 for a target the scan did not see); what it did not see is no longer
+// craftable. Refused for an unknown or finished scan.
 auto finishScan(pg::Cluster& db, std::int64_t scan, domain::TimePoint now)
     -> std::expected<void, std::string>;
 

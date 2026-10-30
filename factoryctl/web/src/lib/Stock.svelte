@@ -119,14 +119,21 @@
           }}
           oncancel={() => (selected = null)}
         />
-        <OrderForm
-          goods={selected}
-          onplaced={(id) => {
-            placed = `Order #${id} queued: see Orders.`
-            formsVersion++
-          }}
-          oncancel={() => (selected = null)}
-        />
+        {#if selected.craftable}
+          <OrderForm
+            goods={selected}
+            onplaced={(id) => {
+              placed = `Order #${id} queued: see Orders.`
+              formsVersion++
+            }}
+            oncancel={() => (selected = null)}
+          />
+        {:else}
+          <p class="nopattern-note">
+            AE has no pattern for it, so it cannot be ordered. A target waits until AE can craft it
+            again; the next scan sees a new pattern (a target's, the next poll).
+          </p>
+        {/if}
       </div>
     {/key}
   </section>
@@ -155,6 +162,7 @@
           {#if target}
             <span class="target" class:off={!target.enabled}>≥ {compact(target.threshold)}</span>
           {/if}
+          {#if !item.craftable}<span class="nopattern">no pattern</span>{/if}
         </span>
       </span>
     </button>
@@ -273,6 +281,16 @@
   .target.off {
     color: var(--muted);
     text-decoration: line-through;
+  }
+
+  .nopattern {
+    margin-left: 0.3rem;
+    color: var(--warn);
+  }
+  .nopattern-note {
+    flex: 1 1 26rem;
+    margin: 0.3rem 0;
+    color: var(--warn);
   }
 
   .key {

@@ -210,4 +210,94 @@ TEST(Poll, NewOrdersWaitForTheNextPoll) {
   EXPECT_TRUE(out.send.empty()) << "a new order has no id before it is stored";
 }
 
+// --- craftability --------------------------------------------------------------
+
+TEST(Poll, NotCraftableResultStopsTheTargetAtOnce) {
+  // The pattern is gone: the agent's getCraftables found nothing. Without
+  // knowing it, plan would order again in this very tick, and fail again
+  // every poll.
+  std::vector orders{order(1, OrderStatus::kSent)};
+  const Stock stock{};
+  const TickInput in{
+      .report = {.results = {{1, AgentStatus::kFailed, "not craftable", false}}},
+      .targets = {{kStick, 100, 1000}},
+      .stock = &stock,
+      .now = t0};
+  const auto out = tick(orders, in, kSettings);
+  EXPECT_EQ(orders[0].status, OrderStatus::kFailed);
+  EXPECT_TRUE(out.created.empty());
+  EXPECT_EQ(out.craftability, (std::vector<Craftability>{{kStick, false}}));
+}
+
+TEST(Poll, UncraftableGoodsWait) {
+  std::vector<OrderState> orders;
+  const Stock stock{};
+  const TickInput in{.targets = {{kStick, 100, 1000}, {kRod, 100, 64}},
+                     .stock = &stock,
+                     .uncraftable = {kStick},
+                     .now = t0};
+  EXPECT_EQ(tick(orders, in, kSettings).created,
+            (std::vector<NewOrder>{{kRod, 64}}));
+}
+
+TEST(Poll, ProbeSaysCraftableAgain) {
+  // The pattern is back: the target orders in the same tick.
+  std::vector<OrderState> orders;
+  const Stock stock{};
+  const TickInput in{.report = {.stock = {{kStick, 0, true}}},
+                     .targets = {{kStick, 100, 1000}},
+                     .stock = &stock,
+                     .uncraftable = {kStick},
+                     .now = t0};
+  const auto out = tick(orders, in, kSettings);
+  EXPECT_EQ(out.created, (std::vector<NewOrder>{{kStick, 1000}}));
+  EXPECT_EQ(out.craftability, (std::vector<Craftability>{{kStick, true}}));
+}
+
+TEST(Poll, ProbeWithoutCraftabilityKeepsWhatIsKnown) {
+  std::vector<OrderState> orders;
+  const Stock stock{};
+  const TickInput in{.report = {.stock = {{kStick, 0, std::nullopt}}},
+                     .targets = {{kStick, 100, 1000}},
+                     .stock = &stock,
+                     .uncraftable = {kStick},
+                     .now = t0};
+  const auto out = tick(orders, in, kSettings);
+  EXPECT_TRUE(out.created.empty());
+  EXPECT_TRUE(out.craftability.empty());
+}
+
+TEST(Poll, ProbeIsFresherThanAResult) {
+  // A result may come from a request made a step before; the probe was taken
+  // after the CPUs of this step.
+  std::vector orders{order(1, OrderStatus::kSent)};
+  const TickInput in{
+      .report = {.results = {{1, AgentStatus::kFailed, "not craftable", false}},
+                 .stock = {{kStick, 0, true}}},
+      .now = t0};
+  EXPECT_EQ(tick(orders, in, kSettings).craftability,
+            (std::vector<Craftability>{{kStick, false}, {kStick, true}}));
+}
+
+TEST(Poll, CraftThatLosesItsPatternRaisesAnAlarmOnce) {
+  // AE keeps the craft on its CPU, which may then wait forever for a pattern
+  // that is gone. It is not canceled by itself (cancel is a user's decision):
+  // the log says so once, when it is seen.
+  std::vector orders{order(1, OrderStatus::kCrafting)};
+  orders[0].cpu = "CPU_022";
+  orders[0].remaining = 500;
+  orders[0].progressAt = t0;
+  const TickInput first{.report = {.cpus = {onCpu(kStick, 500)},
+                                   .stock = {{kStick, 0, false}}},
+                        .now = t0 + 10s};
+  EXPECT_EQ(tick(orders, first, kSettings).alarms,
+            (std::vector<Alarm>{{1, AlarmKind::kNoLongerCraftable}}));
+  EXPECT_EQ(orders[0].status, OrderStatus::kCrafting);
+
+  TickInput next = first;
+  next.uncraftable = {kStick};
+  next.now = t0 + 20s;
+  EXPECT_TRUE(tick(orders, next, kSettings).alarms.empty()) << "known already";
+}
+
 }  // namespace

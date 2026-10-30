@@ -1,5 +1,7 @@
 #include "db/orders.hpp"
 
+#include <map>
+
 #include <array>
 #include <optional>
 #include <stdexcept>
@@ -186,6 +188,43 @@ auto loadSettling(pg::Transaction& tx, domain::TimePoint stockAsOf)
                     row["variant"].As<std::string>()});
   }
   return keys;
+}
+
+auto loadUncraftable(pg::Transaction& tx) -> std::vector<domain::ItemKey> {
+  const auto rows = tx.Execute(
+      "SELECT g.name, g.damage, g.variant FROM factoryctl.stock s "
+      "JOIN factoryctl.goods g ON g.id = s.goods_id WHERE NOT s.craftable");
+  std::vector<domain::ItemKey> out;
+  for (const auto& row : rows) {
+    out.push_back({row["name"].As<std::string>(),
+                   row["damage"].As<std::int32_t>(),
+                   row["variant"].As<std::string>()});
+  }
+  return out;
+}
+
+auto saveCraftability(pg::Transaction& tx,
+                      std::span<const domain::Craftability> learned) -> void {
+  std::map<domain::ItemKey, bool> last;
+  for (const auto& c : learned) last[c.item] = c.craftable;
+  if (last.empty()) return;
+  std::vector<std::string> names, variants;
+  std::vector<std::int32_t> damages;
+  std::vector<bool> craftable;
+  for (const auto& [item, value] : last) {
+    names.push_back(item.name);
+    damages.push_back(item.damage);
+    variants.push_back(item.variant);
+    craftable.push_back(value);
+  }
+  tx.Execute(
+      "UPDATE factoryctl.stock s SET craftable = c.craftable "
+      "FROM unnest($1::text[], $2::integer[], $3::text[], $4::boolean[])"
+      "       AS c(name, damage, variant, craftable) "
+      "JOIN factoryctl.goods g ON g.kind = 'item' AND g.name = c.name"
+      "  AND g.damage = c.damage AND g.variant = c.variant "
+      "WHERE s.goods_id = g.id",
+      names, damages, variants, craftable);
 }
 
 auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,

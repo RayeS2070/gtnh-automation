@@ -208,4 +208,15 @@ TEST(Plan, HighPriorityIgnoresTheReserve) {
   EXPECT_EQ(plan({targets, &stock, {}, cpus(0, 32), 8}).size(), 1);
 }
 
+TEST(Plan, UncraftableIsNotOrdered) {
+  // AE has no pattern for it: an order would only fail, again every poll.
+  const Stock stock{};
+  PlanInput in{.stock = &stock};
+  const std::vector<Target> targets{{kDust, 100, 500}, {kRod, 100, 64}};
+  const std::vector<ItemKey> uncraftable{kDust};
+  in.targets = targets;
+  in.uncraftable = uncraftable;
+  EXPECT_EQ(plan(in), (std::vector<NewOrder>{{kRod, 64}}));
+}
+
 }  // namespace

@@ -65,6 +65,30 @@ TEST(PollProtocol, StockProbes) {
   EXPECT_EQ(r->stock[2].size, std::nullopt) << "not found";
 }
 
+TEST(PollProtocol, Craftability) {
+  const auto r = poll(R"({"cpus": [],
+    "results": [{"order": 1, "status": "failed", "message": "not craftable",
+                 "craftable": false},
+                {"order": 2, "status": "computing", "craftable": true},
+                {"order": 3, "status": "done"}],
+    "stock": [{"name": "a:b", "size": 1, "craftable": false},
+              {"name": "a:c", "size": 1}]})");
+  ASSERT_TRUE(r.has_value()) << r.error();
+  EXPECT_EQ(r->results[0].craftable, false);
+  EXPECT_EQ(r->results[1].craftable, true);
+  EXPECT_EQ(r->results[2].craftable, std::nullopt);
+  EXPECT_EQ(r->stock[0].craftable, false);
+  EXPECT_EQ(r->stock[1].craftable, std::nullopt);
+  EXPECT_NE(error(R"({"cpus": [], "stock": [
+      {"name": "a:b", "craftable": "no"}]})")
+                .find("stock[0].craftable"),
+            std::string::npos);
+  EXPECT_NE(error(R"({"cpus": [], "results": [
+      {"order": 1, "status": "done", "craftable": 0}]})")
+                .find("results[0].craftable"),
+            std::string::npos);
+}
+
 TEST(PollProtocol, StockProbeErrors) {
   EXPECT_NE(
       error(R"({"cpus": [], "stock": [{"size": 1}]})").find("stock[0].name"),

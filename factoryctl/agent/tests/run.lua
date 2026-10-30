@@ -170,6 +170,11 @@ suite('me', function()
     local sizes = {}
     for _, i in ipairs(kept) do sizes[#sizes + 1] = i.label .. '=' .. i.size end
     eq(table.concat(sizes, ' '), 'MFE=1 MFE=0', 'both MFE stacks go: one of them is craftable')
+    check(kept[1].craftable == true and kept[2].craftable == true, 'an item is craftable as a whole')
+    local dirt = me.chunk({ getItemsInNetworkById = function()
+        return { { name = 'minecraft:dirt', damage = 0, label = 'Dirt', size = 900, isCraftable = false } }
+    end }, 0, 0, 500)
+    check(dirt[1].craftable == false, 'kept for its size, not craftable: says so')
     -- Drops share name and damage: they are told apart by their fluid, not lumped together.
     local broken = { getItemsInNetworkById = function() error('chunk unloaded') end }
     local none, why = me.chunk(broken, 0, 9, 500)
@@ -290,6 +295,8 @@ suite('jobs', function()
     j:start(fake.crafting({ ['minecraft:stick'] = { { job = fake.job() }, { job = fake.job() } } }),
         { id = 5, amount = 1, filter = stickFilter })
     eq(results(j), '4:failed(not craftable) 5:failed(ambiguous: 2 craftables)', 'filter matches')
+    check(j:results()[1].craftable == false, 'not craftable: the server learns it')
+    check(j:results()[2].craftable == nil, 'ambiguous says nothing about craftability')
     j:start(fake.crafting({ ['minecraft:stick'] = { { job = 'no CPU' } } }), { id = 6, amount = 1, filter = stickFilter })
     check(results(j):find('6:failed%(request: .*no CPU%)') ~= nil, 'request() throwing: failed, not a crash')
 
@@ -500,6 +507,11 @@ suite('probe', function()
     check(out[3].size == nil, 'not found: no size (the server decides)')
     check(warned[1] and warned[1]:find('boom:item') ~= nil, 'a failed lookup is logged')
     eq(#probe.measure(me, nil, function() end), 0, 'no probe list yet')
+    check(out[1].craftable == nil, 'a stack without isCraftable: unknown, not false')
+    local told = probe.measure({ getItemInNetwork = function(name)
+        return { name = name, damage = 0, size = 1, isCraftable = name == 'a:yes' }
+    end }, { { name = 'a:yes', damage = 0 }, { name = 'a:no', damage = 0 } }, function() end)
+    check(told[1].craftable == true and told[2].craftable == false, 'isCraftable passed on, false too')
     check(probe.nbt('a"b\\c') == '{Fluid:"a\\"b\\\\c"}', 'quotes in a fluid name are escaped')
 end)
 

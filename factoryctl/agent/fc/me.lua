@@ -8,6 +8,7 @@ local me = {}
 ---@field label string
 ---@field size number
 ---@field fluid string? # fluidDrop.name of a fluid drop: the server keys drops by it
+---@field craftable boolean? # scanned items: AE has a pattern for the item
 
 ---@param stack table # an ItemStack from OC
 ---@return fc.Item
@@ -65,8 +66,11 @@ function me.chunk(proxy, first, last, threshold)
     end
     local items = {}
     for _, s in ipairs(stacks or {}) do
-        if me.keep(sums[me.key(s)], threshold) then
-            items[#items + 1] = me.item(s)
+        local sum = sums[me.key(s)]
+        if me.keep(sum, threshold) then
+            local item = me.item(s)
+            item.craftable = sum.isCraftable
+            items[#items + 1] = item
         end
     end
     return items

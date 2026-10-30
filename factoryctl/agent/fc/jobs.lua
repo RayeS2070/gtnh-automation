@@ -16,6 +16,7 @@ jobs.__index = jobs
 ---@field order integer
 ---@field status string # computing | accepted | failed | canceled | done
 ---@field message string?
+---@field craftable boolean? # false: getCraftables found nothing (the pattern is gone)
 
 local kFinal = { failed = true, canceled = true, done = true }
 
@@ -29,14 +30,15 @@ function jobs.new(warn)
     }, jobs)
 end
 
-function jobs:report(order, status, message)
+function jobs:report(order, status, message, craftable)
     for _, r in ipairs(self.pending) do
         if r.order == order then
-            r.status, r.message = status, message
+            r.status, r.message, r.craftable = status, message, craftable
             return
         end
     end
-    self.pending[#self.pending + 1] = { order = order, status = status, message = message }
+    self.pending[#self.pending + 1] = { order = order, status = status, message = message,
+        craftable = craftable }
 end
 
 local function flag(job, method)
@@ -83,7 +85,7 @@ function jobs:start(proxy, task)
         return
     end
     if #craftables == 0 then
-        self:report(task.id, 'failed', 'not craftable')
+        self:report(task.id, 'failed', 'not craftable', false)
         return
     elseif #craftables > 1 then
         self:report(task.id, 'failed', ('ambiguous: %d craftables'):format(#craftables))

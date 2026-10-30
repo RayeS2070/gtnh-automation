@@ -25,9 +25,10 @@ auto mergeBatch(std::span<const ScannedStack> stacks)
     auto key = keyOf(s);
     const auto [it, added] = index.try_emplace(key, out.size());
     if (added) {
-      out.push_back({std::move(key), s.label, s.size});
+      out.push_back({std::move(key), s.label, s.size, s.craftable});
     } else {
       out[it->second].size += s.size;
+      out[it->second].craftable = out[it->second].craftable || s.craftable;
     }
   }
   return out;

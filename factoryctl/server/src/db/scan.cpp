@@ -51,12 +51,14 @@ auto storeBatch(pg::Cluster& db, std::int64_t scan,
   std::vector<std::string> names, variants, labels;
   std::vector<std::int32_t> damages;
   std::vector<std::int64_t> sizes;
+  std::vector<bool> craftable;
   for (const auto& g : goods) {
     names.push_back(g.key.name);
     damages.push_back(g.key.damage);
     variants.push_back(g.key.variant);
     labels.push_back(g.label);
     sizes.push_back(g.size);
+    craftable.push_back(g.craftable);
   }
 
   auto tx = db.Begin(kMaster, {});
@@ -66,8 +68,8 @@ auto storeBatch(pg::Cluster& db, std::int64_t scan,
   tx.Execute(
       "WITH batch AS ("
       "  SELECT * FROM unnest($2::text[], $3::integer[], $4::text[],"
-      "                       $5::text[], $6::bigint[])"
-      "    AS b(name, damage, variant, label, size)"
+      "                       $5::text[], $6::bigint[], $7::boolean[])"
+      "    AS b(name, damage, variant, label, size, craftable)"
       "), g AS ("
       "  INSERT INTO factoryctl.goods (kind, name, damage, variant, label)"
       "  SELECT 'item', name, damage, variant, label FROM batch"
@@ -75,12 +77,13 @@ auto storeBatch(pg::Cluster& db, std::int64_t scan,
       "    DO UPDATE SET label = EXCLUDED.label"
       "  RETURNING id, name, damage, variant"
       ") "
-      "INSERT INTO factoryctl.stock (goods_id, amount, scan_id) "
-      "SELECT g.id, batch.size, $1 FROM g "
+      "INSERT INTO factoryctl.stock (goods_id, amount, scan_id, craftable) "
+      "SELECT g.id, batch.size, $1, batch.craftable FROM g "
       "JOIN batch USING (name, damage, variant) "
       "ON CONFLICT (goods_id) "
-      "  DO UPDATE SET amount = EXCLUDED.amount, scan_id = EXCLUDED.scan_id",
-      scan, names, damages, variants, labels, sizes);
+      "  DO UPDATE SET amount = EXCLUDED.amount, scan_id = EXCLUDED.scan_id,"
+      "                craftable = EXCLUDED.craftable",
+      scan, names, damages, variants, labels, sizes, craftable);
   tx.Commit();
   return {};
 }
@@ -100,6 +103,12 @@ auto finishScan(pg::Cluster& db, std::int64_t scan, domain::TimePoint now)
       "LEFT JOIN factoryctl.stock s USING (goods_id) "
       "ON CONFLICT DO NOTHING",
       scan, pg::TimePointTz{now});
+  // Craftable goods are always scanned, even at 0: one this scan did not see
+  // has lost its pattern. Kept apart from scan_id, which a probe moves up.
+  tx.Execute(
+      "UPDATE factoryctl.stock SET craftable = false "
+      "WHERE scan_id < $1 AND craftable",
+      scan);
   tx.Commit();
   return {};
 }

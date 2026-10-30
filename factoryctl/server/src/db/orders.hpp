@@ -57,6 +57,14 @@ struct ProbedAmount {
 auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,
                  domain::TimePoint now) -> void;
 
+// Goods AE could not craft when last seen (stock.craftable).
+auto loadUncraftable(pg::Transaction& tx) -> std::vector<domain::ItemKey>;
+
+// What the agent learned in a poll; of several words on one item the last
+// counts. Unknown goods are left out.
+auto saveCraftability(pg::Transaction& tx,
+                      std::span<const domain::Craftability> learned) -> void;
+
 // Names of the order_status database enum.
 auto statusName(domain::OrderStatus status) -> std::string;
 auto statusOf(std::string_view name) -> domain::OrderStatus;

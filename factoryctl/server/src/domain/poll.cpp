@@ -23,6 +23,16 @@ auto trustedAmount(const Probe& probe, std::int64_t scanned)
 auto tick(std::vector<OrderState>& orders, const TickInput& in,
           const Settings& settings) -> TickOutput {
   TickOutput out;
+  // Whether AE can craft: the database's view, then what this report tells.
+  auto uncraftable = in.uncraftable;
+  const auto learn = [&](const ItemKey& item, bool craftable) {
+    out.craftability.push_back({item, craftable});
+    if (craftable) {
+      std::erase(uncraftable, item);
+    } else if (!std::ranges::contains(uncraftable, item)) {
+      uncraftable.push_back(item);
+    }
+  };
 
   for (const auto& r : in.report.results) {
     const auto it = std::ranges::find(orders, r.order, &OrderState::id);
@@ -34,6 +44,12 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
     if (auto ok = applyResult(*it, r.status, r.message, in.now); !ok) {
       out.errors.push_back(ok.error());
     }
+    if (r.craftable) learn(it->item, *r.craftable);
+  }
+  // Probes last: taken after the CPUs of this step, while a result may come
+  // from a request made a step before.
+  for (const auto& p : in.report.stock) {
+    if (p.craftable) learn(p.item, *p.craftable);
   }
 
   for (auto& o : orders) {
@@ -43,6 +59,14 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
     }
     if (markSent(o, in.now)) out.send.push_back(o.id);
     if (needsCancelTask(o)) out.cancel.push_back({o.id, o.cpu});
+    // AE keeps such a craft on its CPU, where it may wait forever. Logged
+    // when first seen; canceling it is a user's decision.
+    const bool lostNow = std::ranges::contains(uncraftable, o.item) &&
+                         !std::ranges::contains(in.uncraftable, o.item);
+    if (lostNow && (o.status == OrderStatus::kAccepted ||
+                    o.status == OrderStatus::kCrafting)) {
+      out.alarms.push_back({o.id, AlarmKind::kNoLongerCraftable});
+    }
   }
 
   std::vector<Order> open;
@@ -56,7 +80,7 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
     if (!isOpen(o.status) && !probed) settling.push_back(o.item);
   }
   out.created = plan({in.targets, in.stock, open, in.report.cpus,
-                      settings.lowFreeCpus, settling});
+                      settings.lowFreeCpus, settling, uncraftable});
   return out;
 }
 

@@ -56,7 +56,8 @@
               <Icon goods={t} />
               <div>
                 <div>{shownLabel(t)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}
-                  {#if t.fill}<span class="tag">fill</span>{/if}</div>
+                  {#if t.fill}<span class="tag">fill</span>{/if}
+                  {#if !t.craftable}<span class="tag warn" title="AE has no pattern for it: the target waits until it has">no pattern</span>{/if}</div>
                 {#if t.note}<div class="note">{t.note}</div>{/if}
               </div>
             </div>
@@ -138,6 +139,10 @@
     border: 1px solid var(--line);
     border-radius: 3px;
     color: var(--muted);
+  }
+  .tag.warn {
+    border-color: var(--warn);
+    color: var(--warn);
   }
   .muted {
     color: var(--muted);

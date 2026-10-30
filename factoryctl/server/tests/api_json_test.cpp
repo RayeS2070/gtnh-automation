@@ -18,12 +18,13 @@ TEST(ApiJson, StockRow) {
   const StockRow row{2293,
                      {"ae2fc:fluid_drop", 0, "sodiumpersulfate"},
                      "drop of Sodium Persulfate",
-                     1'366'000};
+                     1'366'000,
+                     true};
   EXPECT_EQ(
       json::ToString(toJson(row).ExtractValue()),
       R"({"goodsId":2293,"name":"ae2fc:fluid_drop","damage":0,)"
       R"("variant":"sodiumpersulfate","label":"drop of Sodium Persulfate",)"
-      R"("amount":1366000})");
+      R"("amount":1366000,"craftable":true})");
 }
 
 TEST(ApiJson, TargetRow) {

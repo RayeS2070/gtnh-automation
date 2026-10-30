@@ -36,6 +36,9 @@ auto alarmName(domain::AlarmKind kind) -> std::string_view {
       return "AE computes the crafting plan too long";
     case domain::AlarmKind::kStalled:
       return "craft stalled: remaining does not go down";
+    case domain::AlarmKind::kNoLongerCraftable:
+      return "AE can no longer craft it (pattern gone?): the craft may hang, "
+             "cancel it if it does";
   }
   return "alarm";
 }
@@ -150,9 +153,11 @@ auto PollHandler::HandleRequestThrow(
                                  .targets = db::loadTargets(tx),
                                  .stock = stock ? &*stock : nullptr,
                                  .settling = std::move(settling),
+                                 .uncraftable = db::loadUncraftable(tx),
                                  .now = now},
                                 settings_);
   db::saveOrders(tx, orders);
+  db::saveCraftability(tx, out.craftability);
   const auto created = db::insertOrders(tx, out.created, now);
   db::saveCpus(tx, report->cpus, now);
   std::optional<ScanTask> scan;

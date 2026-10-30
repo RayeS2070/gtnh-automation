@@ -22,7 +22,7 @@ auto listTargets(pg::Cluster& db) -> std::vector<TargetRow> {
       "              WHERE finished_at IS NOT NULL) "
       "SELECT g.id, g.name, g.damage, g.variant, g.label,"
       "       CASE WHEN s.scan_id >= last.id THEN s.amount ELSE 0 END AS "
-      "amount,"
+      "amount, coalesce(s.craftable, false) AS craftable,"
       "       t.threshold, t.batch, t.priority::text AS priority, t.enabled,"
       "       t.note, t.fill "
       "FROM factoryctl.targets t "
@@ -37,7 +37,8 @@ auto listTargets(pg::Cluster& db) -> std::vector<TargetRow> {
                {row["name"].As<std::string>(), row["damage"].As<std::int32_t>(),
                 row["variant"].As<std::string>()},
                row["label"].As<std::string>(),
-               row["amount"].As<std::optional<std::int64_t>>().value_or(0)};
+               row["amount"].As<std::optional<std::int64_t>>().value_or(0),
+               row["craftable"].As<bool>()};
     t.settings = {row["threshold"].As<std::int64_t>(),
                   row["batch"].As<std::int64_t>(),
                   row["priority"].As<std::string>() == "low"

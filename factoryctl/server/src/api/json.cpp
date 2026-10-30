@@ -26,6 +26,7 @@ auto toJson(const db::StockRow& row) -> json::ValueBuilder {
   e["variant"] = row.key.variant;
   e["label"] = row.label;
   e["amount"] = row.amount;
+  e["craftable"] = row.craftable;
   return e;
 }
 

@@ -16,12 +16,13 @@ function probe.nbt(fluid)
     return ('{Fluid:"%s"}'):format(fluid:gsub('[\\"]', '\\%0'))
 end
 
----Measures every task. Found: its size; not found: no size (0, or a lookup that missed: the server
----tells them apart by its scan). A lookup that fails is logged and left out.
+---Measures every task. Found: its size, and isCraftable if the stack has it; not found: no size
+---(0, or a lookup that missed: the server tells them apart by its scan). A lookup that fails is
+---logged and left out.
 ---@param proxy table # me_interface
 ---@param tasks fc.ProbeTask[]?
 ---@param warn fun(fmt: string, ...)
----@return table[] # {name, damage, fluid, size}
+---@return table[] # {name, damage, fluid, size, craftable}
 function probe.measure(proxy, tasks, warn)
     local out = {}
     for _, t in ipairs(tasks or {}) do
@@ -32,8 +33,15 @@ function probe.measure(proxy, tasks, warn)
             ok, stack = pcall(proxy.getItemInNetwork, t.name, t.damage or 0)
         end
         if ok then
-            out[#out + 1] = { name = t.name, damage = t.damage, fluid = t.fluid,
-                size = stack and stack.size or nil }
+            local found = { name = t.name, damage = t.damage, fluid = t.fluid }
+            if stack then
+                found.size = stack.size
+                -- Not `x and y or nil`: that turns false into nil.
+                if type(stack.isCraftable) == 'boolean' then
+                    found.craftable = stack.isCraftable
+                end
+            end
+            out[#out + 1] = found
         else
             warn('probe %s: %s', t.fluid or (t.name .. ':' .. tostring(t.damage)), tostring(stack))
         end

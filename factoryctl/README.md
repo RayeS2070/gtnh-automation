@@ -36,6 +36,9 @@ at most once: one whose result never comes is marked lost, never sent again by i
 - results first, then CPUs: orders move `queued → sent → computing/accepted → crafting → done`
   (or `failed`, `canceled`, `lost`); a craft that left its CPU is done;
 - time limits: lost orders, and alarms in the log for long computing and stalled crafts;
+- goods AE cannot craft (no pattern; from scans, target probes and failed orders) are not
+  ordered: targets wait, one-off orders are refused; a craft whose pattern is lost on the way
+  raises an alarm in the log (it may hang on its CPU; canceling is left to a person);
 - targets: an order when the stock is below the threshold, one batch or, with *fill*, what is
   missing in whole batches; low priority only while enough CPUs are idle (`low-free-cpus`);
   goods whose order closed wait until their stock is measured again;

@@ -25,11 +25,19 @@ auto orderOnce(pg::Cluster& db, std::int64_t goodsId, std::int64_t amount,
         kMaster,
         "INSERT INTO factoryctl.orders"
         "  (goods_id, amount, source, requested_by, created_at, changed_at) "
-        "SELECT id, $2, 'manual', $3, $4, $4 FROM factoryctl.goods "
-        "WHERE id = $1 RETURNING id",
+        "SELECT g.id, $2, 'manual', $3, $4, $4 FROM factoryctl.goods g "
+        "JOIN factoryctl.stock s ON s.goods_id = g.id "
+        "WHERE g.id = $1 AND s.craftable RETURNING id",
         goodsId, amount, std::string(requestedBy), pg::TimePointTz{now});
     if (res.IsEmpty()) {
-      return std::unexpected(std::format("no goods {}", goodsId));
+      // AE would refuse it: the agent's getCraftables finds nothing.
+      const auto known = db.Execute(kMaster,
+                                    "SELECT 1 FROM factoryctl.goods "
+                                    "WHERE id = $1",
+                                    goodsId);
+      return std::unexpected(
+          known.IsEmpty() ? std::format("no goods {}", goodsId)
+                          : std::string("AE cannot craft it: no pattern"));
     }
     return res.AsSingleRow<std::int64_t>();
   } catch (const pg::UniqueViolation&) {
@@ -45,6 +53,7 @@ auto listOrders(pg::Cluster& db, std::int64_t limit) -> std::vector<OrderRow> {
       "              WHERE finished_at IS NOT NULL) "
       "SELECT o.id, g.id AS goods_id, g.name, g.damage, g.variant, g.label,"
       "       CASE WHEN s.scan_id >= last.id THEN s.amount ELSE 0 END AS stock,"
+      "       coalesce(s.craftable, false) AS craftable,"
       "       o.amount, o.status::text AS status, o.source::text AS source,"
       "       o.requested_by, o.created_at, o.changed_at, o.message, o.cpu,"
       "       o.remaining, o.cancel_requested "
@@ -62,7 +71,8 @@ auto listOrders(pg::Cluster& db, std::int64_t limit) -> std::vector<OrderRow> {
                {row["name"].As<std::string>(), row["damage"].As<std::int32_t>(),
                 row["variant"].As<std::string>()},
                row["label"].As<std::string>(),
-               row["stock"].As<std::optional<std::int64_t>>().value_or(0)};
+               row["stock"].As<std::optional<std::int64_t>>().value_or(0),
+               row["craftable"].As<bool>()};
     o.amount = row["amount"].As<std::int64_t>();
     o.status = row["status"].As<std::string>();
     o.source = row["source"].As<std::string>();

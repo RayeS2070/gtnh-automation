@@ -18,6 +18,7 @@ struct StockRow {
   domain::ItemKey key;
   std::string label;
   std::int64_t amount = 0;  // 0 when the last finished scan did not see it
+  bool craftable = false;   // AE has a pattern for it, when last seen
 };
 
 enum class GoodsKind { kAll, kItems, kFluids };

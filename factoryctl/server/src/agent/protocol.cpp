@@ -40,6 +40,13 @@ auto flag(const json::Value& v, std::string_view path, bool absent)
   return v.As<bool>();
 }
 
+auto maybeFlag(const json::Value& v, std::string_view path)
+    -> Result<std::optional<bool>> {
+  if (v.IsMissing()) return std::nullopt;
+  if (!v.IsBool()) return fail(path, "not a boolean");
+  return v.As<bool>();
+}
+
 auto stack(const json::Value& v, std::string_view path)
     -> Result<domain::ScannedStack> {
   if (!v.IsObject()) return fail(path, "not an object");
@@ -70,6 +77,11 @@ auto stack(const json::Value& v, std::string_view path)
     if (!fluid) return std::unexpected(fluid.error());
     s.fluid = *fluid;
   }
+
+  const auto craftable =
+      flag(v["craftable"], std::format("{}.craftable", path), true);
+  if (!craftable) return std::unexpected(craftable.error());
+  s.craftable = *craftable;
   return s;
 }
 
@@ -151,6 +163,10 @@ auto result(const json::Value& v, std::string_view path)
     if (!m) return std::unexpected(m.error());
     r.message = *m;
   }
+  const auto craftable =
+      maybeFlag(v["craftable"], std::format("{}.craftable", path));
+  if (!craftable) return std::unexpected(craftable.error());
+  r.craftable = *craftable;
   return r;
 }
 
@@ -176,13 +192,17 @@ auto probe(const json::Value& v, std::string_view path)
     return fail(std::format("{}.fluid", path),
                 "missing: a drop is keyed by it");
   }
-  domain::Probe p{domain::keyOf(s), std::nullopt};
+  domain::Probe p{domain::keyOf(s), std::nullopt, std::nullopt};
   if (!v["size"].IsMissing()) {
     const auto size = integer(v["size"], std::format("{}.size", path));
     if (!size) return std::unexpected(size.error());
     if (*size < 0) return fail(std::format("{}.size", path), "negative");
     p.size = *size;
   }
+  const auto craftable =
+      maybeFlag(v["craftable"], std::format("{}.craftable", path));
+  if (!craftable) return std::unexpected(craftable.error());
+  p.craftable = *craftable;
   return p;
 }
 

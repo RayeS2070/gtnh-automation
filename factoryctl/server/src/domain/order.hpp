@@ -49,7 +49,12 @@ struct Timeouts {
   std::chrono::seconds stalled{600};    // remaining unchanged: alarm
 };
 
-enum class AlarmKind { kLost, kComputingTooLong, kStalled };
+enum class AlarmKind {
+  kLost,
+  kComputingTooLong,
+  kStalled,
+  kNoLongerCraftable,  // a craft on a CPU whose pattern is gone: may hang
+};
 
 // The order was put into a poll response. Only a queued order can be sent:
 // each order goes to the agent at most once.

@@ -31,9 +31,9 @@ struct OrderRow {
   bool cancelRequested = false;
 };
 
-// Queues a one-off order. Fails for unknown goods, an amount <= 0, and goods
-// with an open order already (one at a time: a CPU is matched to an order
-// by its item).
+// Queues a one-off order. Fails for unknown goods, an amount <= 0, goods AE
+// cannot craft, and goods with an open order already (one at a time: a CPU
+// is matched to an order by its item).
 auto orderOnce(pg::Cluster& db, std::int64_t goodsId, std::int64_t amount,
                std::string_view requestedBy, domain::TimePoint now)
     -> std::expected<std::int64_t, std::string>;

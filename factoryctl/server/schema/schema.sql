@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (4);
+INSERT INTO factoryctl.schema_version VALUES (5);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -37,11 +37,15 @@ CREATE TABLE factoryctl.scans (
 -- was not seen in it: its stock is 0 (rows are kept for the labels).
 -- probed_at: the agent measured it then (targets, every poll); a probe
 -- moves scan_id up to the last finished scan.
+-- craftable: AE has a pattern for it (isCraftable). A finished scan clears it
+-- for what it did not see (craftable goods are always scanned); the agent's
+-- probes and orders tell it between scans.
 CREATE TABLE factoryctl.stock (
     goods_id  bigint PRIMARY KEY REFERENCES factoryctl.goods ON DELETE CASCADE,
     amount    bigint NOT NULL,
     scan_id   bigint NOT NULL REFERENCES factoryctl.scans,
-    probed_at timestamptz
+    probed_at timestamptz,
+    craftable boolean NOT NULL
 );
 
 -- What to keep stocked. threshold 0 = order whenever nothing is on order;

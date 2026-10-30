@@ -50,6 +50,18 @@ TEST(Scan, MergeSumsStacksOfOneKey) {
                     {{"minecraft:stick", 0, ""}, "Stick", 1}}));
 }
 
+TEST(Scan, MergeIsCraftableIfAnyStackIs) {
+  // In game: a stored MFE (NBT, not craftable) next to its craftable entry.
+  const ScannedStack stacks[] = {
+      {"IC2:blockElectric", 1, "MFE", 1, "", false},
+      {"IC2:blockElectric", 1, "MFE", 0, "", true},
+      {"minecraft:dirt", 0, "Dirt", 900, "", false},
+  };
+  EXPECT_EQ(mergeBatch(stacks),
+            (Merged{{{"IC2:blockElectric", 1, ""}, "MFE", 1, true},
+                    {{"minecraft:dirt", 0, ""}, "Dirt", 900, false}}));
+}
+
 TEST(Scan, MergeOfNothing) { EXPECT_TRUE(mergeBatch({}).empty()); }
 
 }  // namespace

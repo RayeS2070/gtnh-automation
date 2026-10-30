@@ -32,7 +32,7 @@ auto findStock(pg::Cluster& db, const StockQuery& query)
       "SELECT * FROM ("
       "  SELECT g.id, g.name, g.damage, g.variant, g.label,"
       "         CASE WHEN s.scan_id >= last.id THEN s.amount ELSE 0 END"
-      "           AS amount,"
+      "           AS amount, s.craftable,"
       "         lower(CASE WHEN g.variant <> ''"
       "                    THEN regexp_replace(g.label, '^drop of ', '')"
       "                    ELSE g.label END) AS shown"
@@ -55,7 +55,7 @@ auto findStock(pg::Cluster& db, const StockQuery& query)
          {row["name"].As<std::string>(), row["damage"].As<std::int32_t>(),
           row["variant"].As<std::string>()},
          row["label"].As<std::string>(),
-         row["amount"].As<std::int64_t>()});
+         row["amount"].As<std::int64_t>(), row["craftable"].As<bool>()});
   }
   return out;
 }

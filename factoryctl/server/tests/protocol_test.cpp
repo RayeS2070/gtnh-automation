@@ -42,6 +42,21 @@ TEST(Protocol, ScanDefaults) {
   EXPECT_EQ(r->stacks[0].damage, 0);
 }
 
+TEST(Protocol, ScanCraftable) {
+  const auto r = scan(R"({"scan": 1, "items": [
+      {"name": "a:b", "label": "B", "size": 900, "craftable": false},
+      {"name": "a:c", "label": "C", "size": 0, "craftable": true},
+      {"name": "a:d", "label": "D", "size": 0}]})");
+  ASSERT_TRUE(r.has_value()) << r.error();
+  EXPECT_FALSE(r->stacks[0].craftable);
+  EXPECT_TRUE(r->stacks[1].craftable);
+  EXPECT_TRUE(r->stacks[2].craftable) << "an agent that does not tell";
+  EXPECT_NE(error(R"({"scan": 1, "items": [
+      {"name": "a:b", "label": "B", "size": 1, "craftable": 1}]})")
+                .find("items[0].craftable"),
+            std::string::npos);
+}
+
 TEST(Protocol, ScanWithoutItems) {
   // The last batch may be empty: it only closes the scan.
   const auto r = scan(R"({"scan": 1, "last": true, "items": []})");

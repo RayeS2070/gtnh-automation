@@ -51,6 +51,8 @@ struct AgentResult {
   std::int64_t order = 0;
   AgentStatus status = AgentStatus::kAccepted;
   std::string message;
+  // Whether getCraftables found its item, when the agent asked AE.
+  std::optional<bool> craftable;
 };
 
 // A target's stock as the agent measured it in this poll, after reading
@@ -58,6 +60,15 @@ struct AgentResult {
 struct Probe {
   ItemKey item;
   std::optional<std::int64_t> size;
+  std::optional<bool> craftable;  // isCraftable of what the lookup found
+};
+
+// What the agent learned about whether AE can craft an item.
+struct Craftability {
+  ItemKey item;
+  bool craftable = true;
+
+  auto operator==(const Craftability&) const -> bool = default;
 };
 
 // A line of the agent's log; `t` is its computer.uptime() (it has no clock).
@@ -102,6 +113,9 @@ struct TickInput {
   // the database); orders that close in this tick are added to them unless
   // this report probed them (measured after the CPUs: the result is in).
   std::vector<ItemKey> settling;
+  // Goods AE could not craft when last seen (from the database); this
+  // report's results and probes update it.
+  std::vector<ItemKey> uncraftable;
   TimePoint now;
 };
 
@@ -110,6 +124,8 @@ struct TickOutput {
   std::vector<CancelTask> cancel;
   std::vector<NewOrder> created;  // queued; sent with the next poll
   std::vector<Alarm> alarms;
+  // Learned in this report, in order (results, then probes): to store.
+  std::vector<Craftability> craftability;
   std::vector<std::string> errors;  // results that did not fit, for the log
 };
 
