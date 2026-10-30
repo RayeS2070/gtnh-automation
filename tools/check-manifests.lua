@@ -43,6 +43,7 @@ for _, path in ipairs(lines("git ls-files -co --exclude-standard '*/manifest.lua
             local rel = file:sub(#project + 2)
             -- ls-files still lists tracked files deleted from disk
             if exists(file) and rel ~= 'manifest.lua' and not rel:match('^tests/')
+                and not rel:match('/tests/')
                 and not listed[rel] then
                 fail('%s: %s is not in manifest.lua', project, rel)
             end

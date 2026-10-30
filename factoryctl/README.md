@@ -9,7 +9,7 @@ agent (OpenComputers, in game) --HTTP poll--> server (C++, userver) --> PostgreS
                                   web page served by the server
 ```
 
-- `agent/` — OC program in the game: measures the ME network, places crafting orders. (todo)
+- `agent/` — OC program in the game: scans the ME network, places and cancels crafting orders.
 - `server/` — the server next to the game server: stock, thresholds, order journal.
 - web client — served by the server. (todo)
 
@@ -43,3 +43,18 @@ start of the volume) and drop the schema there all the time.
 `FACTORYCTL_DB` overrides the database connection string of `config_vars.yaml`.
 
 There is no authentication: reach the server through an SSH tunnel.
+
+## Agent (in game)
+
+Needs an Internet Card and an Adapter next to an ME interface. Install with the repository's
+installer and set the server address in `agent/config.lua`:
+
+```
+gtnh-install factoryctl
+cd /home/factoryctl/agent && edit config.lua && main
+```
+
+OpenComputers refuses private and local addresses by default (`internet.filteringRules` in its
+config on the game server): allow the factoryctl server's address there.
+
+Local tests with fake components built from real dumps: `cd agent && lua tests/run.lua`.
