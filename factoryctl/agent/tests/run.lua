@@ -386,6 +386,61 @@ suite('agent', function()
     eq(#srv.requests, 1, 'no batch sent after a failed chunk')
 end)
 
+-- trigger: when to poll the server next ----------------------------------------------------------
+---A fake clock: pull(timeout) advances time by the timeout (or less, if `at` asks for an event
+---at some moment) and returns what the test scripted.
+function fake.clock()
+    local c = { now = 0, events = {} }
+    c.time = function() return c.now end
+    c.pull = function(timeout)
+        local e = c.events[1]
+        if e and e.at <= c.now + timeout then
+            table.remove(c.events, 1)
+            c.now = math.max(c.now, e.at)
+            return e.name
+        end
+        c.now = c.now + timeout
+        return nil
+    end
+    return c
+end
+
+suite('trigger', function()
+    local trigger = require('fc.trigger')
+    local jobs = require('fc.jobs')
+
+    -- nothing happens: wait the whole interval, checking jobs every step
+    local clock, j = fake.clock(), jobs.new()
+    local checks = 0
+    j.update = function() checks = checks + 1 end
+    local t = trigger.polling({ jobs = j, pull = clock.pull, time = clock.time, step = 1, minGap = 2 })
+    eq(t:wait(10), 'due', 'nothing: the poll is due')
+    eq(clock.now, 10, 'after the whole interval')
+    eq(checks, 10, 'jobs looked at once a second')
+
+    -- a job ends after 3.5 s: poll early, at the next step
+    clock, j = fake.clock(), jobs.new()
+    j.update = function()
+        if clock.now >= 3.5 and #j.pending == 0 then j:report(5, 'done') end
+    end
+    t = trigger.polling({ jobs = j, pull = clock.pull, time = clock.time, step = 1, minGap = 2 })
+    eq(t:wait(10), 'early', 'a result: poll early')
+    eq(clock.now, 4, 'within a step')
+
+    -- results waiting already: still not before the minimal gap
+    clock, j = fake.clock(), jobs.new()
+    j:report(1, 'accepted')
+    t = trigger.polling({ jobs = j, pull = clock.pull, time = clock.time, step = 1, minGap = 2 })
+    eq(t:wait(10), 'early', 'early')
+    eq(clock.now, 2, 'not before minGap: no storm of polls')
+
+    -- Ctrl+C
+    clock, j = fake.clock(), jobs.new()
+    clock.events = { { at = 1.5, name = 'interrupted' } }
+    t = trigger.polling({ jobs = j, pull = clock.pull, time = clock.time, step = 1, minGap = 2 })
+    eq(t:wait(10), 'interrupted', 'interrupted')
+end)
+
 for _, s in ipairs(suites) do
     local ok, err = pcall(s.fn)
     if not ok then

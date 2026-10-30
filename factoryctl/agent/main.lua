@@ -15,6 +15,7 @@ local serialization = require('serialization')
 local agent = require('fc.agent')
 local http = require('fc.http')
 local log = require('fc.log')
+local trigger = require('fc.trigger')
 local config = require('config')
 
 local kRetry = 10 -- seconds before polling again after a failed poll
@@ -61,7 +62,15 @@ local function main()
     })
     log.inf('agent for %s, ME %s; Ctrl+C to stop', config.server, proxy.address:sub(1, 8))
 
-    local wait = 0
+    -- 2.8.4 has no events from AE: look at our own jobs every second and poll at once when one
+    -- ends. On 2.9 an event-driven trigger replaces this one (see fc/trigger.lua).
+    local waiter = trigger.polling({
+        jobs = a.jobs,
+        pull = function(timeout) return event.pull(timeout, 'interrupted') end,
+        time = computer.uptime,
+    })
+
+    local wait, why = 0, nil
     repeat
         -- A bug in a poll must not kill the agent; the traceback says where it was.
         local ok, reply, perr = xpcall(a.poll, debug.traceback, a)
@@ -76,7 +85,11 @@ local function main()
                 reply.scan and ', scan' or '')
             wait = reply.poll or kRetry
         end
-    until event.pull(wait, 'interrupted')
+        why = waiter:wait(wait)
+        if why == 'early' then
+            log.dbg('a craft ended: polling early')
+        end
+    until why == 'interrupted'
     log.inf('stopped; crafts already requested go on in AE')
     return 0
 end

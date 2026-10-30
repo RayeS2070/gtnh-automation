@@ -10,6 +10,7 @@ return {
         'agent/fc/log.lua',
         'agent/fc/me.lua',
         'agent/fc/scan.lua',
+        'agent/fc/trigger.lua',
     },
     config = {
         'agent/config.lua',
