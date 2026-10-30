@@ -31,9 +31,13 @@ components_manager:
                     .png: "image/png"
                     .webp: "image/webp"
                     .ico: "image/x-icon"
+                # Our queries take milliseconds, but a COMMIT waits for fsync, which on the
+                # dev machine's btrfs sometimes takes over a second: with userver's 750 ms
+                # the poll failed with HTTP 500 (4 of 1209 polls). A timeout on COMMIT also
+                # leaves its outcome unknown: orders sent in it would never reach the agent.
                 POSTGRES_DEFAULT_COMMAND_CONTROL:
-                    network_timeout_ms: 750
-                    statement_timeout_ms: 500
+                    network_timeout_ms: 5000
+                    statement_timeout_ms: 3000
 
         testsuite-support: {}
 
