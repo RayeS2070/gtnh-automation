@@ -119,11 +119,15 @@ TEST(PollProtocol, ReplyOrdersWithFilters) {
 }
 
 TEST(PollProtocol, ReplyCancelAndScan) {
-  const PollReply reply{.poll = 2s,
-                        .cancel = {{17, "CPU_022"}},
-                        .scan = ScanTask{.id = 42, .params = {}}};
+  // The filter lets the agent check that the CPU still crafts our item: it
+  // may not know the order (restarted), and the craft may have ended.
+  auto order = sent(17, {"minecraft:stick", 0, ""}, "Stick", 1000);
+  order.cpu = "CPU_022";
+  const PollReply reply{
+      .poll = 2s, .cancel = {order}, .scan = ScanTask{.id = 42, .params = {}}};
   EXPECT_EQ(replyPoll(reply),
-            "{poll=2,orders={},cancel={{order=17,cpu=\"CPU_022\"}},"
+            "{poll=2,orders={},cancel={{order=17,cpu=\"CPU_022\","
+            "filter={name=\"minecraft:stick\",damage=0}}},"
             "scan={id=42,threshold=500,maxId=11500,chunk=1000,"
             "slow={from=250,to=320,chunk=5}}}");
 }

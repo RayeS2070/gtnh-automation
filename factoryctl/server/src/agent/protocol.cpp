@@ -209,10 +209,11 @@ auto replyPoll(const PollReply& reply) -> Result<std::string> {
   b["orders"] = std::move(orders);
 
   json::ValueBuilder cancel(Type::kArray);
-  for (const auto& c : reply.cancel) {
+  for (const auto& o : reply.cancel) {
     json::ValueBuilder e;
-    e["order"] = c.order;
-    e["cpu"] = c.cpu;
+    e["order"] = o.id;
+    e["cpu"] = o.cpu;
+    e["filter"] = filter(o);
     cancel.PushBack(std::move(e));
   }
   b["cancel"] = std::move(cancel);

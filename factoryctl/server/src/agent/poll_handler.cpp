@@ -138,9 +138,12 @@ auto PollHandler::HandleRequestThrow(
   if (created > 0) LOG_INFO() << "poll: " << created << " new orders";
   if (scan) LOG_INFO() << "poll: scan " << scan->id << " started";
 
-  PollReply reply{.poll = settings_.poll, .cancel = out.cancel, .scan = scan};
+  PollReply reply{.poll = settings_.poll, .scan = scan};
   for (const auto& o : orders) {
     if (std::ranges::contains(out.send, o.id)) reply.send.push_back(o);
+    if (std::ranges::contains(out.cancel, o.id, &domain::CancelTask::order)) {
+      reply.cancel.push_back(o);
+    }
   }
   const auto lua = replyPoll(reply);
   if (!lua) {

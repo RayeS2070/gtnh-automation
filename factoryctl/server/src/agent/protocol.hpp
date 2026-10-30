@@ -51,19 +51,20 @@ struct ScanTask {
 
 struct PollReply {
   std::chrono::seconds poll{10};
-  std::vector<domain::OrderState> send;  // orders handed out now
-  std::vector<domain::CancelTask> cancel;
+  std::vector<domain::OrderState> send;    // orders handed out now
+  std::vector<domain::OrderState> cancel;  // crafts on a CPU (order.cpu)
   std::optional<ScanTask> scan;
 };
 
 // The answer to a poll, a Lua table:
 //   {poll=10, orders={{id=18, amount=1000, filter={...}}},
-//    cancel={{order=17, cpu="CPU_022"}},
+//    cancel={{order=17, cpu="CPU_022", filter={...}}},
 //    scan={id=42, threshold=500, maxId=11500, chunk=1000,
 //          slow={from=250, to=320, chunk=5}}}
 // `filter` goes to getCraftables as is: {name, damage} for an item,
-// {name, label} for a fluid drop (drops differ in NBT only). No `scan` when
-// there is none to run.
+// {name, label} for a fluid drop (drops differ in NBT only). A cancel task
+// has it too: the agent cancels only if the CPU still shows that item. No
+// `scan` when there is none to run.
 auto replyPoll(const PollReply& reply)
     -> std::expected<std::string, std::string>;
 
