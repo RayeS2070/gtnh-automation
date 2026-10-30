@@ -11,7 +11,7 @@ agent (OpenComputers, in game) --HTTP poll--> server (C++, userver) --> PostgreS
 
 - `agent/` — OC program in the game: scans the ME network, places and cancels crafting orders.
 - `server/` — the server next to the game server: stock, thresholds, order journal.
-- web client — served by the server. (todo)
+- `web/` — the web client (Svelte + TypeScript), built into static files the server serves.
 
 Replaces `../maintainer/` and, for items and fluids, the InfluxDB exporter.
 
@@ -29,6 +29,9 @@ build/linux/linux_clang_debug/server/factoryctl_server \
     --config server/configs/static_config.yaml --config_vars server/configs/config_vars.yaml
 curl localhost:8080/health
 ```
+
+The web client: `cd web && npm install && npm run build` before starting the server, then open
+http://localhost:8080 (see `web/README.md` for development).
 
 Tests:
 

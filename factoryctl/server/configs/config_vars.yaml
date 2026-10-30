@@ -20,3 +20,6 @@ scan-chunk: 1000
 scan-slow-from: 250
 scan-slow-to: 320
 scan-slow-chunk: 5
+
+# The built web client (factoryctl/web: npm run build); relative to where the server starts.
+web-dir: web/dist

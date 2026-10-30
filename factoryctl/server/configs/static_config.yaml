@@ -22,6 +22,15 @@ components_manager:
 
         dynamic-config:
             defaults:
+                USERVER_FILES_CONTENT_TYPE_MAP:
+                    .html: "text/html; charset=utf-8"
+                    .js: "text/javascript"
+                    .css: "text/css"
+                    .json: "application/json"
+                    .svg: "image/svg+xml"
+                    .png: "image/png"
+                    .webp: "image/webp"
+                    .ico: "image/x-icon"
                 POSTGRES_DEFAULT_COMMAND_CONTROL:
                     network_timeout_ms: 750
                     statement_timeout_ms: 500
@@ -75,3 +84,20 @@ components_manager:
             scan-slow-from: $scan-slow-from
             scan-slow-to: $scan-slow-to
             scan-slow-chunk: $scan-slow-chunk
+
+        handler-api-stock:
+            path: /api/v1/stock
+            method: GET
+            task_processor: main-task-processor
+
+        # The web client: `npm run build` in factoryctl/web, served from web-dir.
+        fs-cache-web:
+            dir: $web-dir
+            update-period: 10s
+            fs-task-processor: fs-task-processor
+
+        handler-static:
+            fs-cache-component: fs-cache-web
+            path: /*
+            method: GET
+            task_processor: main-task-processor

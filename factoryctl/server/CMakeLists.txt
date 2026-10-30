@@ -5,6 +5,7 @@ add_library(factoryctl_lib STATIC
         src/agent/protocol.cpp
         src/agent/scan_handler.cpp
         src/agent/poll_handler.cpp
+        src/api/stock_handler.cpp
         src/domain/plan.cpp
         src/domain/order.cpp
         src/domain/scan.cpp
@@ -13,6 +14,7 @@ add_library(factoryctl_lib STATIC
         src/db/schema.cpp
         src/db/scan.cpp
         src/db/orders.cpp
+        src/db/stock.cpp
 )
 target_include_directories(factoryctl_lib PUBLIC src)
 target_link_libraries(factoryctl_lib
@@ -53,6 +55,7 @@ add_executable(factoryctl_dbtest
         tests/db/schema_dbtest.cpp
         tests/db/scan_dbtest.cpp
         tests/db/orders_dbtest.cpp
+        tests/db/stock_dbtest.cpp
 )
 target_link_libraries(factoryctl_dbtest
         PRIVATE
