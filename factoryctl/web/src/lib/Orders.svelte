@@ -1,6 +1,7 @@
 <script lang="ts">
   import { cancelOrder, fetchOrders, openStatuses, type Order } from './api'
   import { amount, plainLabel, unit } from './format'
+  import { every, kRefreshMs } from './refresh'
 
   let orders = $state<Order[]>([])
   let error = $state('')
@@ -15,11 +16,8 @@
   }
 
   // The agent polls every 10 s; refreshing a little more often shows its steps.
-  $effect(() => {
-    load()
-    const timer = setInterval(load, 5000)
-    return () => clearInterval(timer)
-  })
+  load()
+  $effect(() => every(kRefreshMs, load))
 
   async function cancel(o: Order) {
     if (!confirm(`Cancel the order of ${amount(o.amount)} ${plainLabel(o.goods.label)}?`)) return

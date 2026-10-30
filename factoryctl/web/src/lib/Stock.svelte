@@ -2,6 +2,7 @@
   import { fetchStock, fetchTargets, type StockItem, type Target } from './api'
   import { amount, isDrop, plainLabel, unit } from './format'
   import OrderForm from './OrderForm.svelte'
+  import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
 
   let query = $state('')
@@ -24,27 +25,39 @@
   }
   loadTargets()
 
-  // Ask the server a moment after typing stops, and drop answers to older queries.
+  // Answers to older queries are dropped: typing fast must not show a stale list.
   let asked = 0
+  async function loadStock(q: string) {
+    const n = ++asked
+    loading = true
+    try {
+      const found = await fetchStock(q)
+      if (n === asked) {
+        items = found
+        error = ''
+      }
+    } catch (e) {
+      if (n === asked) error = String(e)
+    } finally {
+      if (n === asked) loading = false
+    }
+  }
+
+  // A moment after typing stops.
   $effect(() => {
     const q = query
-    const n = ++asked
-    const timer = setTimeout(async () => {
-      loading = true
-      try {
-        const found = await fetchStock(q)
-        if (n === asked) {
-          items = found
-          error = ''
-        }
-      } catch (e) {
-        if (n === asked) error = String(e)
-      } finally {
-        if (n === asked) loading = false
-      }
-    }, 250)
+    const timer = setTimeout(() => loadStock(q), 250)
     return () => clearTimeout(timer)
   })
+
+  // And again on its own: stock and targets change while the page is open. Open forms keep what
+  // is typed in them: rows are keyed by goods, and a form reads its values once.
+  $effect(() =>
+    every(kRefreshMs, () => {
+      loadStock(query)
+      loadTargets()
+    }),
+  )
 </script>
 
 <section>

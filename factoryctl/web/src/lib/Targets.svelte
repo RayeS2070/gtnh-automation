@@ -1,6 +1,7 @@
 <script lang="ts">
   import { deleteTarget, fetchTargets, putTarget, type Target } from './api'
   import { amount, plainLabel, unit } from './format'
+  import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
 
   let targets = $state<Target[]>([])
@@ -16,6 +17,8 @@
     }
   }
   load()
+  // Stock is measured every poll: keep the numbers current. An open form keeps what is typed.
+  $effect(() => every(kRefreshMs, load))
 
   async function act(fn: () => Promise<void>) {
     try {
