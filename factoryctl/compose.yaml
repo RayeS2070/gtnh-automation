@@ -1,0 +1,14 @@
+# Development database: `docker compose up -d`. Not for the game server.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: factoryctl
+      POSTGRES_PASSWORD: factoryctl
+      POSTGRES_DB: factoryctl
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+volumes:
+  pgdata:

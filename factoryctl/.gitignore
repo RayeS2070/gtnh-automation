@@ -1,0 +1,14 @@
+# IDE
+.vscode
+.idea
+
+# Build trees and installs made by CMakePresets.json
+build/
+install/
+
+# Personal presets, by CMake convention not shared
+CMakeUserPresets.json
+
+# AI
+AGENTS.md
+CLAUDE.md

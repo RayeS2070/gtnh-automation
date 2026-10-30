@@ -1,0 +1,6 @@
+worker-threads: 2
+worker-fs-threads: 1
+logger-level: info
+server-port: 8080
+# The development database from compose.yaml; FACTORYCTL_DB overrides it.
+db-connection: postgresql://factoryctl:factoryctl@localhost:15432/factoryctl

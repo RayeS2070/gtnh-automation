@@ -10,6 +10,7 @@
 | [pumpingctl](pumpingctl/) | Space Elevator pump module control (third-party script, being reworked). **Does not run yet**, see below. |
 | [space-mining-calc](space-mining-calc/) | C++ calculator of the best Space Elevator mining module settings. Not an in-game program. |
 | [maintainer](maintainer/) | Work in progress: keeping item stock via AE2 crafting with an external checker service. |
+| [factoryctl](factoryctl/) | Remote production control: an OC agent, a C++ server (userver, PostgreSQL) and a web client. Replaces maintainer. Early setup. |
 
 Each project has its own README with installation and usage.
 

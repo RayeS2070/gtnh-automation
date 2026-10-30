@@ -1,0 +1,174 @@
+{
+  "version": 9,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 30,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CPM_SOURCE_CACHE": "$env{HOME}/.cache/CPM"
+      }
+    },
+    {
+      "name": "ccache",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "asan",
+      "hidden": true,
+      "description": "AddressSanitizer + UBSan through userver's USERVER_SANITIZE.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "USERVER_SANITIZE": "addr;ub"
+      }
+    },
+    {
+      "name": "linux",
+      "hidden": true,
+      "inherits": [
+        "base",
+        "ccache"
+      ],
+      "description": "Native Linux build; shown only on a Linux host.",
+      "binaryDir": "${sourceDir}/build/linux/${presetName}",
+      "installDir": "${sourceDir}/install/linux/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_LINKER_TYPE": "LLD"
+      }
+    },
+    {
+      "name": "linux_gcc_debug",
+      "displayName": "linux-gcc-debug",
+      "inherits": [
+        "linux",
+        "gcc",
+        "debug"
+      ]
+    },
+    {
+      "name": "linux_gcc_release",
+      "displayName": "linux-gcc-release",
+      "inherits": [
+        "linux",
+        "gcc",
+        "release"
+      ]
+    },
+    {
+      "name": "linux_clang_debug",
+      "displayName": "linux-clang-debug",
+      "inherits": [
+        "linux",
+        "clang",
+        "debug"
+      ]
+    },
+    {
+      "name": "linux_clang_release",
+      "displayName": "linux-clang-release",
+      "inherits": [
+        "linux",
+        "clang",
+        "release"
+      ]
+    },
+    {
+      "name": "linux_clang_asan",
+      "displayName": "linux-clang-asan",
+      "inherits": [
+        "linux",
+        "clang",
+        "asan"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux_gcc_debug",
+      "configurePreset": "linux_gcc_debug",
+      "inherits": [
+        "linux"
+      ]
+    },
+    {
+      "name": "linux_gcc_release",
+      "configurePreset": "linux_gcc_release",
+      "inherits": [
+        "linux"
+      ]
+    },
+    {
+      "name": "linux_clang_debug",
+      "configurePreset": "linux_clang_debug",
+      "inherits": [
+        "linux"
+      ]
+    },
+    {
+      "name": "linux_clang_release",
+      "configurePreset": "linux_clang_release",
+      "inherits": [
+        "linux"
+      ]
+    },
+    {
+      "name": "linux_clang_asan",
+      "configurePreset": "linux_clang_asan",
+      "inherits": [
+        "linux"
+      ]
+    }
+  ]
+}
