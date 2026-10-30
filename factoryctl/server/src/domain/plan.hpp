@@ -28,11 +28,13 @@ enum class Priority { kHigh, kLow };
 
 // Keep `item` stocked: order `batch` when the stock is below `threshold`.
 // A threshold of 0 orders whenever nothing is on order (passive production).
+// With `fill`, order what is missing instead, rounded up to whole batches.
 struct Target {
   ItemKey item;
   std::int64_t threshold = 0;
   std::int64_t batch = 0;
   Priority priority = Priority::kHigh;
+  bool fill = false;
 };
 
 enum class OrderStatus {

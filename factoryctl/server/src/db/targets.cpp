@@ -24,7 +24,7 @@ auto listTargets(pg::Cluster& db) -> std::vector<TargetRow> {
       "       CASE WHEN s.scan_id >= last.id THEN s.amount ELSE 0 END AS "
       "amount,"
       "       t.threshold, t.batch, t.priority::text AS priority, t.enabled,"
-      "       t.note "
+      "       t.note, t.fill "
       "FROM factoryctl.targets t "
       "JOIN factoryctl.goods g ON g.id = t.goods_id "
       "LEFT JOIN factoryctl.stock s ON s.goods_id = g.id "
@@ -38,11 +38,14 @@ auto listTargets(pg::Cluster& db) -> std::vector<TargetRow> {
                 row["variant"].As<std::string>()},
                row["label"].As<std::string>(),
                row["amount"].As<std::optional<std::int64_t>>().value_or(0)};
-    t.settings = {
-        row["threshold"].As<std::int64_t>(), row["batch"].As<std::int64_t>(),
-        row["priority"].As<std::string>() == "low" ? domain::Priority::kLow
-                                                   : domain::Priority::kHigh,
-        row["enabled"].As<bool>(), row["note"].As<std::string>()};
+    t.settings = {row["threshold"].As<std::int64_t>(),
+                  row["batch"].As<std::int64_t>(),
+                  row["priority"].As<std::string>() == "low"
+                      ? domain::Priority::kLow
+                      : domain::Priority::kHigh,
+                  row["enabled"].As<bool>(),
+                  row["note"].As<std::string>(),
+                  row["fill"].As<bool>()};
     out.push_back(std::move(t));
   }
   return out;
@@ -56,15 +59,16 @@ auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s)
   const auto res = db.Execute(
       kMaster,
       "INSERT INTO factoryctl.targets"
-      "  (goods_id, threshold, batch, priority, enabled, note, updated_at) "
-      "SELECT id, $2, $3, $4::factoryctl.priority, $5, $6, now() "
+      "  (goods_id, threshold, batch, priority, enabled, note, fill,"
+      "   updated_at) "
+      "SELECT id, $2, $3, $4::factoryctl.priority, $5, $6, $7, now() "
       "FROM factoryctl.goods WHERE id = $1 "
       "ON CONFLICT (goods_id) DO UPDATE SET"
       "  threshold = EXCLUDED.threshold, batch = EXCLUDED.batch,"
       "  priority = EXCLUDED.priority, enabled = EXCLUDED.enabled,"
-      "  note = EXCLUDED.note, updated_at = now()",
+      "  note = EXCLUDED.note, fill = EXCLUDED.fill, updated_at = now()",
       goodsId, s.threshold, s.batch, priorityName(s.priority), s.enabled,
-      s.note);
+      s.note, s.fill);
   if (res.RowsAffected() == 0) {
     return std::unexpected(std::format("no goods {}", goodsId));
   }

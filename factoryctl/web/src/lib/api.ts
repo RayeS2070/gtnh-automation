@@ -17,6 +17,7 @@ export type TargetSettings = {
   priority: Priority
   enabled: boolean
   note: string
+  fill: boolean // order what is missing, in whole batches, instead of one batch
 }
 
 export type Target = StockItem & TargetSettings

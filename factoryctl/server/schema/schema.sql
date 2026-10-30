@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (2);
+INSERT INTO factoryctl.schema_version VALUES (3);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -41,7 +41,8 @@ CREATE TABLE factoryctl.stock (
     scan_id  bigint NOT NULL REFERENCES factoryctl.scans
 );
 
--- What to keep stocked. threshold 0 = order whenever nothing is on order.
+-- What to keep stocked. threshold 0 = order whenever nothing is on order;
+-- fill = order what is missing, in whole batches, instead of one batch.
 CREATE TYPE factoryctl.priority AS ENUM ('high', 'low');
 
 CREATE TABLE factoryctl.targets (
@@ -51,6 +52,7 @@ CREATE TABLE factoryctl.targets (
     priority   factoryctl.priority NOT NULL DEFAULT 'high',
     enabled    boolean NOT NULL DEFAULT true,
     note       text NOT NULL DEFAULT '',
+    fill       boolean NOT NULL DEFAULT false,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 

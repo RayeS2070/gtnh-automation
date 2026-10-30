@@ -48,7 +48,8 @@
       {#each targets as t (t.goodsId)}
         <tr class:off={!t.enabled}>
           <td>
-            <div>{plainLabel(t.label)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}</div>
+            <div>{plainLabel(t.label)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}
+              {#if t.fill}<span class="tag">fill</span>{/if}</div>
             {#if t.note}<div class="note">{t.note}</div>{/if}
           </td>
           <td class="num" class:below={below(t)}>{amount(t.amount)}{unit(t)}</td>

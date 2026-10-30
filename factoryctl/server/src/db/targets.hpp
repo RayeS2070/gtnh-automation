@@ -22,6 +22,7 @@ struct TargetSettings {
   domain::Priority priority = domain::Priority::kHigh;
   bool enabled = true;
   std::string note;
+  bool fill = false;  // order what is missing, in whole batches
 
   auto operator==(const TargetSettings&) const -> bool = default;
 };

@@ -28,7 +28,7 @@ TEST(ApiJson, StockRow) {
 
 TEST(ApiJson, TargetRow) {
   const TargetRow row{{1, {"minecraft:stick", 0, ""}, "Stick", 5},
-                      {100, 64, Priority::kLow, false, "note"}};
+                      {100, 64, Priority::kLow, false, "note", true}};
   const auto v = toJson(row).ExtractValue();
   EXPECT_EQ(v["goodsId"].As<int>(), 1);
   EXPECT_EQ(v["label"].As<std::string>(), "Stick");
@@ -38,20 +38,22 @@ TEST(ApiJson, TargetRow) {
   EXPECT_EQ(v["priority"].As<std::string>(), "low");
   EXPECT_FALSE(v["enabled"].As<bool>());
   EXPECT_EQ(v["note"].As<std::string>(), "note");
+  EXPECT_TRUE(v["fill"].As<bool>());
 }
 
 TEST(ApiJson, TargetSettingsFull) {
   const auto s = settings(
       R"({"threshold": 100, "batch": 64, "priority": "low", "enabled": false,
-          "note": "assembler"})");
+          "note": "assembler", "fill": true})");
   ASSERT_TRUE(s.has_value()) << s.error();
-  EXPECT_EQ(*s, (TargetSettings{100, 64, Priority::kLow, false, "assembler"}));
+  EXPECT_EQ(
+      *s, (TargetSettings{100, 64, Priority::kLow, false, "assembler", true}));
 }
 
 TEST(ApiJson, TargetSettingsDefaults) {
   const auto s = settings(R"({"threshold": 0, "batch": 1})");
   ASSERT_TRUE(s.has_value()) << s.error();
-  EXPECT_EQ(*s, (TargetSettings{0, 1, Priority::kHigh, true, ""}));
+  EXPECT_EQ(*s, (TargetSettings{0, 1, Priority::kHigh, true, "", false}));
 }
 
 TEST(ApiJson, TargetSettingsErrors) {
@@ -70,6 +72,9 @@ TEST(ApiJson, TargetSettingsErrors) {
             std::string::npos);
   EXPECT_NE(
       error(R"({"threshold": 1, "batch": 1, "enabled": 1})").find("enabled"),
+      std::string::npos);
+  EXPECT_NE(
+      error(R"({"threshold": 1, "batch": 1, "fill": "yes"})").find("fill"),
       std::string::npos);
   EXPECT_NE(error(R"([])").find("object"), std::string::npos);
 }

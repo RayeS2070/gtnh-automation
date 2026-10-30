@@ -37,6 +37,7 @@ auto toJson(const db::TargetRow& row) -> json::ValueBuilder {
   e["priority"] = s.priority == domain::Priority::kLow ? "low" : "high";
   e["enabled"] = s.enabled;
   e["note"] = s.note;
+  e["fill"] = s.fill;
   return e;
 }
 
@@ -62,6 +63,10 @@ auto parseTargetSettings(const json::Value& body)
   if (const auto& v = body["enabled"]; !v.IsMissing()) {
     if (!v.IsBool()) return fail("enabled", "not a boolean");
     s.enabled = v.As<bool>();
+  }
+  if (const auto& v = body["fill"]; !v.IsMissing()) {
+    if (!v.IsBool()) return fail("fill", "not a boolean");
+    s.fill = v.As<bool>();
   }
   if (const auto& v = body["note"]; !v.IsMissing()) {
     if (!v.IsString()) return fail("note", "not a string");

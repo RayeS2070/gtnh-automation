@@ -23,6 +23,11 @@ auto inProgress(const PlanInput& in, const ItemKey& item) -> bool {
   return ordered || crafted;
 }
 
+// What is missing, rounded up to whole batches.
+auto fillAmount(std::int64_t missing, std::int64_t batch) -> std::int64_t {
+  return (missing + batch - 1) / batch * batch;
+}
+
 auto stockOf(const Stock& stock, const ItemKey& item) -> std::int64_t {
   const auto it = stock.find(item);
   return it == stock.end() ? 0 : it->second;
@@ -58,8 +63,11 @@ auto plan(const PlanInput& in) -> std::vector<NewOrder> {
     if (inProgress(in, t.item)) continue;
     if (std::ranges::contains(in.settling, t.item)) continue;
     const bool always = t.threshold <= 0;
-    if (always || stockOf(*in.stock, t.item) < t.threshold) {
-      out.push_back({t.item, t.batch});
+    const auto have = stockOf(*in.stock, t.item);
+    if (always || have < t.threshold) {
+      out.push_back({t.item, always || !t.fill
+                                 ? t.batch
+                                 : fillAmount(t.threshold - have, t.batch)});
     }
   }
   return out;

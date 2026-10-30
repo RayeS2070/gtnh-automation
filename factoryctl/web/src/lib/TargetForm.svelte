@@ -19,6 +19,7 @@
   let priority = $state<Priority>(initial?.priority ?? 'high')
   let enabled = $state(initial?.enabled ?? true)
   let note = $state(initial?.note ?? '')
+  let fill = $state(initial?.fill ?? false)
   let error = $state('')
   let saving = $state(false)
 
@@ -37,6 +38,7 @@
         priority,
         enabled,
         note,
+        fill,
       })
       onsaved()
     } catch (e) {
@@ -65,6 +67,10 @@
       <option value="high">high</option>
       <option value="low">low: only when CPUs are free</option>
     </select>
+  </label>
+  <label class="inline">
+    <input type="checkbox" bind:checked={fill} />
+    order what is missing, in whole batches (instead of one batch)
   </label>
   <label class="inline"><input type="checkbox" bind:checked={enabled} /> enabled</label>
   <label>Note <input bind:value={note} /></label>

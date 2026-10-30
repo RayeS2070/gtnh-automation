@@ -39,7 +39,8 @@ UTEST_F(TargetsTest, SetAndList) {
                          .batch = 64,
                          .priority = Priority::kLow,
                          .enabled = true,
-                         .note = "for the assembler"};
+                         .note = "for the assembler",
+                         .fill = true};
   ASSERT_TRUE(setTarget(db(), stick, s).has_value());
   const auto list = listTargets(db());
   ASSERT_EQ(list.size(), 1);
@@ -69,6 +70,14 @@ UTEST_F(TargetsTest, DisabledTargetsAreListedButNotPlanned) {
   const auto planned = loadTargets(tx);
   ASSERT_EQ(planned.size(), 1);
   EXPECT_EQ(planned[0].item.variant, "xenoxene");
+  EXPECT_FALSE(planned[0].fill);
+}
+
+UTEST_F(TargetsTest, FillReachesThePoll) {
+  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1, .fill = true})
+                  .has_value());
+  auto tx = db().Begin(pg::ClusterHostType::kMaster, {});
+  EXPECT_TRUE(loadTargets(tx).at(0).fill);
 }
 
 UTEST_F(TargetsTest, UnknownGoodsRefused) {

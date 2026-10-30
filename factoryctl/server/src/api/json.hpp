@@ -20,14 +20,15 @@ namespace factoryctl::api {
 // {"goodsId", "name", "damage", "variant", "label", "amount"}
 auto toJson(const db::StockRow& row) -> userver::formats::json::ValueBuilder;
 
-// The goods' fields and {"threshold", "batch", "priority", "enabled", "note"}.
+// The goods' fields and {"threshold", "batch", "priority", "enabled", "note",
+// "fill"}.
 auto toJson(const db::TargetRow& row) -> userver::formats::json::ValueBuilder;
 
 // The body of PUT /api/v1/targets/{goodsId}:
 //   {"threshold": 100, "batch": 64, "priority": "high"|"low",
-//    "enabled": true, "note": "..."}
-// threshold and batch are required; priority (high), enabled (true) and note
-// ('') may be left out.
+//    "enabled": true, "note": "...", "fill": false}
+// threshold and batch are required; priority (high), enabled (true), note
+// ('') and fill (false) may be left out.
 auto parseTargetSettings(const userver::formats::json::Value& body)
     -> std::expected<db::TargetSettings, std::string>;
 

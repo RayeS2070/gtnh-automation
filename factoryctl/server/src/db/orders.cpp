@@ -103,7 +103,7 @@ auto insertOrders(pg::Transaction& tx, std::span<const domain::NewOrder> orders,
 auto loadTargets(pg::Transaction& tx) -> std::vector<domain::Target> {
   const auto rows = tx.Execute(
       "SELECT g.name, g.damage, g.variant, t.threshold, t.batch,"
-      "       t.priority::text AS priority "
+      "       t.priority::text AS priority, t.fill "
       "FROM factoryctl.targets t JOIN factoryctl.goods g ON g.id = t.goods_id "
       "WHERE t.enabled ORDER BY g.id");
   std::vector<domain::Target> targets;
@@ -114,7 +114,8 @@ auto loadTargets(pg::Transaction& tx) -> std::vector<domain::Target> {
          row["threshold"].As<std::int64_t>(),
          row["batch"].As<std::int64_t>(),
          row["priority"].As<std::string>() == "low" ? Priority::kLow
-                                                    : Priority::kHigh});
+                                                    : Priority::kHigh,
+         row["fill"].As<bool>()});
   }
   return targets;
 }

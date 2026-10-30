@@ -73,6 +73,44 @@ TEST(Plan, OrderOfAnotherItemDoesNotBlock) {
       1);
 }
 
+// Fill: order what is missing, in whole batches. The rods target in game:
+// 55452 of 60000, batches of 500 -> 4548 missing -> 10 batches.
+TEST(Plan, FillOrdersWhatIsMissingInBatches) {
+  const Stock stock{{kRod, 55'452}};
+  const std::vector<Target> targets{
+      {.item = kRod, .threshold = 60'000, .batch = 500, .fill = true}};
+  EXPECT_EQ(plan({targets, &stock}), (std::vector<NewOrder>{{kRod, 5000}}));
+}
+
+TEST(Plan, FillOfAnExactMultiple) {
+  const Stock stock{{kRod, 59'000}};
+  const std::vector<Target> targets{
+      {.item = kRod, .threshold = 60'000, .batch = 500, .fill = true}};
+  EXPECT_EQ(plan({targets, &stock}), (std::vector<NewOrder>{{kRod, 1000}}));
+}
+
+TEST(Plan, FillOrdersAtLeastABatch) {
+  const Stock stock{{kRod, 59'999}};
+  const std::vector<Target> targets{
+      {.item = kRod, .threshold = 60'000, .batch = 500, .fill = true}};
+  EXPECT_EQ(plan({targets, &stock}), (std::vector<NewOrder>{{kRod, 500}}));
+}
+
+TEST(Plan, FillWithoutThresholdOrdersABatch) {
+  // threshold 0 orders always: there is nothing to fill up to.
+  const Stock stock{{kRod, 10}};
+  const std::vector<Target> targets{
+      {.item = kRod, .threshold = 0, .batch = 500, .fill = true}};
+  EXPECT_EQ(plan({targets, &stock}), (std::vector<NewOrder>{{kRod, 500}}));
+}
+
+TEST(Plan, WithoutFillOneBatch) {
+  const Stock stock{{kRod, 55'452}};
+  const std::vector<Target> targets{
+      {.item = kRod, .threshold = 60'000, .batch = 500}};
+  EXPECT_EQ(plan({targets, &stock}), (std::vector<NewOrder>{{kRod, 500}}));
+}
+
 TEST(Plan, SettlingGoodsWaitForTheirScan) {
   // An order of it closed after the stock was measured: the stock does not
   // show its result yet.
