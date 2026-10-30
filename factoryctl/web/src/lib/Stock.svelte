@@ -1,11 +1,23 @@
 <script lang="ts">
-  import { fetchStock, type StockItem } from './api'
-  import { amount, isDrop, plainLabel } from './format'
+  import { fetchStock, fetchTargets, type StockItem, type Target } from './api'
+  import { amount, isDrop, plainLabel, unit } from './format'
+  import TargetForm from './TargetForm.svelte'
 
   let query = $state('')
   let items = $state<StockItem[]>([])
+  let targets = $state(new Map<number, Target>())
+  let editing = $state<number | null>(null)
   let error = $state('')
   let loading = $state(false)
+
+  async function loadTargets() {
+    try {
+      targets = new Map((await fetchTargets()).map((t) => [t.goodsId, t]))
+    } catch (e) {
+      error = String(e)
+    }
+  }
+  loadTargets()
 
   // Ask the server a moment after typing stops, and drop answers to older queries.
   let asked = 0
@@ -31,7 +43,7 @@
 </script>
 
 <section>
-  <input type="search" placeholder="Search by name" bind:value={query} />
+  <input class="search" type="search" placeholder="Search by name" bind:value={query} />
   {#if error}
     <p class="error">{error}</p>
   {:else if !loading && items.length === 0}
@@ -40,22 +52,41 @@
   <table>
     <tbody>
       {#each items as item (item.goodsId)}
+        {@const target = targets.get(item.goodsId)}
         <tr>
           <td>
             <div>{plainLabel(item.label)}</div>
             <div class="key">{item.name}:{item.damage}{isDrop(item) ? ` · ${item.variant}` : ''}</div>
           </td>
-          <td class="num" class:zero={item.amount === 0}>
-            {amount(item.amount)}{isDrop(item) ? ' mB' : ''}
+          <td class="num" class:zero={item.amount === 0}>{amount(item.amount)}{unit(item)}</td>
+          <td class="actions">
+            <button class:set={target} onclick={() => (editing = editing === item.goodsId ? null : item.goodsId)}>
+              {target ? `≥ ${amount(target.threshold)}` : 'Target…'}
+            </button>
           </td>
         </tr>
+        {#if editing === item.goodsId}
+          <tr>
+            <td colspan="3">
+              <TargetForm
+                goods={item}
+                current={target}
+                onsaved={() => {
+                  editing = null
+                  loadTargets()
+                }}
+                oncancel={() => (editing = null)}
+              />
+            </td>
+          </tr>
+        {/if}
       {/each}
     </tbody>
   </table>
 </section>
 
 <style>
-  input {
+  .search {
     width: 100%;
     box-sizing: border-box;
     padding: 0.5rem 0.75rem;
@@ -78,6 +109,13 @@
   .num {
     text-align: right;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .actions {
+    width: 1%;
+    white-space: nowrap;
+  }
+  button.set {
     font-variant-numeric: tabular-nums;
   }
   .zero,

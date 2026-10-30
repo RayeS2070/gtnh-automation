@@ -90,6 +90,16 @@ components_manager:
             method: GET
             task_processor: main-task-processor
 
+        handler-api-targets:
+            path: /api/v1/targets
+            method: GET
+            task_processor: main-task-processor
+
+        handler-api-target:
+            path: /api/v1/targets/{goods_id}
+            method: PUT,DELETE
+            task_processor: main-task-processor
+
         # The web client: `npm run build` in factoryctl/web, served from web-dir.
         fs-cache-web:
             dir: $web-dir

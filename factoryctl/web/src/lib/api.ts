@@ -9,16 +9,51 @@ export type StockItem = {
   amount: number // pieces; mB for a fluid drop
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(path)
-  if (!res.ok) {
-    throw new Error(`${path}: HTTP ${res.status}`)
+export type Priority = 'high' | 'low'
+
+export type TargetSettings = {
+  threshold: number // 0: order whenever nothing is on order
+  batch: number
+  priority: Priority
+  enabled: boolean
+  note: string
+}
+
+export type Target = StockItem & TargetSettings
+
+async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await res.text()
+  let data: unknown = undefined
+  try {
+    data = text ? JSON.parse(text) : undefined
+  } catch {
+    // not JSON: an error page of the server
   }
-  return (await res.json()) as T
+  if (!res.ok) {
+    const message = (data as { error?: string } | undefined)?.error ?? text
+    throw new Error(message || `HTTP ${res.status}`)
+  }
+  return data as T
 }
 
 export async function fetchStock(query: string, limit = 200): Promise<StockItem[]> {
   const params = new URLSearchParams({ q: query, limit: String(limit) })
-  const body = await get<{ items: StockItem[] }>(`/api/v1/stock?${params}`)
-  return body.items
+  return (await call<{ items: StockItem[] }>('GET', `/api/v1/stock?${params}`)).items
+}
+
+export async function fetchTargets(): Promise<Target[]> {
+  return (await call<{ items: Target[] }>('GET', '/api/v1/targets')).items
+}
+
+export async function putTarget(goodsId: number, settings: TargetSettings): Promise<void> {
+  await call('PUT', `/api/v1/targets/${goodsId}`, settings)
+}
+
+export async function deleteTarget(goodsId: number): Promise<void> {
+  await call('DELETE', `/api/v1/targets/${goodsId}`)
 }

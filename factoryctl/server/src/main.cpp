@@ -10,6 +10,7 @@
 #include "agent/poll_handler.hpp"
 #include "agent/scan_handler.hpp"
 #include "api/stock_handler.hpp"
+#include "api/targets_handler.hpp"
 #include "db/schema.hpp"
 #include "health.hpp"
 
@@ -26,6 +27,8 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::agent::ScanHandler>()
           .Append<factoryctl::agent::PollHandler>()
           .Append<factoryctl::api::StockHandler>()
+          .Append<factoryctl::api::TargetsHandler>()
+          .Append<factoryctl::api::TargetHandler>()
           // The web client (factoryctl/web, built): everything not matched
           // above.
           .Append<userver::components::FsCache>("fs-cache-web")

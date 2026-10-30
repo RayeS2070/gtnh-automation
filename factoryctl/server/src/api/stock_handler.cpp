@@ -8,6 +8,7 @@
 #include <userver/server/http/http_request.hpp>
 #include <userver/storages/postgres/component.hpp>
 
+#include "api/json.hpp"
 #include "db/schema.hpp"
 #include "db/stock.hpp"
 
@@ -48,16 +49,7 @@ auto StockHandler::HandleRequestThrow(
   const auto rows = db::findStock(*db_, request.GetArg("q"),
                                   limitOf(request.GetArg("limit")));
   json::ValueBuilder items(userver::formats::common::Type::kArray);
-  for (const auto& r : rows) {
-    json::ValueBuilder e;
-    e["goodsId"] = r.goodsId;
-    e["name"] = r.key.name;
-    e["damage"] = r.key.damage;
-    e["variant"] = r.key.variant;
-    e["label"] = r.label;
-    e["amount"] = r.amount;
-    items.PushBack(std::move(e));
-  }
+  for (const auto& r : rows) items.PushBack(toJson(r));
   json::ValueBuilder body;
   body["items"] = std::move(items);
   return json::ToString(body.ExtractValue());
