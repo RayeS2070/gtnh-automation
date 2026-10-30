@@ -35,6 +35,7 @@ components_manager:
                     .txt: "text/plain; charset=utf-8"
                     .map: "application/json"
                     .woff2: "font/woff2"
+                    .bin: "application/octet-stream"
                 # Our queries take milliseconds, but a COMMIT waits for fsync, which on the
                 # dev machine's btrfs sometimes takes over a second: with userver's 750 ms
                 # the poll failed with HTTP 500 (4 of 1209 polls). A timeout on COMMIT also
@@ -128,5 +129,17 @@ components_manager:
         handler-static:
             fs-cache-component: fs-cache-web
             path: /*
+            method: GET
+            task_processor: main-task-processor
+
+        # The icon atlas and the data that numbers the icons, as the GTNH Calculator reads
+        # them (factoryctl/web/src/lib/icons.svelte.ts). Read once at startup.
+        fs-cache-data:
+            dir: $data-dir
+            fs-task-processor: fs-task-processor
+
+        handler-static-data:
+            fs-cache-component: fs-cache-data
+            path: /data/*
             method: GET
             task_processor: main-task-processor

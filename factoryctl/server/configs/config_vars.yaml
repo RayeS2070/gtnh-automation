@@ -25,3 +25,5 @@ scan-slow-chunk: 5
 
 # The built web client (factoryctl/web: npm run build); relative to where the server starts.
 web-dir: web/dist
+# The GTNH Calculator's export (the assets submodule): item icons for the web client.
+data-dir: ../assets/data

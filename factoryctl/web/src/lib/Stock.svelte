@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fetchStock, fetchTargets, type StockItem, type Target } from './api'
   import { amount, isDrop, plainLabel, unit } from './format'
+  import Icon from './Icon.svelte'
   import OrderForm from './OrderForm.svelte'
   import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
@@ -74,8 +75,13 @@
         {@const target = targets.get(item.goodsId)}
         <tr>
           <td>
-            <div>{plainLabel(item.label)}</div>
-            <div class="key">{item.name}:{item.damage}{isDrop(item) ? ` · ${item.variant}` : ''}</div>
+            <div class="goods">
+              <Icon goods={item} />
+              <div>
+                <div>{plainLabel(item.label)}</div>
+                <div class="key">{item.name}:{item.damage}{isDrop(item) ? ` · ${item.variant}` : ''}</div>
+              </div>
+            </div>
           </td>
           <td class="num" class:zero={item.amount === 0}>{amount(item.amount)}{unit(item)}</td>
           <td class="actions">

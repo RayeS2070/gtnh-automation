@@ -1,6 +1,7 @@
 <script lang="ts">
   import { cancelOrder, fetchOrders, openStatuses, type Order } from './api'
   import { amount, plainLabel, unit } from './format'
+  import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
 
   let orders = $state<Order[]>([])
@@ -52,8 +53,13 @@
       {#each orders as o (o.id)}
         <tr class:closed={!isOpen(o)}>
           <td>
-            <div>{plainLabel(o.goods.label)}</div>
-            <div class="small">#{o.id} · {o.source === 'auto' ? 'target' : o.requestedBy || 'one-off'}</div>
+            <div class="goods">
+              <Icon goods={o.goods} />
+              <div>
+                <div>{plainLabel(o.goods.label)}</div>
+                <div class="small">#{o.id} · {o.source === 'auto' ? 'target' : o.requestedBy || 'one-off'}</div>
+              </div>
+            </div>
           </td>
           <td class="num">{amount(o.amount)}{unit(o.goods)}</td>
           <td>

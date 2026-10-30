@@ -1,6 +1,7 @@
 <script lang="ts">
   import { deleteTarget, fetchTargets, putTarget, type Target } from './api'
   import { amount, plainLabel, unit } from './format'
+  import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
 
@@ -51,9 +52,14 @@
       {#each targets as t (t.goodsId)}
         <tr class:off={!t.enabled}>
           <td>
-            <div>{plainLabel(t.label)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}
-              {#if t.fill}<span class="tag">fill</span>{/if}</div>
-            {#if t.note}<div class="note">{t.note}</div>{/if}
+            <div class="goods">
+              <Icon goods={t} />
+              <div>
+                <div>{plainLabel(t.label)} {#if t.priority === 'low'}<span class="tag">low</span>{/if}
+                  {#if t.fill}<span class="tag">fill</span>{/if}</div>
+                {#if t.note}<div class="note">{t.note}</div>{/if}
+              </div>
+            </div>
           </td>
           <td class="num" class:below={below(t)}>{amount(t.amount)}{unit(t)}</td>
           <td class="num">{t.threshold === 0 ? 'always' : amount(t.threshold)}</td>

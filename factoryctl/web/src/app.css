@@ -30,3 +30,10 @@ body {
   background: var(--bg);
   color: var(--fg);
 }
+
+/* A goods cell of a table: the icon, then the label and what goes under it. */
+.goods {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

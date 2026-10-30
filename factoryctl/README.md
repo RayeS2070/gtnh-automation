@@ -48,6 +48,9 @@ Periods and scan parameters are in `server/configs/config_vars.yaml`.
 **Web client** (`web/`, Svelte + TypeScript). Stock search; targets (threshold, batch,
 priority, fill, pause); one-off orders and cancel; the order list with status, CPU and
 progress. Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
+Item icons come from the GTNH Calculator's export (`../assets/data`, served at `/data/`): the
+page reads `data.bin` the way the calculator does and draws icons from `atlas.webp`. The export
+is of another game version, so a few goods have no icon.
 
 **HTTP API**
 
@@ -75,7 +78,8 @@ curl localhost:8080/health
 ```
 
 The web client: `cd web && npm install && npm run build` before starting the server, then open
-http://localhost:8080 (see `web/README.md` for development).
+http://localhost:8080 (see `web/README.md` for development). Icons need the `assets` submodule
+with its `data` submodule checked out (`data-dir` in `config_vars.yaml`).
 
 Tests:
 

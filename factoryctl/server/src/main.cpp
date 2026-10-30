@@ -35,6 +35,10 @@ auto main(int argc, char* argv[]) -> int {
           // The web client (factoryctl/web, built): everything not matched
           // above.
           .Append<userver::components::FsCache>("fs-cache-web")
-          .Append<userver::server::handlers::HttpHandlerStatic>();
+          .Append<userver::server::handlers::HttpHandlerStatic>()
+          // Item icons: the GTNH Calculator's export (assets/data) at /data/.
+          .Append<userver::components::FsCache>("fs-cache-data")
+          .Append<userver::server::handlers::HttpHandlerStatic>(
+              "handler-static-data");
   return userver::utils::DaemonMain(argc, argv, components);
 }
