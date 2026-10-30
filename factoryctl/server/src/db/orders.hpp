@@ -5,6 +5,8 @@
 
 #include <cstdint>
 #include <span>
+#include <string>
+#include <string_view>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
 
@@ -37,5 +39,9 @@ auto saveCpus(pg::Transaction& tx, std::span<const domain::Cpu> cpus,
               domain::TimePoint now) -> void;
 
 auto scanState(pg::Transaction& tx) -> domain::ScanState;
+
+// Names of the order_status database enum.
+auto statusName(domain::OrderStatus status) -> std::string;
+auto statusOf(std::string_view name) -> domain::OrderStatus;
 
 }  // namespace factoryctl::db

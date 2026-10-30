@@ -6,6 +6,7 @@
   --error: #c62828;
   --warn: #b45309;
   --panel: #ffffff;
+  --accent: #1565c0;
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   line-height: 1.4;
@@ -20,6 +21,7 @@
     --error: #ef6b6b;
     --warn: #f0a050;
     --panel: #202024;
+    --accent: #64a8f0;
   }
 }
 

@@ -1,9 +1,10 @@
 <script lang="ts">
+  import Orders from './lib/Orders.svelte'
   import Stock from './lib/Stock.svelte'
   import Targets from './lib/Targets.svelte'
 
-  // Pages by the URL hash (#/stock, #/targets): no router needed for a few tabs.
-  const pages = { stock: 'Stock', targets: 'Targets' } as const
+  // Pages by the URL hash (#/stock, #/targets, #/orders): no router needed for a few tabs.
+  const pages = { stock: 'Stock', targets: 'Targets', orders: 'Orders' } as const
   type Page = keyof typeof pages
 
   const fromHash = (): Page => {
@@ -29,6 +30,8 @@
 <main>
   {#if page === 'targets'}
     <Targets />
+  {:else if page === 'orders'}
+    <Orders />
   {:else}
     <Stock />
   {/if}

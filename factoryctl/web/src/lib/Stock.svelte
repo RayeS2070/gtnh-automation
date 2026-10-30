@@ -1,12 +1,17 @@
 <script lang="ts">
   import { fetchStock, fetchTargets, type StockItem, type Target } from './api'
   import { amount, isDrop, plainLabel, unit } from './format'
+  import OrderForm from './OrderForm.svelte'
   import TargetForm from './TargetForm.svelte'
 
   let query = $state('')
   let items = $state<StockItem[]>([])
   let targets = $state(new Map<number, Target>())
-  let editing = $state<number | null>(null)
+  // The row whose form is open, and which form.
+  let editing = $state<{ id: number; form: 'target' | 'order' } | null>(null)
+  let placed = $state('')
+  const toggle = (id: number, form: 'target' | 'order') =>
+    (editing = editing?.id === id && editing.form === form ? null : { id, form })
   let error = $state('')
   let loading = $state(false)
 
@@ -44,6 +49,7 @@
 
 <section>
   <input class="search" type="search" placeholder="Search by name" bind:value={query} />
+  {#if placed}<p class="ok">{placed}</p>{/if}
   {#if error}
     <p class="error">{error}</p>
   {:else if !loading && items.length === 0}
@@ -60,12 +66,27 @@
           </td>
           <td class="num" class:zero={item.amount === 0}>{amount(item.amount)}{unit(item)}</td>
           <td class="actions">
-            <button class:set={target} onclick={() => (editing = editing === item.goodsId ? null : item.goodsId)}>
+            <button onclick={() => toggle(item.goodsId, 'order')}>Order…</button>
+            <button class:set={target} onclick={() => toggle(item.goodsId, 'target')}>
               {target ? `≥ ${amount(target.threshold)}` : 'Target…'}
             </button>
           </td>
         </tr>
-        {#if editing === item.goodsId}
+        {#if editing?.id === item.goodsId && editing.form === 'order'}
+          <tr>
+            <td colspan="3">
+              <OrderForm
+                goods={item}
+                onplaced={(id) => {
+                  editing = null
+                  placed = `Order #${id} queued: see Orders.`
+                }}
+                oncancel={() => (editing = null)}
+              />
+            </td>
+          </tr>
+        {/if}
+        {#if editing?.id === item.goodsId && editing.form === 'target'}
           <tr>
             <td colspan="3">
               <TargetForm
@@ -124,5 +145,8 @@
   }
   .error {
     color: var(--error);
+  }
+  .ok {
+    color: var(--accent);
   }
 </style>

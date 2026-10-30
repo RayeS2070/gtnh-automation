@@ -1,6 +1,7 @@
 #include "api/json.hpp"
 
 #include <charconv>
+#include <chrono>
 #include <format>
 #include <userver/formats/json/serialize.hpp>
 
@@ -67,6 +68,45 @@ auto parseTargetSettings(const json::Value& body)
     s.note = v.As<std::string>();
   }
   return s;
+}
+
+auto toJson(const db::OrderRow& row) -> json::ValueBuilder {
+  const auto utc = [](domain::TimePoint t) {
+    return std::format("{:%FT%TZ}",
+                       std::chrono::floor<std::chrono::seconds>(t));
+  };
+  json::ValueBuilder e;
+  e["id"] = row.id;
+  e["goods"] = toJson(row.goods);
+  e["amount"] = row.amount;
+  e["status"] = row.status;
+  e["source"] = row.source;
+  e["requestedBy"] = row.requestedBy;
+  e["createdAt"] = utc(row.createdAt);
+  e["changedAt"] = utc(row.changedAt);
+  e["message"] = row.message;
+  e["cpu"] = row.cpu;
+  e["remaining"] = row.remaining;
+  e["cancelRequested"] = row.cancelRequested;
+  return e;
+}
+
+auto parseOrderRequest(const json::Value& body)
+    -> std::expected<OrderRequest, std::string> {
+  if (!body.IsObject()) return fail("order", "not an object");
+  OrderRequest r;
+  for (const auto& [field, out] :
+       {std::pair{"goodsId", &r.goodsId}, std::pair{"amount", &r.amount}}) {
+    const auto& v = body[field];
+    if (v.IsMissing()) return fail(field, "missing");
+    if (!v.IsInt64()) return fail(field, "not an integer");
+    *out = v.As<std::int64_t>();
+  }
+  if (const auto& v = body["requestedBy"]; !v.IsMissing()) {
+    if (!v.IsString()) return fail("requestedBy", "not a string");
+    r.requestedBy = v.As<std::string>();
+  }
+  return r;
 }
 
 auto parseId(std::string_view text) -> std::optional<std::int64_t> {

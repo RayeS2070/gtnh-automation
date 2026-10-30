@@ -8,6 +8,7 @@ add_library(factoryctl_lib STATIC
         src/api/stock_handler.cpp
         src/api/json.cpp
         src/api/targets_handler.cpp
+        src/api/orders_handler.cpp
         src/domain/plan.cpp
         src/domain/order.cpp
         src/domain/scan.cpp
@@ -18,6 +19,7 @@ add_library(factoryctl_lib STATIC
         src/db/orders.cpp
         src/db/stock.cpp
         src/db/targets.cpp
+        src/db/manual.cpp
 )
 target_include_directories(factoryctl_lib PUBLIC src)
 target_link_libraries(factoryctl_lib
@@ -61,6 +63,7 @@ add_executable(factoryctl_dbtest
         tests/db/orders_dbtest.cpp
         tests/db/stock_dbtest.cpp
         tests/db/targets_dbtest.cpp
+        tests/db/manual_dbtest.cpp
 )
 target_link_libraries(factoryctl_dbtest
         PRIVATE

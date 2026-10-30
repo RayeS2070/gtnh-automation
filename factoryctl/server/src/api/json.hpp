@@ -11,6 +11,7 @@
 #include <userver/formats/json/value.hpp>
 #include <userver/formats/json/value_builder.hpp>
 
+#include "db/manual.hpp"
 #include "db/stock.hpp"
 #include "db/targets.hpp"
 
@@ -29,6 +30,22 @@ auto toJson(const db::TargetRow& row) -> userver::formats::json::ValueBuilder;
 // ('') may be left out.
 auto parseTargetSettings(const userver::formats::json::Value& body)
     -> std::expected<db::TargetSettings, std::string>;
+
+// The goods' fields under "goods", and {"id", "amount", "status", "source",
+// "requestedBy", "createdAt", "changedAt", "message", "cpu", "remaining",
+// "cancelRequested"}; times as UTC "2026-10-30T06:40:20Z".
+auto toJson(const db::OrderRow& row) -> userver::formats::json::ValueBuilder;
+
+// The body of POST /api/v1/orders: {"goodsId": 1267, "amount": 128,
+// "requestedBy": "Pavel"}; requestedBy may be left out.
+struct OrderRequest {
+  std::int64_t goodsId = 0;
+  std::int64_t amount = 0;
+  std::string requestedBy;
+};
+
+auto parseOrderRequest(const userver::formats::json::Value& body)
+    -> std::expected<OrderRequest, std::string>;
 
 // A positive id from a path argument.
 auto parseId(std::string_view text) -> std::optional<std::int64_t>;

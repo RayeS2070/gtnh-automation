@@ -100,6 +100,16 @@ components_manager:
             method: PUT,DELETE
             task_processor: main-task-processor
 
+        handler-api-orders:
+            path: /api/v1/orders
+            method: GET,POST
+            task_processor: main-task-processor
+
+        handler-api-order-cancel:
+            path: /api/v1/orders/{order_id}/cancel
+            method: POST
+            task_processor: main-task-processor
+
         # The web client: `npm run build` in factoryctl/web, served from web-dir.
         fs-cache-web:
             dir: $web-dir

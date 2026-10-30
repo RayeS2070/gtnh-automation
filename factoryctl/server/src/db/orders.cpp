@@ -30,21 +30,6 @@ constexpr std::array<std::pair<OrderStatus, std::string_view>, 9> kStatuses{{
     {OrderStatus::kLost, "lost"},
 }};
 
-auto statusName(OrderStatus s) -> std::string {
-  for (const auto& [status, name] : kStatuses) {
-    if (status == s) return std::string(name);
-  }
-  return "failed";
-}
-
-auto statusOf(std::string_view name) -> OrderStatus {
-  for (const auto& [status, n] : kStatuses) {
-    if (n == name) return status;
-  }
-  // The schema allows nothing else: a mismatch is a bug, not data.
-  throw std::logic_error("unknown order status " + std::string(name));
-}
-
 }  // namespace
 
 auto loadOpenOrders(pg::Transaction& tx) -> std::vector<domain::OrderState> {
@@ -167,6 +152,21 @@ auto scanState(pg::Transaction& tx) -> domain::ScanState {
   if (const auto t = row["running"].As<std::optional<pg::TimePointTz>>())
     s.running = t->GetUnderlying();
   return s;
+}
+
+auto statusName(OrderStatus s) -> std::string {
+  for (const auto& [status, name] : kStatuses) {
+    if (status == s) return std::string(name);
+  }
+  return "failed";
+}
+
+auto statusOf(std::string_view name) -> OrderStatus {
+  for (const auto& [status, n] : kStatuses) {
+    if (n == name) return status;
+  }
+  // The schema allows nothing else: a mismatch is a bug, not data.
+  throw std::logic_error("unknown order status " + std::string(name));
 }
 
 }  // namespace factoryctl::db

@@ -57,3 +57,45 @@ export async function putTarget(goodsId: number, settings: TargetSettings): Prom
 export async function deleteTarget(goodsId: number): Promise<void> {
   await call('DELETE', `/api/v1/targets/${goodsId}`)
 }
+
+export type OrderStatus =
+  | 'queued'
+  | 'sent'
+  | 'computing'
+  | 'accepted'
+  | 'crafting'
+  | 'done'
+  | 'failed'
+  | 'canceled'
+  | 'lost'
+
+export const openStatuses: OrderStatus[] = ['queued', 'sent', 'computing', 'accepted', 'crafting']
+
+export type Order = {
+  id: number
+  goods: StockItem
+  amount: number
+  status: OrderStatus
+  source: 'auto' | 'manual'
+  requestedBy: string
+  createdAt: string // UTC, ISO 8601
+  changedAt: string
+  message: string // why it failed
+  cpu: string // the CPU that crafts it, once seen
+  remaining: number // what the CPU has left to deliver
+  cancelRequested: boolean
+}
+
+export async function fetchOrders(limit = 100): Promise<Order[]> {
+  return (await call<{ items: Order[] }>('GET', `/api/v1/orders?limit=${limit}`)).items
+}
+
+// A one-off order, queued for the agent's next poll.
+export async function placeOrder(goodsId: number, amount: number, requestedBy: string): Promise<number> {
+  return (await call<{ id: number }>('POST', '/api/v1/orders', { goodsId, amount, requestedBy })).id
+}
+
+// 'canceled': it was queued; 'asked': the agent cancels the craft; 'nothing': closed already.
+export async function cancelOrder(id: number): Promise<'canceled' | 'asked' | 'nothing'> {
+  return (await call<{ result: 'canceled' | 'asked' | 'nothing' }>('POST', `/api/v1/orders/${id}/cancel`)).result
+}
