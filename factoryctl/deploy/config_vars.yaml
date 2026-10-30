@@ -1,0 +1,6 @@
+# Overrides of server/configs/config_vars.yaml inside the image (--config_vars_override).
+# The database is the `db` service of deploy/compose.yaml; FACTORYCTL_DB still overrides it.
+db-connection: postgresql://factoryctl:factoryctl@db:5432/factoryctl
+web-dir: /app/web
+# The calculator's export, mounted by compose.yaml.
+data-dir: /app/data

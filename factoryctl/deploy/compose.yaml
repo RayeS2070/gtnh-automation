@@ -1,0 +1,39 @@
+# factoryctl on the game server's machine: the server and its database. deploy.sh copies this
+# file to ~/factoryctl there, next to data/ (the calculator's export, for icons).
+# Ports listen on 127.0.0.1 only: the agent runs on this machine, people come through SSH.
+name: factoryctl
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: factoryctl
+      POSTGRES_PASSWORD: factoryctl
+      POSTGRES_DB: factoryctl
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "factoryctl", "-d", "factoryctl"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  server:
+    image: factoryctl:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/app/data:ro
+    logging: *logging
+
+volumes:
+  pgdata:

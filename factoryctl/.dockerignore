@@ -1,0 +1,7 @@
+build/
+install/
+agent/
+web/node_modules/
+web/dist/
+AGENTS.md
+CLAUDE.md

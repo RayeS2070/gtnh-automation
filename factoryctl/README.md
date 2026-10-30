@@ -99,6 +99,20 @@ start of the volume) and drop the schema there all the time.
 
 There is no authentication: reach the server through an SSH tunnel.
 
+## Deploy
+
+The server runs next to the game server, in Docker; nothing is compiled there.
+`deploy/deploy.sh` builds the image here (`Dockerfile`: the web client in Node, the server on
+Ubuntu 26.04 with the `linux_clang_release` preset; CPM and ccache caches make a rebuild quick),
+copies the icons (`../assets/data`) and `deploy/compose.yaml` to `~/factoryctl` on the host,
+sends the image over SSH (`docker save | docker load`, no registry) and runs `docker compose up -d`.
+Host and SSH port: `FACTORYCTL_HOST`, `FACTORYCTL_SSH_PORT`.
+
+On the host the server listens on `127.0.0.1:8080` only: the agent runs on the same machine
+(`server = 'http://127.0.0.1:8080'` in `agent/config.lua`), people open the web client through
+`ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is the `factoryctl_pgdata`
+volume. Logs: `docker compose logs server` in `~/factoryctl`.
+
 ## Agent (in game)
 
 Needs an Internet Card and an Adapter next to an ME interface. Install with the repository's
