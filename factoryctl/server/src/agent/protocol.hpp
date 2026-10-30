@@ -35,11 +35,13 @@ auto parseScan(const userver::formats::json::Value& body)
 // POST /agent/v1/poll:
 //   {"cpus": [{"name": "CPU_022", "busy": true,
 //              "output": {"name", "damage", "label", "size", "fluid"}}],
-//    "results": [{"order": 17, "status": "accepted", "message": "..."}]}
+//    "results": [{"order": 17, "status": "accepted", "message": "..."}],
+//    "stock": [{"name", "damage", "fluid", "size"}]}
 // `output` is finalOutput(), left out for a free CPU; it is keyed like a
-// scanned stack, its size is what is left to deliver. `results` and
-// `message` may be left out. Statuses: computing, accepted, failed, canceled,
-// done.
+// scanned stack, its size is what is left to deliver. `stock` measures the
+// probe list of the last reply, after the CPUs were read; no size: not found.
+// `results`, `stock` and `message` may be left out. Statuses: computing,
+// accepted, failed, canceled, done.
 auto parsePoll(const userver::formats::json::Value& body)
     -> std::expected<domain::PollReport, std::string>;
 
@@ -49,8 +51,16 @@ struct ScanTask {
   domain::ScanParams params;
 };
 
+// A target the agent measures in every poll; the label is for drops (a
+// lookup by label is the fallback when the fluid lookup misses).
+struct ProbeTask {
+  domain::ItemKey item;
+  std::string label;
+};
+
 struct PollReply {
   std::chrono::seconds poll{10};
+  std::vector<ProbeTask> probe;
   std::vector<domain::OrderState> send;    // orders handed out now
   std::vector<domain::OrderState> cancel;  // crafts on a CPU (order.cpu)
   std::optional<ScanTask> scan;
@@ -59,6 +69,8 @@ struct PollReply {
 // The answer to a poll, a Lua table:
 //   {poll=10, orders={{id=18, amount=1000, filter={...}}},
 //    cancel={{order=17, cpu="CPU_022", filter={...}}},
+//    probe={{name=..., damage=...}, {name="ae2fc:fluid_drop", fluid=...,
+//            label=...}},
 //    scan={id=42, threshold=500, maxId=11500, chunk=1000,
 //          slow={from=250, to=320, chunk=5}}}
 // `filter` goes to getCraftables as is: {name, damage} for an item,

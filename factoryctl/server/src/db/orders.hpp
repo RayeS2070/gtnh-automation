@@ -40,10 +40,22 @@ auto saveCpus(pg::Transaction& tx, std::span<const domain::Cpu> cpus,
 
 auto scanState(pg::Transaction& tx) -> domain::ScanState;
 
-// Goods with an order closed at or after `stockAsOf` (the start of the last
-// finished scan): that scan's stock does not show what the order made.
+// Goods with an order closed after their stock was last measured: by the
+// last finished scan (started at `stockAsOf`) or by a probe, whichever is
+// later. That stock does not show what the order made.
 auto loadSettling(pg::Transaction& tx, domain::TimePoint stockAsOf)
     -> std::vector<domain::ItemKey>;
+
+struct ProbedAmount {
+  domain::ItemKey item;
+  std::int64_t amount = 0;
+};
+
+// Stock measured by the agent in a poll: the amount, when (for settling),
+// and it counts as seen by the last finished scan. Unknown goods are left
+// out (a probe is of a target, and targets are of scanned goods).
+auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,
+                 domain::TimePoint now) -> void;
 
 // Names of the order_status database enum.
 auto statusName(domain::OrderStatus status) -> std::string;

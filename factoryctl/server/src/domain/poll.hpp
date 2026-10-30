@@ -53,10 +53,24 @@ struct AgentResult {
   std::string message;
 };
 
+// A target's stock as the agent measured it in this poll, after reading
+// the CPUs. No size: the lookup found nothing (0, or a lookup that missed).
+struct Probe {
+  ItemKey item;
+  std::optional<std::int64_t> size;
+};
+
 struct PollReport {
   std::vector<Cpu> cpus;
   std::vector<AgentResult> results;
+  std::vector<Probe> stock;
 };
+
+// What a probe tells about the stock: its size; "found nothing" is 0 only if
+// the last scan agrees. A scan that saw some means the lookup missed it:
+// trusting it would order without end, so the probe is ignored (nullopt).
+auto trustedAmount(const Probe& probe, std::int64_t scanned)
+    -> std::optional<std::int64_t>;
 
 struct CancelTask {
   std::int64_t order = 0;
@@ -76,8 +90,9 @@ struct TickInput {
   PollReport report;
   std::vector<Target> targets;  // enabled ones
   const Stock* stock = nullptr;
-  // Goods with an order closed since the last finished scan started (from
-  // the database); orders that close in this tick are added to them.
+  // Goods with an order closed since their stock was last measured (from
+  // the database); orders that close in this tick are added to them unless
+  // this report probed them (measured after the CPUs: the result is in).
   std::vector<ItemKey> settling;
   TimePoint now;
 };

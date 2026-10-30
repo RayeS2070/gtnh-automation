@@ -13,6 +13,13 @@ auto needScan(const ScanState& scans, const Settings& settings, TimePoint now)
   return !scans.lastFinished || now - *scans.lastFinished >= settings.scanEvery;
 }
 
+auto trustedAmount(const Probe& probe, std::int64_t scanned)
+    -> std::optional<std::int64_t> {
+  if (probe.size) return probe.size;
+  if (scanned == 0) return 0;
+  return std::nullopt;
+}
+
 auto tick(std::vector<OrderState>& orders, const TickInput& in,
           const Settings& settings) -> TickOutput {
   TickOutput out;
@@ -42,8 +49,11 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
   auto settling = in.settling;
   for (const auto& o : orders) {
     open.push_back({o.item, o.status});
-    // Closed in this tick: what it made is in no scan yet.
-    if (!isOpen(o.status)) settling.push_back(o.item);
+    // Closed in this tick: what it made is in no scan yet, but it is in a
+    // probe of this report (taken after the CPUs were read).
+    const bool probed =
+        std::ranges::contains(in.report.stock, o.item, &Probe::item);
+    if (!isOpen(o.status) && !probed) settling.push_back(o.item);
   }
   out.created = plan({in.targets, in.stock, open, in.report.cpus,
                       settings.lowFreeCpus, settling});

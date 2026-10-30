@@ -72,7 +72,7 @@ TEST(Sql, NoSchemaVersion) {
 // The real schema file, as embedded into the server.
 TEST(Sql, SchemaFileIsReadable) {
   const auto sql = factoryctl::db::schemaSql();
-  EXPECT_EQ(schemaVersion(sql), 3);
+  EXPECT_EQ(schemaVersion(sql), 4);
   const auto statements = splitStatements(sql);
   ASSERT_FALSE(statements.empty());
   EXPECT_EQ(statements.front(), "CREATE SCHEMA factoryctl");

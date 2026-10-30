@@ -18,6 +18,7 @@
 #include "db/orders.hpp"
 #include "db/scan.hpp"
 #include "db/schema.hpp"
+#include "db/targets.hpp"
 
 namespace factoryctl::agent {
 
@@ -115,12 +116,32 @@ auto PollHandler::HandleRequestThrow(
   // Database errors are the server's fault: they end as HTTP 500, and the
   // agent simply polls again.
   const auto now = userver::utils::datetime::Now();
-  const auto stock = db::currentStock(*db_);
+  auto stock = db::currentStock(*db_);
   auto tx = db_->Begin(pg::ClusterHostType::kMaster, {});
   auto orders = db::loadOpenOrders(tx);
   const auto scans = db::scanState(tx);
-  // The stock is as of the start of the last finished scan: goods whose order
-  // closed since then wait for the next one.
+
+  // The agent's probes of the targets, measured after the CPUs: fresher than
+  // any scan. One that found nothing where the scan saw some is not trusted.
+  std::vector<db::ProbedAmount> probed;
+  if (stock) {
+    for (const auto& p : report->stock) {
+      const auto it = stock->find(p.item);
+      const auto scanned = it == stock->end() ? 0 : it->second;
+      if (const auto amount = domain::trustedAmount(p, scanned)) {
+        probed.push_back({p.item, *amount});
+        (*stock)[p.item] = *amount;
+      } else {
+        LOG_WARNING() << "poll: probe of " << p.item.name << ":"
+                      << p.item.damage << " " << p.item.variant
+                      << " found nothing, the scan saw " << scanned
+                      << "; ignored";
+      }
+    }
+    db::applyProbes(tx, probed, now);
+  }
+  // Goods whose order closed after their stock was last measured (scan or
+  // probe) wait for the next measurement.
   auto settling = scans.lastFinished ? db::loadSettling(tx, *scans.lastFinished)
                                      : std::vector<domain::ItemKey>{};
   const auto out = domain::tick(orders,
@@ -147,6 +168,10 @@ auto PollHandler::HandleRequestThrow(
   if (scan) LOG_INFO() << "poll: scan " << scan->id << " started";
 
   PollReply reply{.poll = settings_.poll, .scan = scan};
+  // Every enabled target is measured in the next poll.
+  for (const auto& t : db::listTargets(*db_)) {
+    if (t.settings.enabled) reply.probe.push_back({t.goods.key, t.goods.label});
+  }
   for (const auto& o : orders) {
     if (std::ranges::contains(out.send, o.id)) reply.send.push_back(o);
     if (std::ranges::contains(out.cancel, o.id, &domain::CancelTask::order)) {

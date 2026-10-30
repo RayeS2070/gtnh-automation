@@ -140,6 +140,34 @@ TEST(Poll, OrderClosedNowSettlesItsGoods) {
   EXPECT_TRUE(out.created.empty());
 }
 
+TEST(Poll, OrderClosedNowButProbedMayOrderAgain) {
+  // The agent measured the stick after reading the CPUs: what the order made
+  // is in that number, the goods need not wait.
+  std::vector orders{order(1, OrderStatus::kCrafting)};
+  orders[0].cpu = "CPU_022";
+  const Stock stock{{kStick, 10}};
+  const TickInput in{.report = {.cpus = {}, .stock = {{kStick, 10}}},
+                     .targets = {{kStick, 100, 1000}},
+                     .stock = &stock,
+                     .now = t0};
+  EXPECT_EQ(tick(orders, in, kSettings).created,
+            (std::vector<NewOrder>{{kStick, 1000}}));
+}
+
+TEST(Poll, ProbeFound) {
+  EXPECT_EQ(trustedAmount({kStick, 42}, 10), 42);
+  EXPECT_EQ(trustedAmount({kStick, 0}, 10), 0) << "found with 0";
+}
+
+TEST(Poll, ProbeFoundNothingAndTheScanAgrees) {
+  EXPECT_EQ(trustedAmount({kStick, std::nullopt}, 0), 0);
+}
+
+TEST(Poll, ProbeFoundNothingButTheScanSawSome) {
+  // The lookup missed it (NBT, a name that changed): not 0.
+  EXPECT_EQ(trustedAmount({kStick, std::nullopt}, 500), std::nullopt);
+}
+
 TEST(Poll, SettlingGoodsFromEarlierPollsWait) {
   std::vector<OrderState> orders;
   const Stock stock{{kStick, 10}, {kRod, 10}};

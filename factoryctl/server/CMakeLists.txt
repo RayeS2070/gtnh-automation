@@ -65,6 +65,7 @@ add_executable(factoryctl_dbtest
         tests/db/targets_dbtest.cpp
         tests/db/manual_dbtest.cpp
         tests/db/settling_dbtest.cpp
+        tests/db/probe_dbtest.cpp
 )
 target_link_libraries(factoryctl_dbtest
         PRIVATE

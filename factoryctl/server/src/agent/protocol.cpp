@@ -154,6 +154,38 @@ auto result(const json::Value& v, std::string_view path)
   return r;
 }
 
+auto probe(const json::Value& v, std::string_view path)
+    -> Result<domain::Probe> {
+  if (!v.IsObject()) return fail(path, "not an object");
+  domain::ScannedStack s;
+  const auto name = text(v["name"], std::format("{}.name", path));
+  if (!name) return std::unexpected(name.error());
+  s.name = *name;
+  if (!v["damage"].IsMissing()) {
+    const auto damage = integer(v["damage"], std::format("{}.damage", path));
+    if (!damage) return std::unexpected(damage.error());
+    s.damage = static_cast<std::int32_t>(*damage);
+  }
+  if (!v["fluid"].IsMissing()) {
+    const auto fluid = text(v["fluid"], std::format("{}.fluid", path));
+    if (!fluid) return std::unexpected(fluid.error());
+    s.fluid = *fluid;
+  }
+  // keyOf would fall back to the label, which a probe does not carry.
+  if (s.name == "ae2fc:fluid_drop" && s.fluid.empty()) {
+    return fail(std::format("{}.fluid", path),
+                "missing: a drop is keyed by it");
+  }
+  domain::Probe p{domain::keyOf(s), std::nullopt};
+  if (!v["size"].IsMissing()) {
+    const auto size = integer(v["size"], std::format("{}.size", path));
+    if (!size) return std::unexpected(size.error());
+    if (*size < 0) return fail(std::format("{}.size", path), "negative");
+    p.size = *size;
+  }
+  return p;
+}
+
 auto filter(const domain::OrderState& o) -> json::ValueBuilder {
   json::ValueBuilder f;
   f["name"] = o.item.name;
@@ -190,6 +222,15 @@ auto parsePoll(const json::Value& body) -> Result<domain::PollReport> {
       report.results.push_back(*std::move(r));
     }
   }
+  const auto& stock = body["stock"];
+  if (!stock.IsMissing()) {
+    if (!stock.IsArray()) return fail("stock", "not an array");
+    for (std::size_t i = 0; i < stock.GetSize(); ++i) {
+      auto p = probe(stock[i], std::format("stock[{}]", i));
+      if (!p) return std::unexpected(p.error());
+      report.stock.push_back(*std::move(p));
+    }
+  }
   return report;
 }
 
@@ -217,6 +258,20 @@ auto replyPoll(const PollReply& reply) -> Result<std::string> {
     cancel.PushBack(std::move(e));
   }
   b["cancel"] = std::move(cancel);
+
+  json::ValueBuilder probes(Type::kArray);
+  for (const auto& p : reply.probe) {
+    json::ValueBuilder e;
+    e["name"] = p.item.name;
+    if (p.item.variant.empty()) {
+      e["damage"] = p.item.damage;
+    } else {
+      e["fluid"] = p.item.variant;
+      e["label"] = p.label;
+    }
+    probes.PushBack(std::move(e));
+  }
+  b["probe"] = std::move(probes);
 
   if (reply.scan) {
     const auto& p = reply.scan->params;

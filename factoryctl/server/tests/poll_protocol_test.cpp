@@ -49,6 +49,37 @@ TEST(PollProtocol, CpusAndResults) {
   EXPECT_EQ(r->results[1].message, "ambiguous");
 }
 
+TEST(PollProtocol, StockProbes) {
+  const auto r = poll(R"({"cpus": [], "stock": [
+      {"name": "bartworks:gt.bwMetaGeneratedstickLong", "damage": 11358,
+       "size": 61097},
+      {"name": "ae2fc:fluid_drop", "fluid": "sodiumpersulfate", "size": 1220600},
+      {"name": "minecraft:stick", "damage": 0}]})");
+  ASSERT_TRUE(r.has_value()) << r.error();
+  ASSERT_EQ(r->stock.size(), 3);
+  EXPECT_EQ(r->stock[0].item,
+            (ItemKey{"bartworks:gt.bwMetaGeneratedstickLong", 11358, ""}));
+  EXPECT_EQ(r->stock[0].size, 61097);
+  EXPECT_EQ(r->stock[1].item,
+            (ItemKey{"ae2fc:fluid_drop", 0, "sodiumpersulfate"}));
+  EXPECT_EQ(r->stock[2].size, std::nullopt) << "not found";
+}
+
+TEST(PollProtocol, StockProbeErrors) {
+  EXPECT_NE(
+      error(R"({"cpus": [], "stock": [{"size": 1}]})").find("stock[0].name"),
+      std::string::npos);
+  EXPECT_NE(
+      error(
+          R"({"cpus": [], "stock": [{"name": "ae2fc:fluid_drop", "size": 1}]})")
+          .find("stock[0].fluid"),
+      std::string::npos)
+      << "a drop is keyed by its fluid";
+  EXPECT_NE(error(R"({"cpus": [], "stock": [{"name": "a:b", "size": -1}]})")
+                .find("stock[0].size"),
+            std::string::npos);
+}
+
 TEST(PollProtocol, EveryStatus) {
   const std::pair<const char*, AgentStatus> cases[] = {
       {"computing", AgentStatus::kComputing},
@@ -102,7 +133,7 @@ auto sent(std::int64_t id, ItemKey item, std::string label, std::int64_t amount)
 }
 
 TEST(PollProtocol, ReplyNothingToDo) {
-  EXPECT_EQ(replyPoll({.poll = 10s}), "{poll=10,orders={},cancel={}}");
+  EXPECT_EQ(replyPoll({.poll = 10s}), "{poll=10,orders={},cancel={},probe={}}");
 }
 
 TEST(PollProtocol, ReplyOrdersWithFilters) {
@@ -115,7 +146,21 @@ TEST(PollProtocol, ReplyOrdersWithFilters) {
             "{poll=10,orders={"
             "{id=18,amount=1000,filter={name=\"minecraft:stick\",damage=0}},"
             "{id=19,amount=144,filter={name=\"ae2fc:fluid_drop\","
-            "label=\"drop of Xenoxene\"}}},cancel={}}");
+            "label=\"drop of Xenoxene\"}}},cancel={},probe={}}");
+}
+
+TEST(PollProtocol, ReplyProbes) {
+  const PollReply reply{
+      .poll = 10s,
+      .probe = {{{"bartworks:gt.bwMetaGeneratedstickLong", 11358, ""},
+                 "Long Lanthanum Hexaboride Rod"},
+                {{"ae2fc:fluid_drop", 0, "sodiumpersulfate"},
+                 "drop of Sodium Persulfate"}}};
+  EXPECT_EQ(replyPoll(reply),
+            "{poll=10,orders={},cancel={},probe={"
+            "{name=\"bartworks:gt.bwMetaGeneratedstickLong\",damage=11358},"
+            "{name=\"ae2fc:fluid_drop\",fluid=\"sodiumpersulfate\","
+            "label=\"drop of Sodium Persulfate\"}}}");
 }
 
 TEST(PollProtocol, ReplyCancelAndScan) {
@@ -127,7 +172,7 @@ TEST(PollProtocol, ReplyCancelAndScan) {
       .poll = 2s, .cancel = {order}, .scan = ScanTask{.id = 42, .params = {}}};
   EXPECT_EQ(replyPoll(reply),
             "{poll=2,orders={},cancel={{order=17,cpu=\"CPU_022\","
-            "filter={name=\"minecraft:stick\",damage=0}}},"
+            "filter={name=\"minecraft:stick\",damage=0}}},probe={},"
             "scan={id=42,threshold=500,maxId=11500,chunk=1000,"
             "slow={from=250,to=320,chunk=5}}}");
 }

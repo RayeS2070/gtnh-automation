@@ -175,8 +175,9 @@ auto loadSettling(pg::Transaction& tx, domain::TimePoint stockAsOf)
   const auto rows = tx.Execute(
       "SELECT DISTINCT g.name, g.damage, g.variant "
       "FROM factoryctl.orders o JOIN factoryctl.goods g ON g.id = o.goods_id "
+      "LEFT JOIN factoryctl.stock s ON s.goods_id = g.id "
       "WHERE o.status IN ('done', 'failed', 'canceled', 'lost')"
-      "  AND o.changed_at >= $1",
+      "  AND o.changed_at >= GREATEST($1, coalesce(s.probed_at, $1))",
       pg::TimePointTz{stockAsOf});
   std::vector<domain::ItemKey> keys;
   for (const auto& row : rows) {
@@ -185,6 +186,33 @@ auto loadSettling(pg::Transaction& tx, domain::TimePoint stockAsOf)
                     row["variant"].As<std::string>()});
   }
   return keys;
+}
+
+auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,
+                 domain::TimePoint now) -> void {
+  if (probes.empty()) return;
+  std::vector<std::string> names, variants;
+  std::vector<std::int32_t> damages;
+  std::vector<std::int64_t> amounts;
+  for (const auto& p : probes) {
+    names.push_back(p.item.name);
+    damages.push_back(p.item.damage);
+    variants.push_back(p.item.variant);
+    amounts.push_back(p.amount);
+  }
+  tx.Execute(
+      "WITH last AS (SELECT max(id) AS id FROM factoryctl.scans"
+      "              WHERE finished_at IS NOT NULL),"
+      "     probe AS (SELECT * FROM unnest($1::text[], $2::integer[],"
+      "                                    $3::text[], $4::bigint[])"
+      "               AS p(name, damage, variant, amount)) "
+      "UPDATE factoryctl.stock s SET amount = probe.amount, probed_at = $5,"
+      "  scan_id = GREATEST(s.scan_id, coalesce(last.id, s.scan_id)) "
+      "FROM probe JOIN factoryctl.goods g"
+      "  ON g.kind = 'item' AND g.name = probe.name"
+      "  AND g.damage = probe.damage AND g.variant = probe.variant, last "
+      "WHERE s.goods_id = g.id",
+      names, damages, variants, amounts, pg::TimePointTz{now});
 }
 
 }  // namespace factoryctl::db
