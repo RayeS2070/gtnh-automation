@@ -8,3 +8,6 @@ CLAUDE.md
 # Python (maintainer)
 .venv/
 __pycache__/
+
+# Mod sources at the modpack's versions: tools/mod-source.py
+/sources/

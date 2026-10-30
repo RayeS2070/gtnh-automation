@@ -79,8 +79,17 @@ Submodules (read-only references, not edited here):
   LuaLS type stubs for OpenComputers and GTNH components, plus real component dumps from the game.
   It targets GTNH 2.9.
 - `assets/` — [GTNH Calculator](https://github.com/ShadowTheAge/gtnh): recipe data of the modpack.
-- `gt5unofficial/` — [GT5-Unofficial](https://github.com/GTNewHorizons/GT5-Unofficial): mod sources,
-  read to learn game mechanics.
+- `gtnh-modpack/` — [GT-New-Horizons-Modpack](https://github.com/GTNewHorizons/GT-New-Horizons-Modpack)
+  at the release the server runs (2.8.4). Its README lists every mod with its version.
+
+Mod sources, read to learn game mechanics, are not submodules. `tools/mod-source.py` clones a mod
+into `sources/` (ignored by git) at the version the modpack ships, and moves it along when the
+modpack moves to another release:
+
+```sh
+tools/mod-source.py GT5-Unofficial   # sources/GT5-Unofficial at 5.09.51.482
+tools/mod-source.py --list open      # the mods and versions, filtered
+```
 
 `.luarc.json` points the Lua language server (the VS Code `Lua` extension by sumneko) at
 `gtnh/lua`, so autocomplete for `component`, `event` and component proxies works in every
