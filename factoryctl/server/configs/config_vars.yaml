@@ -4,3 +4,19 @@ logger-level: info
 server-port: 8080
 # The development database from compose.yaml; FACTORYCTL_DB overrides it.
 db-connection: postgresql://factoryctl:factoryctl@localhost:15432/factoryctl
+
+# The agent's poll (handler-agent-poll). Periods like 10s, 5m; shorten them to debug.
+poll-interval: 10s
+scan-every: 5m
+scan-give-up: 10m
+sent-timeout: 2m       # a sent order without a result becomes lost
+computing-timeout: 2m  # alarm in the log
+stalled-timeout: 10m   # alarm in the log: remaining does not go down
+# Scan: stacks below the threshold go only if craftable. Ids 250..320 hold items with
+# a great many NBT variants: small chunks there, or the game server runs out of memory.
+scan-threshold: 500
+scan-max-id: 11500
+scan-chunk: 1000
+scan-slow-from: 250
+scan-slow-to: 320
+scan-slow-chunk: 5

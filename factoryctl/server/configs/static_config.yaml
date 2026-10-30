@@ -37,6 +37,11 @@ components_manager:
             blocking_task_processor: fs-task-processor
             dns_resolver: async
             sync-start: true
+            # One server: no need for the watchdog that shares connection
+            # limits through a u_clients table.
+            connlimit_mode: manual
+
+        schema: {}
 
         handler-ping:
             path: /ping
@@ -48,3 +53,25 @@ components_manager:
             path: /health
             method: GET
             task_processor: main-task-processor
+
+        handler-agent-scan:
+            path: /agent/v1/scan
+            method: POST
+            task_processor: main-task-processor
+
+        handler-agent-poll:
+            path: /agent/v1/poll
+            method: POST
+            task_processor: main-task-processor
+            poll-interval: $poll-interval
+            scan-every: $scan-every
+            scan-give-up: $scan-give-up
+            sent-timeout: $sent-timeout
+            computing-timeout: $computing-timeout
+            stalled-timeout: $stalled-timeout
+            scan-threshold: $scan-threshold
+            scan-max-id: $scan-max-id
+            scan-chunk: $scan-chunk
+            scan-slow-from: $scan-slow-from
+            scan-slow-to: $scan-slow-to
+            scan-slow-chunk: $scan-slow-chunk

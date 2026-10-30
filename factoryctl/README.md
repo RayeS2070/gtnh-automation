@@ -30,6 +30,16 @@ build/linux/linux_clang_debug/server/factoryctl_server \
 curl localhost:8080/health
 ```
 
+Tests:
+
+```sh
+ctest --test-dir build/linux/linux_clang_debug            # all; database tests need compose up
+ctest --test-dir build/linux/linux_clang_debug -LE db     # without the database
+```
+
+The database tests use their own database `factoryctl_test` (made by `initdb/` on the first
+start of the volume) and drop the schema there all the time.
+
 `FACTORYCTL_DB` overrides the database connection string of `config_vars.yaml`.
 
 There is no authentication: reach the server through an SSH tunnel.

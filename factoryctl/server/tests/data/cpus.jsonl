@@ -1,0 +1,32 @@
+{"busy": false, "isBusy": false, "name": "CPU_024"}
+{"busy": false, "isBusy": false, "name": "CPU_003"}
+{"busy": false, "isBusy": false, "name": "CPU_012"}
+{"busy": false, "isBusy": false, "name": "CPU_001"}
+{"busy": true, "finalOutput": {"damage": 3008, "label": "Pseudostable Black Hole Containment Field", "name": "gregtech:gt.blockmachines", "size": 1}, "isBusy": true, "name": "CPU_002"}
+{"busy": false, "isBusy": false, "name": "CPU_016"}
+{"busy": false, "isBusy": false, "name": "CPU_019"}
+{"busy": false, "isBusy": false, "name": "CPU_032"}
+{"busy": true, "finalOutput": {"damage": 0, "label": "TCetiE-Seaweed Extract", "name": "dreamcraft:item.TCetiESeaweedExtract", "size": 1929}, "isBusy": true, "name": "CPU_031"}
+{"busy": false, "isBusy": false, "name": "CPU_018"}
+{"busy": false, "isBusy": false, "name": "CPU_023"}
+{"busy": true, "finalOutput": {"damage": 0, "fluidDrop": {"label": "Naquadah Based Liquid Fuel MkIV", "name": "naquadah based liquid fuel mkiv"}, "label": "drop of Naquadah Based Liquid Fuel MkIV", "name": "ae2fc:fluid_drop", "size": 34250}, "isBusy": true, "name": "CPU_020"}
+{"busy": true, "finalOutput": {"damage": 0, "label": "Raw Neutronium Dust", "name": "dreamcraft:item.RawNeutronium", "size": 27336}, "isBusy": true, "name": "CPU_014"}
+{"busy": false, "isBusy": false, "name": "CPU_027"}
+{"busy": false, "isBusy": false, "name": "CPU_011"}
+{"busy": false, "isBusy": false, "name": "CPU_030"}
+{"busy": true, "finalOutput": {"damage": 0, "fluidDrop": {"label": "Sterilized Bio Catalyst Medium", "name": "biohmediumsterilized"}, "label": "drop of Sterilized Bio Catalyst Medium", "name": "ae2fc:fluid_drop", "size": 4054000}, "isBusy": true, "name": "CPU_010"}
+{"busy": false, "isBusy": false, "name": "CPU_021"}
+{"busy": false, "isBusy": false, "name": "CPU_007"}
+{"busy": false, "isBusy": false, "name": "CPU_006"}
+{"busy": false, "isBusy": false, "name": "CPU_004"}
+{"busy": false, "isBusy": false, "name": "CPU_015"}
+{"busy": false, "isBusy": false, "name": "CPU_028"}
+{"busy": false, "isBusy": false, "name": "CPU_029"}
+{"busy": false, "finalOutput": {"damage": 0, "fluidDrop": {"label": "Xenoxene", "name": "xenoxene"}, "label": "drop of Xenoxene", "name": "ae2fc:fluid_drop", "size": 1000000}, "isBusy": true, "name": "CPU_022"}
+{"busy": false, "isBusy": false, "name": "CPU_013"}
+{"busy": false, "isBusy": false, "name": "CPU_025"}
+{"busy": false, "isBusy": false, "name": "CPU_008"}
+{"busy": false, "isBusy": false, "name": "CPU_026"}
+{"busy": false, "isBusy": false, "name": "CPU_009"}
+{"busy": false, "isBusy": false, "name": "CPU_017"}
+{"busy": false, "isBusy": false, "name": "CPU_005"}

@@ -5,6 +5,9 @@
 #include <userver/testsuite/testsuite_support.hpp>
 #include <userver/utils/daemon_run.hpp>
 
+#include "agent/poll_handler.hpp"
+#include "agent/scan_handler.hpp"
+#include "db/schema.hpp"
 #include "health.hpp"
 
 auto main(int argc, char* argv[]) -> int {
@@ -15,6 +18,9 @@ auto main(int argc, char* argv[]) -> int {
           .Append<userver::components::TestsuiteSupport>()
           .Append<userver::clients::dns::Component>()
           .Append<userver::components::Postgres>("postgres-db")
-          .Append<factoryctl::Health>();
+          .Append<factoryctl::db::Schema>()
+          .Append<factoryctl::Health>()
+          .Append<factoryctl::agent::ScanHandler>()
+          .Append<factoryctl::agent::PollHandler>();
   return userver::utils::DaemonMain(argc, argv, components);
 }
