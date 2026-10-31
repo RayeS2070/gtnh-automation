@@ -1,4 +1,5 @@
-# Overrides of server/configs/config_vars.yaml inside the image (--config_vars_override).
+# The image's values over server/configs/config_vars.yaml, merged into it at build
+# (merge_vars.awk). Hand-tuned values on the host go to host_config_vars.yaml, not here.
 # The database is the `db` service of deploy/compose.yaml; FACTORYCTL_DB still overrides it.
 db-connection: postgresql://factoryctl:factoryctl@db:5432/factoryctl
 web-dir: /app/web

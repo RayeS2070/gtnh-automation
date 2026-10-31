@@ -62,11 +62,11 @@ kill "$pid"
 pid=
 
 echo "check: container"
-printf 'server-port: %s\ndb-connection: %s\nweb-dir: /app/web\ndata-dir: /app/data\n' \
-    "$image_port" "$db" > "$tmp/image.yaml"
+# As on the host: the override is the mounted config/config_vars.yaml.
+mkdir "$tmp/config"
+printf 'server-port: %s\ndb-connection: %s\n' "$image_port" "$db" > "$tmp/config/config_vars.yaml"
 # Not --rm: a container that dies at start keeps its log for probe to show.
-container=$(docker run -d --network host \
-    -v "$tmp/image.yaml:/app/configs/deploy_vars.yaml:ro" \
+container=$(docker run -d --network host -v "$tmp/config:/app/config:ro" \
     -v "$here/../assets/data:/app/data:ro" factoryctl:latest)
 probe "$image_port" image_log
 

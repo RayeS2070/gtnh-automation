@@ -120,6 +120,18 @@ On the host the server listens on `127.0.0.1:8080` only: the agent runs on the s
 `ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is the `factoryctl_pgdata`
 volume.
 
+Periods and other values can be tuned on the host without a deploy, in
+`~/factoryctl/config/config_vars.yaml`: it goes over the image's `config_vars.yaml` (the image has
+`server/configs/config_vars.yaml` with `deploy/config_vars.yaml` merged in), so set only what
+differs. `deploy.sh` puts it there once, from `deploy/host_config_vars.yaml`, and never overwrites
+it. The server reads it at start:
+
+```sh
+cd ~/factoryctl && docker compose restart server && docker compose ps
+```
+
+A bad value stops the server until it is fixed: look at the logs after the restart.
+
 Logs are JSON, one object per line (`logger-format` in `config_vars.yaml`; `tskv` and `raw` are
 the other formats): `timestamp`, `level`, `module`, `text`, and tags. Lines the agent sent have
 `"source": "agent"` and `agent_uptime`. Most lines are userver's records of each request; to read

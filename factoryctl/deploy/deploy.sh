@@ -23,10 +23,12 @@ docker build -t factoryctl:latest "$here"
 # Natively and in a container, against the test database: nothing leaves if it fails.
 "$here/deploy/check.sh"
 
-on_host mkdir -p "$remote/data"
+on_host mkdir -p "$remote/data" "$remote/config"
 # Icons: the calculator's export, about 42 MB; rsync sends it only when it changed.
 rsync_to --delete --exclude .git "$here/../assets/data/" "$host:$remote/data/"
 rsync_to "$here/deploy/compose.yaml" "$host:$remote/compose.yaml"
+# Hand-tuned on the host: sent once, never overwritten.
+rsync_to --ignore-existing "$here/deploy/host_config_vars.yaml" "$host:$remote/config/config_vars.yaml"
 
 echo "sending the image..."
 docker save factoryctl:latest | gzip | on_host 'gunzip | docker load'

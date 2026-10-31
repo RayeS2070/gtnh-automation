@@ -53,11 +53,17 @@ WORKDIR /app
 COPY --from=build /out/lib/ /app/lib/
 COPY --from=build /out/factoryctl_server /app/
 COPY --from=web /web/dist/ /app/web/
-COPY server/configs/ /app/configs/
-COPY deploy/config_vars.yaml /app/configs/deploy_vars.yaml
+COPY server/configs/static_config.yaml /app/configs/
+# The image's values (deploy/config_vars.yaml) go into config_vars itself: the override is the
+# host's, /app/config is mounted from ~/factoryctl/config (compose.yaml).
+RUN --mount=type=bind,source=server/configs/config_vars.yaml,target=/tmp/base.yaml \
+    --mount=type=bind,source=deploy/config_vars.yaml,target=/tmp/deploy.yaml \
+    --mount=type=bind,source=deploy/merge_vars.awk,target=/tmp/merge_vars.awk \
+    awk -f /tmp/merge_vars.awk /tmp/deploy.yaml /tmp/base.yaml > /app/configs/config_vars.yaml
+COPY deploy/host_config_vars.yaml /app/config/config_vars.yaml
 ENV LD_LIBRARY_PATH=/app/lib
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD curl -sf http://localhost:8080/health || exit 1
 CMD ["/app/factoryctl_server", "--config", "/app/configs/static_config.yaml", \
      "--config_vars", "/app/configs/config_vars.yaml", \
-     "--config_vars_override", "/app/configs/deploy_vars.yaml"]
+     "--config_vars_override", "/app/config/config_vars.yaml"]
