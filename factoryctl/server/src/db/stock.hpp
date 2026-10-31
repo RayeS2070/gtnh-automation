@@ -3,6 +3,7 @@
 // Stock as the client sees it.
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
@@ -30,7 +31,7 @@ struct StockQuery {
   GoodsKind kind = GoodsKind::kAll;
   StockOrder order = StockOrder::kLabel;  // ties: by label
   bool descending = false;
-  std::int64_t limit = 200;
+  std::optional<std::int64_t> limit;  // none: everything
 };
 
 // Before the first finished scan there is no stock: empty.

@@ -50,13 +50,13 @@ export type StockQuery = {
   dir: 'asc' | 'desc'
 }
 
-export async function fetchStock(query: StockQuery, limit = 200): Promise<StockItem[]> {
+// Everything that matches: the whole network is some 5000 rows.
+export async function fetchStock(query: StockQuery): Promise<StockItem[]> {
   const params = new URLSearchParams({
     q: query.text,
     kind: query.kind,
     sort: query.sort,
     dir: query.dir,
-    limit: String(limit),
   })
   return (await call<{ items: StockItem[] }>('GET', `/api/v1/stock?${params}`)).items
 }

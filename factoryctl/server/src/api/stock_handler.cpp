@@ -1,7 +1,7 @@
 #include "api/stock_handler.hpp"
 
-#include <algorithm>
 #include <charconv>
+#include <optional>
 #include <userver/components/component_context.hpp>
 #include <userver/formats/json/serialize.hpp>
 #include <userver/formats/json/value_builder.hpp>
@@ -18,18 +18,17 @@ namespace {
 
 namespace json = userver::formats::json;
 
-constexpr std::int64_t kDefaultLimit = 200;
-constexpr std::int64_t kMaxLimit = 2000;
-
-auto limitOf(const std::string& arg) -> std::int64_t {
+// No limit or an unusable one: everything (the whole network is some 5000
+// rows, the page shows them all).
+auto limitOf(const std::string& arg) -> std::optional<std::int64_t> {
   std::int64_t n = 0;
   const auto [end, ec] =
       std::from_chars(arg.data(), arg.data() + arg.size(), n);
   if (arg.empty() || ec != std::errc{} || end != arg.data() + arg.size() ||
       n <= 0) {
-    return kDefaultLimit;
+    return std::nullopt;
   }
-  return std::min(n, kMaxLimit);
+  return n;
 }
 
 // Unknown values mean the default, as an unusable limit does.

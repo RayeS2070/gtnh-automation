@@ -13,15 +13,11 @@
   import OrderForm from './OrderForm.svelte'
   import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
+  import { stockView as view } from './views.svelte'
 
-  const kLimit = 200
   const kinds = { all: 'All', items: 'Items', fluids: 'Fluids' } as const
 
-  let text = $state('')
-  let kind = $state<StockQuery['kind']>('all')
-  let sort = $state<StockQuery['sort']>('label')
-  let dir = $state<StockQuery['dir']>('asc')
-  const query = (): StockQuery => ({ text, kind, sort, dir })
+  const query = (): StockQuery => ({ ...view })
 
   let items = $state<StockItem[]>([])
   let targets = $state(new Map<number, Target>())
@@ -64,7 +60,7 @@
     const n = ++asked
     loading = true
     try {
-      const found = await fetchStock(q, kLimit)
+      const found = await fetchStock(q)
       if (n === asked) {
         items = found
         error = ''
@@ -104,18 +100,18 @@
 </script>
 
 <div class="controls">
-  <input class="search" type="search" placeholder="Search: words in any order, e.g. al cab" bind:value={text} />
+  <input class="search" type="search" placeholder="Search: words in any order, e.g. al cab" bind:value={view.text} />
   <div class="switch">
     {#each Object.entries(kinds) as [key, title] (key)}
-      <button class:on={kind === key} onclick={() => (kind = key as StockQuery['kind'])}>{title}</button>
+      <button class:on={view.kind === key} onclick={() => (view.kind = key as StockQuery['kind'])}>{title}</button>
     {/each}
   </div>
-  <select bind:value={sort}>
+  <select bind:value={view.sort}>
     <option value="label">by name</option>
     <option value="amount">by amount</option>
   </select>
-  <button onclick={() => (dir = dir === 'asc' ? 'desc' : 'asc')}>
-    {dir === 'asc' ? '↑ ascending' : '↓ descending'}
+  <button onclick={() => (view.dir = view.dir === 'asc' ? 'desc' : 'asc')}>
+    {view.dir === 'asc' ? '↑ ascending' : '↓ descending'}
   </button>
 </div>
 
@@ -172,7 +168,7 @@
 {#if error}
   <p class="error">{error}</p>
 {:else if !loading && items.length === 0}
-  <p class="muted">Nothing found{text || kind !== 'all' ? '' : ': no finished scan yet?'}</p>
+  <p class="muted">Nothing found{view.text || view.kind !== 'all' ? '' : ': no finished scan yet?'}</p>
 {/if}
 
 <div class="grid">
@@ -204,9 +200,6 @@
     </button>
   {/each}
 </div>
-{#if items.length === kLimit}
-  <p class="muted">The first {kLimit} only: narrow the search.</p>
-{/if}
 
 <style>
   .controls {
@@ -274,6 +267,9 @@
     gap: 0.4rem;
   }
   .tile {
+    /* The whole network is some 5000 tiles: the browser skips laying out the ones off screen. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 3.2rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;

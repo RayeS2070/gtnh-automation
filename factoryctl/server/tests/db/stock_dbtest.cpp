@@ -42,9 +42,9 @@ UTEST_F(StockTest, NothingBeforeAScan) { EXPECT_TRUE(labels("").empty()); }
 
 UTEST_F(StockTest, AllByLabelWithoutTheDropPrefix) {
   scan({kStick, kCasing, kPersulfate}, t0);
-  EXPECT_EQ(labels(""), (std::vector<std::string>{
-                            "Extreme Density Space-Bending Casing",
-                            "drop of Sodium Persulfate", "Stick"}));
+  EXPECT_EQ(labels(""),
+            (std::vector<std::string>{"Extreme Density Space-Bending Casing",
+                                      "drop of Sodium Persulfate", "Stick"}));
 }
 
 UTEST_F(StockTest, ByLabelDescending) {
@@ -56,10 +56,10 @@ UTEST_F(StockTest, ByLabelDescending) {
 
 UTEST_F(StockTest, ByAmount) {
   scan({kStick, kCasing, kPersulfate}, t0);
-  EXPECT_EQ(labels({.order = StockOrder::kAmount}),
-            (std::vector<std::string>{"Stick",
-                                      "Extreme Density Space-Bending Casing",
-                                      "drop of Sodium Persulfate"}));
+  EXPECT_EQ(
+      labels({.order = StockOrder::kAmount}),
+      (std::vector<std::string>{"Stick", "Extreme Density Space-Bending Casing",
+                                "drop of Sodium Persulfate"}));
   EXPECT_EQ(labels({.order = StockOrder::kAmount, .descending = true}),
             (std::vector<std::string>{"drop of Sodium Persulfate",
                                       "Extreme Density Space-Bending Casing",
@@ -120,6 +120,7 @@ UTEST_F(StockTest, PatternCharactersAreLiteral) {
 UTEST_F(StockTest, Limit) {
   scan({kStick, kCasing, kPersulfate}, t0);
   EXPECT_EQ(labels({.limit = 2}).size(), 2);
+  EXPECT_EQ(labels(StockQuery{}).size(), 3) << "no limit: everything";
 }
 
 UTEST_F(StockTest, RowCarriesKeyAndAmount) {

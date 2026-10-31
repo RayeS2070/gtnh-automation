@@ -1,15 +1,14 @@
 <script lang="ts">
-  import { fetchEvents, type EventLevel, type FactoryEvent } from './api'
+  import { fetchEvents, type FactoryEvent } from './api'
   import EventList from './EventList.svelte'
   import { every, kRefreshMs } from './refresh'
+  import { logsView } from './views.svelte'
 
   const kPage = 200
   const kMaxShown = 1000 // what the server gives at once
   const sources = ['', 'agent', 'order', 'scan', 'target', 'server']
 
-  let level = $state<EventLevel>('info')
-  let source = $state('')
-  let text = $state('')
+  const view = logsView
   let events = $state<FactoryEvent[]>([])
   let error = $state('')
   let more = $state(true)
@@ -19,7 +18,7 @@
   async function load(count: number) {
     const n = ++asked
     try {
-      const found = await fetchEvents({ level, source, text, limit: count })
+      const found = await fetchEvents({ ...view, limit: count })
       if (n !== asked) return
       events = found
       more = found.length === count
@@ -33,7 +32,7 @@
     const last = events.at(-1)
     if (!last) return
     try {
-      const found = await fetchEvents({ level, source, text, before: last.id, limit: kPage })
+      const found = await fetchEvents({ ...view, before: last.id, limit: kPage })
       events = [...events, ...found]
       more = found.length === kPage
     } catch (e) {
@@ -43,7 +42,7 @@
 
   // A filter change starts over, a moment after typing stops.
   $effect(() => {
-    void [level, source, text]
+    void [view.level, view.source, view.text]
     const timer = setTimeout(() => load(kPage), 250)
     return () => clearTimeout(timer)
   })
@@ -53,14 +52,14 @@
 
 <section>
   <div class="controls">
-    <input type="search" placeholder="Search the text" bind:value={text} />
-    <select bind:value={level}>
+    <input type="search" placeholder="Search the text" bind:value={view.text} />
+    <select bind:value={view.level}>
       <option value="debug">debug and above</option>
       <option value="info">info and above</option>
       <option value="warning">warnings and errors</option>
       <option value="error">errors</option>
     </select>
-    <select bind:value={source}>
+    <select bind:value={view.source}>
       {#each sources as s (s)}<option value={s}>{s || 'all sources'}</option>{/each}
     </select>
   </div>
