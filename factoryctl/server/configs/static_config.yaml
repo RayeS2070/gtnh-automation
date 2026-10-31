@@ -7,6 +7,11 @@ components_manager:
     default_task_processor: main-task-processor
 
     components:
+        # Our middlewares after userver's: compression wraps the handler's answer.
+        default-server-middleware-pipeline-builder:
+            append:
+              - compression
+
         server:
             listener:
                 port: $server-port

@@ -39,6 +39,12 @@ probe() {
         code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$port$path")
         [[ $code == 200 ]] || fail ":$port$path answered $code"
     done
+    # The web client's bundle comes compressed to a browser that takes it.
+    local js encoding
+    js=$(curl -s "localhost:$port/" | grep -oE '/assets/[^"]+\.js' | head -1)
+    encoding=$(curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip, zstd' "localhost:$port$js" \
+        | tr -d '\r' | awk -F': ' 'tolower($1) == "content-encoding" {print $2}')
+    [[ $encoding == zstd ]] || fail ":$port$js is not compressed (Content-Encoding: '$encoding')"
     # After the pages: errors they caused count too.
     $log > "$tmp/log" 2>&1 || true
     if grep -q '"level":"ERROR"' "$tmp/log"; then

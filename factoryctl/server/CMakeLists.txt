@@ -27,12 +27,20 @@ add_library(factoryctl_lib STATIC
         src/db/events_cleanup.cpp
         src/config/dynamic.cpp
         src/config/file_updater.cpp
+        src/http/compression.cpp
 )
+# Compression of responses (http/compression.cpp): both libraries are userver's
+# dependencies already.
+find_package(ZLIB REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET libzstd)
 target_include_directories(factoryctl_lib PUBLIC src)
 target_link_libraries(factoryctl_lib
         PUBLIC
         userver::core
         userver::postgresql
+        ZLIB::ZLIB
+        PkgConfig::ZSTD
         PRIVATE
         fctl_warnings
 )
@@ -55,6 +63,7 @@ add_executable(factoryctl_unittest
         tests/poll_test.cpp
         tests/sql_test.cpp
         tests/config_test.cpp
+        tests/compression_test.cpp
 )
 target_link_libraries(factoryctl_unittest
         PRIVATE

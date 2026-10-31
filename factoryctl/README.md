@@ -104,6 +104,9 @@ start of the volume) and drop the schema there all the time.
 
 `FACTORYCTL_DB` overrides the database connection string of `config_vars.yaml`.
 
+Text answers (JSON, the web client) are compressed, zstd or gzip, as the browser asks; icons
+are not (they are compressed already).
+
 There is no authentication: reach the server through an SSH tunnel.
 
 ## Deploy

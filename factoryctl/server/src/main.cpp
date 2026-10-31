@@ -18,12 +18,14 @@
 #include "db/events_cleanup.hpp"
 #include "db/schema.hpp"
 #include "health.hpp"
+#include "http/compression.hpp"
 
 auto main(int argc, char* argv[]) -> int {
   const auto components =
       userver::components::MinimalServerComponentList()
           .Append<userver::server::handlers::Ping>()
           .Append<factoryctl::config::FileUpdater>()
+          .Append<factoryctl::http::CompressionFactory>()
           // The Postgres component requires it, even without testsuite.
           .Append<userver::components::TestsuiteSupport>()
           .Append<userver::clients::dns::Component>()
