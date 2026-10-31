@@ -70,15 +70,25 @@ auto FileUpdater::update() -> void {
 
   try {
     auto docs = parseDocs(text);
-    for (const auto& name : unknownNames(docs, known_)) {
-      LOG_WARNING() << "dynamic config: " << path_ << ": no key " << name
-                    << " in this server, ignored";
+    const auto unknown = unknownNames(docs, known_);
+    for (const auto& name : unknown) {
+      if (const auto key = keyOfField(name)) {
+        LOG_WARNING() << "dynamic config: " << path_ << ": " << name
+                      << " is a field of " << *key << ", ignored at the top: "
+                      << "write it under `" << *key << ":`, indented";
+      } else {
+        LOG_WARNING() << "dynamic config: " << path_ << ": no key " << name
+                      << " in this server, ignored";
+      }
     }
-    auto names = docs.GetNames();
+    std::vector<std::string> taken;
+    for (const auto& name : docs.GetNames()) {
+      if (!std::ranges::contains(unknown, name)) taken.push_back(name);
+    }
     sink_.SetConfig(kName, std::move(docs));
     loaded_ = true;
     LOG_INFO() << "dynamic config from " << path_ << ": "
-               << listed({names.begin(), names.end()});
+               << listed(std::move(taken));
   } catch (const std::exception& e) {
     if (loaded_) {
       LOG_ERROR() << "dynamic config: " << path_

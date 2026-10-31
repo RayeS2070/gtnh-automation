@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -29,14 +30,19 @@ struct EventsSettings {
 // FACTORYCTL_EVENTS: keep, how long events stay.
 extern const userver::dynamic_config::Key<EventsSettings> kEvents;
 
-// The parsers of the keys. A missing field keeps its default; an unknown one
-// or a bad value throws, and userver refuses the whole update.
+// The parsers of the keys. A missing field keeps its default, a key without
+// fields (null) is all defaults; an unknown field or a bad value throws, and
+// userver refuses the whole update.
 auto parsePoll(const userver::formats::json::Value& value) -> domain::Settings;
 auto parseEvents(const userver::formats::json::Value& value) -> EventsSettings;
 
 // The file's text: a YAML mapping of keys; empty or only comments is none.
 // Throws on bad YAML or a document that is not a mapping.
 auto parseDocs(std::string_view yaml) -> userver::dynamic_config::DocsMap;
+
+// The key that has `field`: a field written at the top of the file (its key
+// line left commented out) is a mistake the log can name.
+auto keyOfField(std::string_view field) -> std::optional<std::string_view>;
 
 // Names in `docs` that no key of the server has: typos, most likely.
 auto unknownNames(const userver::dynamic_config::DocsMap& docs,

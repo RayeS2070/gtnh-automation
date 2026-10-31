@@ -2,13 +2,14 @@
 # again every 5 s: a change applies without a restart. deploy.sh puts this file there only
 # once and never overwrites it.
 #
-# Set only what differs: a key or a field left out keeps its default (the values below).
+# Set only what differs: a key or a field left out keeps its default (the values below). To
+# change a field, uncomment its line where it is: it must stay under its key, indented.
 # A file the server refuses (bad YAML, a bad value, an unknown field) changes nothing: the
 # values before it stay, and the log says why:
 #   docker compose logs server --no-log-prefix | jq -r 'select(.text | test("dynamic config")) | .text'
 # A key the server does not know is a warning in the log, and nothing else.
 #
-# FACTORYCTL_POLL:            # the agent's poll; periods like 10s, 5m, 1h, at least 1s
+FACTORYCTL_POLL:              # the agent's poll; periods like 10s, 5m, 1h, at least 1s
 #   poll-interval: 10s        # how often the agent polls
 #   scan-every: 5m            # time between scans
 #   scan-give-up: 10m         # an unfinished scan this old is replaced
@@ -23,7 +24,7 @@
 #   scan-slow-to: 320         # or the game server runs out of memory
 #   scan-slow-chunk: 5
 #
-# FACTORYCTL_EVENTS:
+FACTORYCTL_EVENTS:
 #   keep: 30d                 # events (the Logs tab, order history) older are deleted, hourly
 #
 # userver's own keys work too, e.g. logging of each request and response:

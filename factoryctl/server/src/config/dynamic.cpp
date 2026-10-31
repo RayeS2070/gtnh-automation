@@ -66,6 +66,7 @@ using Fields =
 template <typename T>
 auto fill(T& out, const json::Value& value, std::string_view key,
           const Fields<T>& fields) -> void {
+  if (value.IsNull()) return;
   if (!value.IsObject()) {
     throw std::runtime_error(std::format("{}: an object of fields", key));
   }
@@ -100,9 +101,7 @@ auto scanOf(std::int32_t domain::ScanParams::* member, std::int32_t min) {
   };
 }
 
-}  // namespace
-
-auto parsePoll(const json::Value& value) -> domain::Settings {
+auto pollFields() -> const Fields<domain::Settings>& {
   static const Fields<domain::Settings> fields{
       {"poll-interval", periodOf(&domain::Settings::poll)},
       {"scan-every", periodOf(&domain::Settings::scanEvery)},
@@ -124,8 +123,24 @@ auto parsePoll(const json::Value& value) -> domain::Settings {
       {"scan-slow-to", scanOf(&domain::ScanParams::slowTo, 0)},
       {"scan-slow-chunk", scanOf(&domain::ScanParams::slowChunk, 1)},
   };
+  return fields;
+}
+
+auto eventsFields() -> const Fields<EventsSettings>& {
+  static const Fields<EventsSettings> fields{
+      {"keep",
+       [](EventsSettings& e, const json::Value& v, std::string_view field) {
+         e.keep = period(v, kEventsName, field);
+       }},
+  };
+  return fields;
+}
+
+}  // namespace
+
+auto parsePoll(const json::Value& value) -> domain::Settings {
   domain::Settings s;
-  fill(s, value, kPollName, fields);
+  fill(s, value, kPollName, pollFields());
   if (s.scan.slowFrom > s.scan.slowTo) {
     fail(kPollName, "scan-slow-from", "after scan-slow-to");
   }
@@ -133,14 +148,8 @@ auto parsePoll(const json::Value& value) -> domain::Settings {
 }
 
 auto parseEvents(const json::Value& value) -> EventsSettings {
-  static const Fields<EventsSettings> fields{
-      {"keep",
-       [](EventsSettings& e, const json::Value& v, std::string_view field) {
-         e.keep = period(v, kEventsName, field);
-       }},
-  };
   EventsSettings e;
-  fill(e, value, kEventsName, fields);
+  fill(e, value, kEventsName, eventsFields());
   return e;
 }
 
@@ -172,6 +181,12 @@ auto parseDocs(std::string_view yaml) -> userver::dynamic_config::DocsMap {
     docs.Set(name, value.As<json::Value>());
   }
   return docs;
+}
+
+auto keyOfField(std::string_view field) -> std::optional<std::string_view> {
+  if (pollFields().contains(field)) return kPollName;
+  if (eventsFields().contains(field)) return kEventsName;
+  return std::nullopt;
 }
 
 auto unknownNames(const userver::dynamic_config::DocsMap& docs,

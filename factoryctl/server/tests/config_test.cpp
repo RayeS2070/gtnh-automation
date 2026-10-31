@@ -124,6 +124,20 @@ TEST(DynamicConfig, BadDocsThrow) {
   EXPECT_THROW(parseDocs("FACTORYCTL_POLL: {scan-every: 2m\n"), std::exception);
 }
 
+TEST(DynamicConfig, KeyWithoutFieldsIsTheDefaults) {
+  // As in the host's template: the key stays, its fields are commented out.
+  const auto docs = parseDocs("FACTORYCTL_POLL:\n#  scan-every: 2m\n");
+  EXPECT_EQ(parsePoll(docs.Get("FACTORYCTL_POLL")), domain::Settings{});
+  EXPECT_EQ(parseEvents(json::FromString("null")), EventsSettings{});
+}
+
+TEST(DynamicConfig, KeyOfField) {
+  EXPECT_EQ(keyOfField("scan-every"), "FACTORYCTL_POLL");
+  EXPECT_EQ(keyOfField("scan-slow-chunk"), "FACTORYCTL_POLL");
+  EXPECT_EQ(keyOfField("keep"), "FACTORYCTL_EVENTS");
+  EXPECT_EQ(keyOfField("FACTORYCTL_POL"), std::nullopt);
+}
+
 TEST(DynamicConfig, UnknownNames) {
   const auto docs = parseDocs("FACTORYCTL_POLL: {}\nFACTORYCTL_POL: {}\n");
   EXPECT_THAT(unknownNames(docs, {"FACTORYCTL_POLL", "FACTORYCTL_EVENTS"}),
