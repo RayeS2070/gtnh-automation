@@ -1,0 +1,30 @@
+# The dynamic config on the host: ~/factoryctl/config/dynamic_config.yaml. The server reads it
+# again every 5 s: a change applies without a restart. deploy.sh puts this file there only
+# once and never overwrites it.
+#
+# Set only what differs: a key or a field left out keeps its default (the values below).
+# A file the server refuses (bad YAML, a bad value, an unknown field) changes nothing: the
+# values before it stay, and the log says why:
+#   docker compose logs server --no-log-prefix | jq -r 'select(.text | test("dynamic config")) | .text'
+# A key the server does not know is a warning in the log, and nothing else.
+#
+# FACTORYCTL_POLL:            # the agent's poll; periods like 10s, 5m, 1h, at least 1s
+#   poll-interval: 10s        # how often the agent polls
+#   scan-every: 5m            # time between scans
+#   scan-give-up: 10m         # an unfinished scan this old is replaced
+#   sent-timeout: 2m          # a sent order without a result becomes lost
+#   computing-timeout: 2m     # alarm when AE computes the plan longer
+#   stalled-timeout: 10m      # alarm when a craft does not progress
+#   low-free-cpus: 8          # low priority orders only while this many CPUs are idle
+#   scan-threshold: 500       # smaller stacks are scanned only if craftable
+#   scan-max-id: 11500        # highest item id the agent asks for
+#   scan-chunk: 1000          # ids per getItemsInNetworkById call
+#   scan-slow-from: 250       # ids with a great many NBT variants: small chunks there,
+#   scan-slow-to: 320         # or the game server runs out of memory
+#   scan-slow-chunk: 5
+#
+# FACTORYCTL_EVENTS:
+#   keep: 30d                 # events (the Logs tab, order history) older are deleted, hourly
+#
+# userver's own keys work too, e.g. logging of each request and response:
+# USERVER_LOG_REQUEST: false

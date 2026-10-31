@@ -33,8 +33,9 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./data:/app/data:ro
-      # config_vars.yaml: hand-tuned values, read at start. A directory, not the file: an editor
-      # that saves a new file would leave a mounted file at its old version.
+      # config_vars.yaml: hand-tuned values, read at start; dynamic_config.yaml: periods and
+      # the like, read again every 5 s. A directory, not the files: an editor that saves a new
+      # file would leave a mounted file at its old version.
       - ./config:/app/config:ro
     logging: *logging
 

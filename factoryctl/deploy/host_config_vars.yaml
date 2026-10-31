@@ -1,11 +1,11 @@
 # Hand-tuned values on the host: ~/factoryctl/config/config_vars.yaml. deploy.sh puts this file
 # there only once and never overwrites it. It goes over the image's config_vars (userver's
 # --config_vars_override): set only what differs, any key of server/configs/config_vars.yaml.
+# Periods, timeouts and scan parameters are not here: they are in dynamic_config.yaml next to
+# it, which applies without a restart.
 # Apply: `docker compose restart server` in ~/factoryctl, then check that it came up
 # (`docker compose ps`, the logs): a bad value stops the server until it is fixed.
 # server-port is the container's: compose.yaml publishes 8080.
 #
-# poll-interval: 10s
-# scan-every: 5m
-# stalled-timeout: 10m
 # logger-level: info
+# worker-threads: 2

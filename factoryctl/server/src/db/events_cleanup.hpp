@@ -1,15 +1,14 @@
 #pragma once
 
-#include <chrono>
 #include <string_view>
 #include <userver/components/component_base.hpp>
+#include <userver/dynamic_config/source.hpp>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <userver/utils/periodic_task.hpp>
-#include <userver/yaml_config/schema.hpp>
 
 namespace factoryctl::db {
 
-// Deletes events older than `keep`, every hour and at start.
+// Deletes events older than config::kEvents keep, every hour and at start.
 class EventsCleanup final : public userver::components::ComponentBase {
  public:
   static constexpr std::string_view kName = "events-cleanup";
@@ -18,13 +17,11 @@ class EventsCleanup final : public userver::components::ComponentBase {
                 const userver::components::ComponentContext& context);
   ~EventsCleanup() override;
 
-  static auto GetStaticConfigSchema() -> userver::yaml_config::Schema;
-
  private:
   auto run() -> void;
 
   userver::storages::postgres::ClusterPtr db_;
-  std::chrono::seconds keep_;
+  userver::dynamic_config::Source config_;
   userver::utils::PeriodicTask task_;
 };
 

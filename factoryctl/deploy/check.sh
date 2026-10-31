@@ -45,14 +45,37 @@ probe() {
         grep '"level":"ERROR"' "$tmp/log" | head -3 >&2
         fail "errors in the log of :$port"
     fi
+    grep -q 'dynamic config from [^"]*: FACTORYCTL_EVENTS, FACTORYCTL_POLL' "$tmp/log" \
+        || fail ":$port did not take the dynamic config"
 }
+
+# Every field of the dynamic config, at its default: a parser that refuses one shows here.
+cat > "$tmp/dynamic_config.yaml" <<'YAML'
+FACTORYCTL_POLL:
+  poll-interval: 10s
+  scan-every: 5m
+  scan-give-up: 10m
+  sent-timeout: 2m
+  computing-timeout: 2m
+  stalled-timeout: 10m
+  low-free-cpus: 8
+  scan-threshold: 500
+  scan-max-id: 11500
+  scan-chunk: 1000
+  scan-slow-from: 250
+  scan-slow-to: 320
+  scan-slow-chunk: 5
+FACTORYCTL_EVENTS:
+  keep: 30d
+YAML
 
 native_log() { cat "$tmp/native.log"; }
 image_log() { docker logs "$container"; }
 
 echo "check: native"
 (cd "$here" && cmake --build --preset linux_clang_debug --target factoryctl_server >/dev/null)
-printf 'server-port: %s\ndb-connection: %s\n' "$native_port" "$db" > "$tmp/native.yaml"
+printf 'server-port: %s\ndb-connection: %s\ndynamic-config-path: %s\n' \
+    "$native_port" "$db" "$tmp/dynamic_config.yaml" > "$tmp/native.yaml"
 (cd "$here" && exec build/linux/linux_clang_debug/server/factoryctl_server \
     --config server/configs/static_config.yaml --config_vars server/configs/config_vars.yaml \
     --config_vars_override "$tmp/native.yaml") > "$tmp/native.log" 2>&1 &
@@ -65,6 +88,7 @@ echo "check: container"
 # As on the host: the override is the mounted config/config_vars.yaml.
 mkdir "$tmp/config"
 printf 'server-port: %s\ndb-connection: %s\n' "$image_port" "$db" > "$tmp/config/config_vars.yaml"
+cp "$tmp/dynamic_config.yaml" "$tmp/config/"
 # Not --rm: a container that dies at start keeps its log for probe to show.
 container=$(docker run -d --network host -v "$tmp/config:/app/config:ro" \
     -v "$here/../assets/data:/app/data:ro" factoryctl:latest)

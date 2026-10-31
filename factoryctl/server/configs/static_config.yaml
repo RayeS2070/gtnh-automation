@@ -21,7 +21,11 @@ components_manager:
                     format: $logger-format
                     overflow_behavior: discard
 
+        # Values that change while the server runs: config::kPoll and the others
+        # in src/config/dynamic.hpp, and userver's own. The defaults are below and
+        # in the code; the file of dynamic-config-file-updater goes over them.
         dynamic-config:
+            updates-enabled: true
             defaults:
                 # handler-static answers HTTP 500 for a file type missing here.
                 USERVER_FILES_CONTENT_TYPE_MAP:
@@ -45,6 +49,11 @@ components_manager:
                     network_timeout_ms: 5000
                     statement_timeout_ms: 3000
 
+        dynamic-config-file-updater:
+            path: $dynamic-config-path
+            update-period: 5s
+            fs-task-processor: fs-task-processor
+
         testsuite-support: {}
 
         dns-client:
@@ -62,8 +71,7 @@ components_manager:
 
         schema: {}
 
-        events-cleanup:
-            keep: $events-keep
+        events-cleanup: {}
 
         handler-ping:
             path: /ping
@@ -85,19 +93,6 @@ components_manager:
             path: /agent/v1/poll
             method: POST
             task_processor: main-task-processor
-            poll-interval: $poll-interval
-            scan-every: $scan-every
-            scan-give-up: $scan-give-up
-            sent-timeout: $sent-timeout
-            computing-timeout: $computing-timeout
-            stalled-timeout: $stalled-timeout
-            low-free-cpus: $low-free-cpus
-            scan-threshold: $scan-threshold
-            scan-max-id: $scan-max-id
-            scan-chunk: $scan-chunk
-            scan-slow-from: $scan-slow-from
-            scan-slow-to: $scan-slow-to
-            scan-slow-chunk: $scan-slow-chunk
 
         handler-api-stock:
             path: /api/v1/stock
@@ -128,7 +123,6 @@ components_manager:
             path: /api/v1/cpus
             method: GET
             task_processor: main-task-processor
-            low-free-cpus: $low-free-cpus
 
         handler-api-events:
             path: /api/v1/events

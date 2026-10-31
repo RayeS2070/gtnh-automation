@@ -25,6 +25,8 @@ add_library(factoryctl_lib STATIC
         src/db/cpus.cpp
         src/db/events.cpp
         src/db/events_cleanup.cpp
+        src/config/dynamic.cpp
+        src/config/file_updater.cpp
 )
 target_include_directories(factoryctl_lib PUBLIC src)
 target_link_libraries(factoryctl_lib
@@ -52,6 +54,7 @@ add_executable(factoryctl_unittest
         tests/scan_test.cpp
         tests/poll_test.cpp
         tests/sql_test.cpp
+        tests/config_test.cpp
 )
 target_link_libraries(factoryctl_unittest
         PRIVATE

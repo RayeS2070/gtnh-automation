@@ -5,3 +5,5 @@ db-connection: postgresql://factoryctl:factoryctl@db:5432/factoryctl
 web-dir: /app/web
 # The calculator's export, mounted by compose.yaml.
 data-dir: /app/data
+# Mounted from ~/factoryctl/config by compose.yaml.
+dynamic-config-path: /app/config/dynamic_config.yaml

@@ -47,6 +47,8 @@ struct Timeouts {
   std::chrono::seconds sent{120};       // no result: lost
   std::chrono::seconds computing{120};  // alarm
   std::chrono::seconds stalled{600};    // remaining unchanged: alarm
+
+  auto operator==(const Timeouts&) const -> bool = default;
 };
 
 enum class AlarmKind {

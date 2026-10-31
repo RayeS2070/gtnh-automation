@@ -29,6 +29,8 @@ rsync_to --delete --exclude .git "$here/../assets/data/" "$host:$remote/data/"
 rsync_to "$here/deploy/compose.yaml" "$host:$remote/compose.yaml"
 # Hand-tuned on the host: sent once, never overwritten.
 rsync_to --ignore-existing "$here/deploy/host_config_vars.yaml" "$host:$remote/config/config_vars.yaml"
+rsync_to --ignore-existing "$here/deploy/host_dynamic_config.yaml" \
+    "$host:$remote/config/dynamic_config.yaml"
 
 echo "sending the image..."
 docker save factoryctl:latest | gzip | on_host 'gunzip | docker load'

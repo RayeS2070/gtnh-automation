@@ -24,6 +24,8 @@ struct ScanParams {
   std::int32_t slowFrom = 250;  // ids with a great many NBT variants:
   std::int32_t slowTo = 320;  // small chunks, or the server runs out of memory
   std::int32_t slowChunk = 5;
+
+  auto operator==(const ScanParams&) const -> bool = default;
 };
 
 // All periods are settings: short ones make debugging faster.
@@ -35,6 +37,8 @@ struct Settings {
   Timeouts timeouts;
   ScanParams scan;
   std::int32_t lowFreeCpus = 8;  // low priority needs this many idle CPUs
+
+  auto operator==(const Settings&) const -> bool = default;
 };
 
 struct ScanState {

@@ -12,3 +12,6 @@ CMakeUserPresets.json
 # AI
 AGENTS.md
 CLAUDE.md
+
+# The dynamic config of a server started here (dynamic-config-path)
+dynamic_config.yaml

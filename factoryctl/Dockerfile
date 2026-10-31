@@ -61,6 +61,7 @@ RUN --mount=type=bind,source=server/configs/config_vars.yaml,target=/tmp/base.ya
     --mount=type=bind,source=deploy/merge_vars.awk,target=/tmp/merge_vars.awk \
     awk -f /tmp/merge_vars.awk /tmp/deploy.yaml /tmp/base.yaml > /app/configs/config_vars.yaml
 COPY deploy/host_config_vars.yaml /app/config/config_vars.yaml
+COPY deploy/host_dynamic_config.yaml /app/config/dynamic_config.yaml
 ENV LD_LIBRARY_PATH=/app/lib
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD curl -sf http://localhost:8080/health || exit 1

@@ -14,6 +14,7 @@
 #include "api/orders_handler.hpp"
 #include "api/stock_handler.hpp"
 #include "api/targets_handler.hpp"
+#include "config/file_updater.hpp"
 #include "db/events_cleanup.hpp"
 #include "db/schema.hpp"
 #include "health.hpp"
@@ -22,6 +23,7 @@ auto main(int argc, char* argv[]) -> int {
   const auto components =
       userver::components::MinimalServerComponentList()
           .Append<userver::server::handlers::Ping>()
+          .Append<factoryctl::config::FileUpdater>()
           // The Postgres component requires it, even without testsuite.
           .Append<userver::components::TestsuiteSupport>()
           .Append<userver::clients::dns::Component>()

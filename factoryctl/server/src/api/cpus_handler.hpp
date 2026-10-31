@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 #include <string_view>
 #include <userver/components/component_fwd.hpp>
+#include <userver/dynamic_config/source.hpp>
 #include <userver/server/handlers/http_handler_base.hpp>
 #include <userver/storages/postgres/postgres_fwd.hpp>
-#include <userver/yaml_config/schema.hpp>
 
 namespace factoryctl::api {
 
@@ -23,11 +22,9 @@ class CpusHandler final : public userver::server::handlers::HttpHandlerBase {
                           userver::server::request::RequestContext& context)
       const -> std::string override;
 
-  static auto GetStaticConfigSchema() -> userver::yaml_config::Schema;
-
  private:
   userver::storages::postgres::ClusterPtr db_;
-  std::int32_t lowFreeCpus_;
+  userver::dynamic_config::Source config_;
 };
 
 }  // namespace factoryctl::api

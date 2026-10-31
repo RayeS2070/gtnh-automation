@@ -2,11 +2,12 @@
 
 #include <userver/components/component_config.hpp>
 #include <userver/components/component_context.hpp>
+#include <userver/dynamic_config/storage/component.hpp>
 #include <userver/logging/log.hpp>
 #include <userver/storages/postgres/component.hpp>
 #include <userver/utils/datetime.hpp>
-#include <userver/yaml_config/merge_schemas.hpp>
 
+#include "config/dynamic.hpp"
 #include "db/events.hpp"
 #include "db/schema.hpp"
 
@@ -18,7 +19,8 @@ EventsCleanup::EventsCleanup(
     : ComponentBase(config, context),
       db_(context.FindComponent<userver::components::Postgres>("postgres-db")
               .GetCluster()),
-      keep_(config["keep"].As<std::chrono::seconds>(std::chrono::days{30})) {
+      config_(context.FindComponent<userver::components::DynamicConfig>()
+                  .GetSource()) {
   context.FindComponent<Schema>();
   using userver::utils::PeriodicTask;
   task_.Start("events-cleanup",
@@ -30,19 +32,10 @@ EventsCleanup::EventsCleanup(
 EventsCleanup::~EventsCleanup() { task_.Stop(); }
 
 auto EventsCleanup::run() -> void {
+  const auto keep = config_.GetCopy(config::kEvents).keep;
   const auto gone =
-      deleteEventsBefore(*db_, userver::utils::datetime::Now() - keep_);
+      deleteEventsBefore(*db_, userver::utils::datetime::Now() - keep);
   if (gone > 0) LOG_INFO() << "events: " << gone << " older ones deleted";
-}
-
-auto EventsCleanup::GetStaticConfigSchema() -> userver::yaml_config::Schema {
-  return userver::yaml_config::MergeSchemas<ComponentBase>(R"(
-type: object
-description: deletes old events
-additionalProperties: false
-properties:
-    keep: {type: string, description: how long events are kept (30d)}
-)");
 }
 
 }  // namespace factoryctl::db

@@ -46,7 +46,10 @@ at most once: one whose result never comes is marked lost, never sent again by i
 
 The schema is one file, `server/schema/schema.sql`, versioned; there are no migrations: a
 server finding another version refuses to start and says how to drop the old schema.
-Periods and scan parameters are in `server/configs/config_vars.yaml`.
+Periods, timeouts and scan parameters are the dynamic config (`server/src/config/dynamic.hpp`):
+a YAML file the server reads again every 5 s, so a change applies without a restart. Started
+here, the server reads `dynamic_config.yaml` in the directory it starts from (not in git; no
+file means the defaults); `deploy/host_dynamic_config.yaml` lists every key with its default.
 
 **Web client** (`web/`, Svelte + TypeScript). Stock as a grid of tiles with search by words,
 items or fluids, by name or amount; the chosen goods' target and order forms above it; targets (threshold, batch,
@@ -120,17 +123,21 @@ On the host the server listens on `127.0.0.1:8080` only: the agent runs on the s
 `ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is the `factoryctl_pgdata`
 volume.
 
-Periods and other values can be tuned on the host without a deploy, in
-`~/factoryctl/config/config_vars.yaml`: it goes over the image's `config_vars.yaml` (the image has
-`server/configs/config_vars.yaml` with `deploy/config_vars.yaml` merged in), so set only what
-differs. `deploy.sh` puts it there once, from `deploy/host_config_vars.yaml`, and never overwrites
-it. The server reads it at start:
+Values can be tuned on the host without a deploy, in `~/factoryctl/config/`. `deploy.sh` puts
+both files there once, from `deploy/host_*`, and never overwrites them; set only what differs.
 
-```sh
-cd ~/factoryctl && docker compose restart server && docker compose ps
-```
+- `dynamic_config.yaml`: periods, timeouts, scan parameters, how long events are kept, and
+  userver's own keys. Read again every 5 s, no restart. A file the server refuses changes
+  nothing (the values before it stay); the log says why:
 
-A bad value stops the server until it is fixed: look at the logs after the restart.
+  ```sh
+  docker compose logs server --no-log-prefix | jq -r 'select(.text | test("dynamic config")) | .text'
+  ```
+
+- `config_vars.yaml`: what is read at start only (log level, threads), over the image's
+  `config_vars.yaml` (`server/configs/config_vars.yaml` with `deploy/config_vars.yaml` merged in).
+  Apply with `docker compose restart server && docker compose ps`; a bad value stops the server
+  until it is fixed.
 
 Logs are JSON, one object per line (`logger-format` in `config_vars.yaml`; `tskv` and `raw` are
 the other formats): `timestamp`, `level`, `module`, `text`, and tags. Lines the agent sent have
