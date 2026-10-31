@@ -38,9 +38,9 @@ class OrdersTest : public DbTest {
   auto make(std::initializer_list<NewOrder> orders) -> std::int64_t {
     auto t = tx();
     const std::vector<NewOrder> v(orders);
-    const auto n = insertOrders(t, v, t0);
+    const auto made = insertOrders(t, v, t0);
     t.Commit();
-    return n;
+    return static_cast<std::int64_t>(made.size());
   }
 
   auto open() -> std::vector<OrderState> {

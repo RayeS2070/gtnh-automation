@@ -8,6 +8,9 @@ server-port: 8080
 # The development database from compose.yaml; FACTORYCTL_DB overrides it.
 db-connection: postgresql://factoryctl:factoryctl@localhost:15432/factoryctl
 
+# Events (the Logs tab, order history) older than this are deleted, hourly.
+events-keep: 30d
+
 # The agent's poll (handler-agent-poll). Periods like 10s, 5m; shorten them to debug.
 poll-interval: 10s
 scan-every: 5m

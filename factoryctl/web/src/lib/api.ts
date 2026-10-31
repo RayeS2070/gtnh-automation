@@ -130,3 +130,38 @@ export const isIdle = (c: Cpu) => !c.busy && c.goods === null
 export async function fetchCpus(): Promise<{ items: Cpu[]; lowFreeCpus: number }> {
   return await call('GET', '/api/v1/cpus')
 }
+
+export type EventLevel = 'debug' | 'info' | 'warning' | 'error'
+
+// Something that happened, for people: the agent's lines, order history, alarms, scans, targets.
+export type FactoryEvent = {
+  id: number
+  at: string // UTC, ISO 8601
+  level: EventLevel
+  source: string // agent | server | order | scan | target
+  text: string
+  order: number | null
+  goods: { goodsId: number; name: string; damage: number; variant: string; label: string } | null
+  agentUptime: number | null // the agent's computer.uptime(), its own lines
+}
+
+export type EventQuery = {
+  level?: EventLevel // this level and above
+  source?: string
+  text?: string
+  order?: number
+  before?: number // ids below it: older events
+  limit?: number
+}
+
+// Newest first.
+export async function fetchEvents(q: EventQuery = {}): Promise<FactoryEvent[]> {
+  const params = new URLSearchParams()
+  if (q.level) params.set('level', q.level)
+  if (q.source) params.set('source', q.source)
+  if (q.text) params.set('q', q.text)
+  if (q.order !== undefined) params.set('order', String(q.order))
+  if (q.before !== undefined) params.set('before', String(q.before))
+  if (q.limit !== undefined) params.set('limit', String(q.limit))
+  return (await call<{ items: FactoryEvent[] }>('GET', `/api/v1/events?${params}`)).items
+}

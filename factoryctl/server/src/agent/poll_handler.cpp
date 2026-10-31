@@ -1,6 +1,7 @@
 #include "agent/poll_handler.hpp"
 
 #include <algorithm>
+#include <format>
 #include <userver/components/component_config.hpp>
 #include <userver/components/component_context.hpp>
 #include <userver/formats/json/exception.hpp>
@@ -15,6 +16,7 @@
 
 #include "agent/protocol.hpp"
 #include "agent/scan_handler.hpp"
+#include "db/events.hpp"
 #include "db/orders.hpp"
 #include "db/scan.hpp"
 #include "db/schema.hpp"
@@ -127,6 +129,8 @@ auto PollHandler::HandleRequestThrow(
   // The agent's probes of the targets, measured after the CPUs: fresher than
   // any scan. One that found nothing where the scan saw some is not trusted.
   std::vector<db::ProbedAmount> probed;
+  // What this poll tells people: written in its transaction.
+  std::vector<db::Event> events;
   if (stock) {
     for (const auto& p : report->stock) {
       const auto it = stock->find(p.item);
@@ -135,10 +139,15 @@ auto PollHandler::HandleRequestThrow(
         probed.push_back({p.item, *amount});
         (*stock)[p.item] = *amount;
       } else {
-        LOG_WARNING() << "poll: probe of " << p.item.name << ":"
-                      << p.item.damage << " " << p.item.variant
-                      << " found nothing, the scan saw " << scanned
-                      << "; ignored";
+        const auto text = std::format(
+            "probe found nothing where the scan saw {}; ignored", scanned);
+        LOG_WARNING() << "poll: " << p.item.name << ":" << p.item.damage
+                      << " " << p.item.variant << ": " << text;
+        events.push_back({.at = now,
+                          .level = "warning",
+                          .source = "server",
+                          .text = text,
+                          .goods = p.item});
       }
     }
     db::applyProbes(tx, probed, now);
@@ -163,6 +172,49 @@ auto PollHandler::HandleRequestThrow(
   if (domain::needScan(scans, settings_, now)) {
     scan = ScanTask{db::startScan(tx, now), settings_.scan};
   }
+
+  for (const auto& l : report->log) {
+    events.push_back({.at = now,
+                      .level = l.level == "err"   ? "error"
+                               : l.level == "wrn" ? "warning"
+                               : l.level == "dbg" ? "debug"
+                                                  : "info",
+                      .source = "agent",
+                      .text = l.text,
+                      .agentUptime = l.t});
+  }
+  for (const auto& c : out.changes) {
+    const bool bad = c.to == domain::OrderStatus::kFailed ||
+                     c.to == domain::OrderStatus::kLost;
+    events.push_back({.at = now,
+                      .level = bad ? "warning" : "info",
+                      .source = "order",
+                      .text = c.text,
+                      .order = c.order});
+  }
+  for (const auto& a : out.alarms) {
+    events.push_back({.at = now,
+                      .level = "error",
+                      .source = "order",
+                      .text = std::string(alarmName(a.kind)),
+                      .order = a.order});
+  }
+  for (const auto& e : out.errors) {
+    events.push_back(
+        {.at = now, .level = "warning", .source = "server", .text = e});
+  }
+  for (const auto& c : created) {
+    events.push_back({.at = now,
+                      .source = "order",
+                      .text = std::format("queued {} for a target", c.order.amount),
+                      .order = c.id});
+  }
+  if (scan) {
+    events.push_back({.at = now,
+                      .source = "scan",
+                      .text = std::format("scan {} started", scan->id)});
+  }
+  db::addEvents(tx, events);
   tx.Commit();
 
   // The agent's own log, after the commit: a poll that failed sends it again.
@@ -181,7 +233,9 @@ auto PollHandler::HandleRequestThrow(
   for (const auto& a : out.alarms) {
     LOG_ERROR() << "order " << a.order << ": " << alarmName(a.kind);
   }
-  if (created > 0) LOG_INFO() << "poll: " << created << " new orders";
+  if (!created.empty()) {
+    LOG_INFO() << "poll: " << created.size() << " new orders";
+  }
   if (scan) LOG_INFO() << "poll: scan " << scan->id << " started";
 
   PollReply reply{.poll = settings_.poll, .scan = scan};

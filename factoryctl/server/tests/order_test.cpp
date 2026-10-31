@@ -296,4 +296,17 @@ TEST(Order, CancelTaskNeedsTheCpu) {
   EXPECT_FALSE(needsCancelTask(o));
 }
 
+TEST(Order, Describe) {
+  OrderState o{.id = 1, .status = OrderStatus::kCrafting};
+  o.cpu = "CPU_014";
+  EXPECT_EQ(describe(o), "crafting on CPU_014");
+  o.status = OrderStatus::kFailed;
+  o.message = "AE could not plan the craft";
+  EXPECT_EQ(describe(o), "failed: AE could not plan the craft");
+  o.message = "";
+  EXPECT_EQ(describe(o), "failed");
+  o.status = OrderStatus::kDone;
+  EXPECT_EQ(describe(o), "done");
+}
+
 }  // namespace

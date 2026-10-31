@@ -108,6 +108,30 @@ auto toJson(const db::CpuRow& row) -> json::ValueBuilder {
   return e;
 }
 
+auto toJson(const db::EventRow& row) -> json::ValueBuilder {
+  json::ValueBuilder e;
+  e["id"] = row.id;
+  e["at"] = utc(row.at);
+  e["level"] = row.level;
+  e["source"] = row.source;
+  e["text"] = row.text;
+  e["order"] = row.order ? json::ValueBuilder{*row.order} : json::ValueBuilder{};
+  if (row.goods) {
+    json::ValueBuilder g;
+    g["goodsId"] = row.goods->id;
+    g["name"] = row.goods->key.name;
+    g["damage"] = row.goods->key.damage;
+    g["variant"] = row.goods->key.variant;
+    g["label"] = row.goods->label;
+    e["goods"] = std::move(g);
+  } else {
+    e["goods"] = json::ValueBuilder{};
+  }
+  e["agentUptime"] = row.agentUptime ? json::ValueBuilder{*row.agentUptime}
+                                     : json::ValueBuilder{};
+  return e;
+}
+
 auto parseOrderRequest(const json::Value& body)
     -> std::expected<OrderRequest, std::string> {
   if (!body.IsObject()) return fail("order", "not an object");

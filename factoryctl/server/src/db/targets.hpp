@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "db/stock.hpp"
+#include "domain/order.hpp"
 #include "domain/plan.hpp"
 
 namespace factoryctl::db {
@@ -35,11 +36,16 @@ struct TargetRow {
 // Every target, enabled or not, by label.
 auto listTargets(pg::Cluster& db) -> std::vector<TargetRow>;
 
-// Creates or replaces the target of the goods. Fails for unknown goods.
-auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s)
-    -> std::expected<void, std::string>;
+// Creates or replaces the target of the goods, and tells it (events). Fails
+// for unknown goods.
+auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s,
+               domain::TimePoint now) -> std::expected<void, std::string>;
 
 // Returns false when there was no target.
-auto deleteTarget(pg::Cluster& db, std::int64_t goodsId) -> bool;
+auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now)
+    -> bool;
+
+// The settings for a person: "keep 100000, order 5000, low priority, fill".
+auto describe(const TargetSettings& s) -> std::string;
 
 }  // namespace factoryctl::db

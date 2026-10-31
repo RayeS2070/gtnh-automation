@@ -6,6 +6,7 @@
 #include <userver/storages/postgres/io/chrono.hpp>
 #include <userver/storages/postgres/transaction.hpp>
 
+#include "db/events.hpp"
 #include "db/orders.hpp"
 
 namespace factoryctl::db {
@@ -21,8 +22,8 @@ auto orderOnce(pg::Cluster& db, std::int64_t goodsId, std::int64_t amount,
     -> std::expected<std::int64_t, std::string> {
   if (amount <= 0) return std::unexpected("amount must be > 0");
   try {
-    const auto res = db.Execute(
-        kMaster,
+    auto tx = db.Begin(kMaster, {});
+    const auto res = tx.Execute(
         "INSERT INTO factoryctl.orders"
         "  (goods_id, amount, source, requested_by, created_at, changed_at) "
         "SELECT g.id, $2, 'manual', $3, $4, $4 FROM factoryctl.goods g "
@@ -31,15 +32,23 @@ auto orderOnce(pg::Cluster& db, std::int64_t goodsId, std::int64_t amount,
         goodsId, amount, std::string(requestedBy), pg::TimePointTz{now});
     if (res.IsEmpty()) {
       // AE would refuse it: the agent's getCraftables finds nothing.
-      const auto known = db.Execute(kMaster,
-                                    "SELECT 1 FROM factoryctl.goods "
-                                    "WHERE id = $1",
-                                    goodsId);
+      const auto known =
+          tx.Execute("SELECT 1 FROM factoryctl.goods WHERE id = $1", goodsId);
       return std::unexpected(
           known.IsEmpty() ? std::format("no goods {}", goodsId)
                           : std::string("AE cannot craft it: no pattern"));
     }
-    return res.AsSingleRow<std::int64_t>();
+    const auto id = res.AsSingleRow<std::int64_t>();
+    const Event told{
+        .at = now,
+        .source = "order",
+        .text = requestedBy.empty()
+                    ? std::format("queued {}", amount)
+                    : std::format("queued {} by {}", amount, requestedBy),
+        .order = id};
+    addEvents(tx, {&told, 1});
+    tx.Commit();
+    return id;
   } catch (const pg::UniqueViolation&) {
     // orders_one_open: the CPU running an order is found by its item.
     return std::unexpected("already on order: wait for it or cancel it");
@@ -111,6 +120,14 @@ auto cancelOrder(pg::Cluster& db, std::int64_t id, domain::TimePoint now)
         "  changed_at = $3, cancel_requested = $4 WHERE id = $1",
         id, statusName(o.status), pg::TimePointTz{o.changedAt},
         o.cancelRequested);
+    const Event told{
+        .at = now,
+        .source = "order",
+        .text = action == domain::CancelAction::kCanceledNow
+                    ? "canceled before it reached the agent"
+                    : "cancel asked: the agent cancels the craft on its CPU",
+        .order = id};
+    addEvents(tx, {&told, 1});
   }
   tx.Commit();
   return action;

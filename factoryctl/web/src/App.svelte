@@ -1,11 +1,12 @@
 <script lang="ts">
   import Cpus from './lib/Cpus.svelte'
+  import Logs from './lib/Logs.svelte'
   import Orders from './lib/Orders.svelte'
   import Stock from './lib/Stock.svelte'
   import Targets from './lib/Targets.svelte'
 
-  // Pages by the URL hash (#/stock, #/targets, #/orders, #/cpus): no router needed for a few tabs.
-  const pages = { stock: 'Stock', targets: 'Targets', orders: 'Orders', cpus: 'CPUs' } as const
+  // Pages by the URL hash (#/stock, #/targets, #/orders, #/cpus, #/logs): no router needed for a few tabs.
+  const pages = { stock: 'Stock', targets: 'Targets', orders: 'Orders', cpus: 'CPUs', logs: 'Logs' } as const
   type Page = keyof typeof pages
 
   const fromHash = (): Page => {
@@ -28,13 +29,15 @@
     {/each}
   </nav>
 </header>
-<main class:wide={page === 'stock'}>
+<main class:wide={page === 'stock' || page === 'logs'}>
   {#if page === 'targets'}
     <Targets />
   {:else if page === 'orders'}
     <Orders />
   {:else if page === 'cpus'}
     <Cpus />
+  {:else if page === 'logs'}
+    <Logs />
   {:else}
     <Stock />
   {/if}

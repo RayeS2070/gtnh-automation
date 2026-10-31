@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (5);
+INSERT INTO factoryctl.schema_version VALUES (6);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -109,3 +109,21 @@ CREATE TABLE factoryctl.cpus (
     remaining bigint NOT NULL DEFAULT 0,
     seen_at   timestamptz NOT NULL
 );
+
+-- What happened, for people: the agent's log lines, order status changes,
+-- alarms, scans, targets. Not the server's whole log (that stays on stderr).
+-- Written in the transaction of what it tells; kept for events-keep.
+CREATE TYPE factoryctl.event_level AS ENUM ('debug', 'info', 'warning', 'error');
+
+CREATE TABLE factoryctl.events (
+    id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    at           timestamptz NOT NULL,
+    level        factoryctl.event_level NOT NULL,
+    source       text NOT NULL,  -- agent | server | order | scan | target
+    text         text NOT NULL,
+    order_id     bigint REFERENCES factoryctl.orders ON DELETE SET NULL,
+    goods_id     bigint REFERENCES factoryctl.goods ON DELETE SET NULL,
+    agent_uptime double precision  -- the agent's computer.uptime(), its lines only
+);
+CREATE INDEX events_by_time ON factoryctl.events (at);
+CREATE INDEX events_of_order ON factoryctl.events (order_id) WHERE order_id IS NOT NULL;

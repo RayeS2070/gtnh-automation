@@ -52,7 +52,8 @@ Periods and scan parameters are in `server/configs/config_vars.yaml`.
 items or fluids, by name or amount; the chosen goods' target and order forms above it; targets (threshold, batch,
 priority, fill, pause); one-off orders and cancel; the order list with status, CPU and
 progress; the CPUs and what they craft (a tile and the order form say when goods are on a CPU
-already). Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
+already); the Logs tab and each order's history (events: what our code tells on purpose, not the
+server's whole log). Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
 Item icons come from the GTNH Calculator's export (`../assets/data`, served at `/data/`): the
 page reads `data.bin` the way the calculator does and draws icons from `atlas.webp`. The export
 is of another game version, so a few goods have no icon.
@@ -64,6 +65,7 @@ is of another game version, so a few goods have no icon.
 | `POST /agent/v1/poll`, `POST /agent/v1/scan` | the agent; answers are Lua tables, always HTTP 200 with `ok` |
 | `GET /api/v1/stock?q=&kind=&sort=&dir=&limit=` | stock: every word of `q` in the label, any order; `kind` all/items/fluids; `sort` label/amount; `dir` asc/desc |
 | `GET /api/v1/cpus` | the CPUs of the agent's last poll: what each crafts, what is left, our open order of it; and `lowFreeCpus` |
+| `GET /api/v1/events?level=&source=&q=&order=&before=&limit=` | events, newest first: the agent's lines, every order status change, alarms, scans, targets (kept `events-keep`, 30 days) |
 | `GET /api/v1/targets`, `PUT|DELETE /api/v1/targets/{goods_id}` | targets |
 | `GET|POST /api/v1/orders`, `POST /api/v1/orders/{order_id}/cancel` | orders |
 | `GET /health`, `GET /ping` | |

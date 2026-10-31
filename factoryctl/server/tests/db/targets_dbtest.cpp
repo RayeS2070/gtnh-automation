@@ -41,7 +41,7 @@ UTEST_F(TargetsTest, SetAndList) {
                          .enabled = true,
                          .note = "for the assembler",
                          .fill = true};
-  ASSERT_TRUE(setTarget(db(), stick, s).has_value());
+  ASSERT_TRUE(setTarget(db(), stick, s, t0).has_value());
   const auto list = listTargets(db());
   ASSERT_EQ(list.size(), 1);
   EXPECT_EQ(list[0].goods.goodsId, stick);
@@ -51,9 +51,9 @@ UTEST_F(TargetsTest, SetAndList) {
 }
 
 UTEST_F(TargetsTest, SetAgainReplaces) {
-  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1}).has_value());
+  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1}, t0).has_value());
   const TargetSettings s{.threshold = 0, .batch = 144, .enabled = false};
-  ASSERT_TRUE(setTarget(db(), stick, s).has_value());
+  ASSERT_TRUE(setTarget(db(), stick, s, t0).has_value());
   const auto list = listTargets(db());
   ASSERT_EQ(list.size(), 1);
   EXPECT_EQ(list[0].settings, s);
@@ -61,10 +61,10 @@ UTEST_F(TargetsTest, SetAgainReplaces) {
 
 UTEST_F(TargetsTest, DisabledTargetsAreListedButNotPlanned) {
   ASSERT_TRUE(
-      setTarget(db(), stick, {.threshold = 1, .batch = 1, .enabled = false})
+      setTarget(db(), stick, {.threshold = 1, .batch = 1, .enabled = false}, t0)
           .has_value());
   ASSERT_TRUE(
-      setTarget(db(), xenoxene, {.threshold = 1, .batch = 1}).has_value());
+      setTarget(db(), xenoxene, {.threshold = 1, .batch = 1}, t0).has_value());
   EXPECT_EQ(listTargets(db()).size(), 2);
   auto tx = db().Begin(pg::ClusterHostType::kMaster, {});
   const auto planned = loadTargets(tx);
@@ -74,30 +74,30 @@ UTEST_F(TargetsTest, DisabledTargetsAreListedButNotPlanned) {
 }
 
 UTEST_F(TargetsTest, FillReachesThePoll) {
-  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1, .fill = true})
+  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1, .fill = true}, t0)
                   .has_value());
   auto tx = db().Begin(pg::ClusterHostType::kMaster, {});
   EXPECT_TRUE(loadTargets(tx).at(0).fill);
 }
 
 UTEST_F(TargetsTest, UnknownGoodsRefused) {
-  const auto r = setTarget(db(), 999'999, {.threshold = 1, .batch = 1});
+  const auto r = setTarget(db(), 999'999, {.threshold = 1, .batch = 1}, t0);
   ASSERT_FALSE(r.has_value());
   EXPECT_NE(r.error().find("999999"), std::string::npos) << r.error();
 }
 
 UTEST_F(TargetsTest, BadNumbersRefused) {
   EXPECT_FALSE(
-      setTarget(db(), stick, {.threshold = -1, .batch = 1}).has_value());
+      setTarget(db(), stick, {.threshold = -1, .batch = 1}, t0).has_value());
   EXPECT_FALSE(
-      setTarget(db(), stick, {.threshold = 1, .batch = 0}).has_value());
+      setTarget(db(), stick, {.threshold = 1, .batch = 0}, t0).has_value());
   EXPECT_TRUE(listTargets(db()).empty());
 }
 
 UTEST_F(TargetsTest, Delete) {
-  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1}).has_value());
-  EXPECT_TRUE(deleteTarget(db(), stick));
-  EXPECT_FALSE(deleteTarget(db(), stick));
+  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1}, t0).has_value());
+  EXPECT_TRUE(deleteTarget(db(), stick, t0));
+  EXPECT_FALSE(deleteTarget(db(), stick, t0));
   EXPECT_TRUE(listTargets(db()).empty());
 }
 

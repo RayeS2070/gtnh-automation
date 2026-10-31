@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { cancelOrder, fetchOrders, openStatuses, type Order } from './api'
+  import { cancelOrder, fetchEvents, fetchOrders, openStatuses, type FactoryEvent, type Order } from './api'
+  import EventList from './EventList.svelte'
   import { amount, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
@@ -7,10 +8,32 @@
   let orders = $state<Order[]>([])
   let error = $state('')
 
+  // The order whose history is open under its row.
+  let history = $state<{ order: number; events: FactoryEvent[] } | null>(null)
+
+  async function loadHistory(order: number) {
+    const events = await fetchEvents({ order, limit: 100 })
+    if (history === null || history.order === order) history = { order, events }
+  }
+
   async function load() {
     try {
       orders = await fetchOrders()
+      if (history) await loadHistory(history.order)
       error = ''
+    } catch (e) {
+      error = String(e)
+    }
+  }
+
+  async function toggleHistory(order: number) {
+    if (history?.order === order) {
+      history = null
+      return
+    }
+    history = { order, events: [] }
+    try {
+      await loadHistory(order)
     } catch (e) {
       error = String(e)
     }
@@ -75,11 +98,23 @@
           </td>
           <td class="small">{time(o.createdAt)}</td>
           <td class="actions">
+            <button class:on={history?.order === o.id} onclick={() => toggleHistory(o.id)}>History</button>
             {#if isOpen(o) && !o.cancelRequested}
               <button onclick={() => cancel(o)}>Cancel</button>
             {/if}
           </td>
         </tr>
+        {#if history?.order === o.id}
+          <tr class="history">
+            <td colspan="5">
+              {#if history.events.length}
+                <EventList events={history.events} showOrder={false} />
+              {:else}
+                <span class="muted">No history: the order is older than the events kept.</span>
+              {/if}
+            </td>
+          </tr>
+        {/if}
       {/each}
     </tbody>
   </table>
@@ -138,6 +173,14 @@
   }
   .muted {
     color: var(--muted);
+  }
+  .history > td {
+    padding: 0 0 0.5rem 2rem;
+    background: var(--panel);
+  }
+  button.on {
+    background: var(--accent);
+    color: var(--bg);
   }
   .warn {
     color: var(--warn);

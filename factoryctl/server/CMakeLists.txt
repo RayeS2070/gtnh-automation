@@ -10,6 +10,7 @@ add_library(factoryctl_lib STATIC
         src/api/targets_handler.cpp
         src/api/orders_handler.cpp
         src/api/cpus_handler.cpp
+        src/api/events_handler.cpp
         src/domain/plan.cpp
         src/domain/order.cpp
         src/domain/scan.cpp
@@ -22,6 +23,8 @@ add_library(factoryctl_lib STATIC
         src/db/targets.cpp
         src/db/manual.cpp
         src/db/cpus.cpp
+        src/db/events.cpp
+        src/db/events_cleanup.cpp
 )
 target_include_directories(factoryctl_lib PUBLIC src)
 target_link_libraries(factoryctl_lib
@@ -70,6 +73,7 @@ add_executable(factoryctl_dbtest
         tests/db/probe_dbtest.cpp
         tests/db/craftable_dbtest.cpp
         tests/db/cpus_dbtest.cpp
+        tests/db/events_dbtest.cpp
 )
 target_link_libraries(factoryctl_dbtest
         PRIVATE

@@ -8,6 +8,7 @@
 #include <userver/server/http/http_request.hpp>
 #include <userver/server/http/http_status.hpp>
 #include <userver/storages/postgres/component.hpp>
+#include <userver/utils/datetime.hpp>
 
 #include "api/json.hpp"
 #include "db/schema.hpp"
@@ -63,7 +64,7 @@ auto TargetHandler::HandleRequestThrow(
   if (!id) return fail(request, HttpStatus::kBadRequest, "bad goods id");
 
   if (request.GetMethod() == userver::server::http::HttpMethod::kDelete) {
-    if (!db::deleteTarget(*db_, *id)) {
+    if (!db::deleteTarget(*db_, *id, userver::utils::datetime::Now())) {
       return fail(request, HttpStatus::kNotFound, "no target");
     }
     LOG_INFO() << "target of goods " << *id << " deleted";
@@ -81,7 +82,8 @@ auto TargetHandler::HandleRequestThrow(
   if (!settings) {
     return fail(request, HttpStatus::kBadRequest, settings.error());
   }
-  if (auto ok = db::setTarget(*db_, *id, *settings); !ok) {
+  if (auto ok = db::setTarget(*db_, *id, *settings,
+                                 userver::utils::datetime::Now()); !ok) {
     // Bad numbers or unknown goods; both are the caller's to fix.
     return fail(request, HttpStatus::kBadRequest, ok.error());
   }

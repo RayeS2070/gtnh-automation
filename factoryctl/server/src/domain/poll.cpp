@@ -34,6 +34,13 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
     }
   };
 
+  // Records a step if it changed the status.
+  const auto told = [&](const OrderState& o, OrderStatus before) {
+    if (o.status != before) {
+      out.changes.push_back({o.id, before, o.status, describe(o)});
+    }
+  };
+
   for (const auto& r : in.report.results) {
     const auto it = std::ranges::find(orders, r.order, &OrderState::id);
     if (it == orders.end()) {
@@ -41,9 +48,11 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
           std::format("result for order {}, which is not open", r.order));
       continue;
     }
+    const auto before = it->status;
     if (auto ok = applyResult(*it, r.status, r.message, in.now); !ok) {
       out.errors.push_back(ok.error());
     }
+    told(*it, before);
     if (r.craftable) learn(it->item, *r.craftable);
   }
   // Probes last: taken after the CPUs of this step, while a result may come
@@ -53,11 +62,19 @@ auto tick(std::vector<OrderState>& orders, const TickInput& in,
   }
 
   for (auto& o : orders) {
+    auto before = o.status;
     applyCpus(o, in.report.cpus, in.now);
+    told(o, before);
+    before = o.status;
     if (const auto alarm = checkTimeouts(o, settings.timeouts, in.now)) {
       out.alarms.push_back({o.id, *alarm});
     }
-    if (markSent(o, in.now)) out.send.push_back(o.id);
+    told(o, before);
+    if (markSent(o, in.now)) {
+      out.send.push_back(o.id);
+      out.changes.push_back(
+          {o.id, OrderStatus::kQueued, OrderStatus::kSent, describe(o)});
+    }
     if (needsCancelTask(o)) out.cancel.push_back({o.id, o.cpu});
     // AE keeps such a craft on its CPU, where it may wait forever. Logged
     // when first seen; canceling it is a user's decision.

@@ -85,8 +85,8 @@ auto saveOrders(pg::Transaction& tx, std::span<const domain::OrderState> orders)
 }
 
 auto insertOrders(pg::Transaction& tx, std::span<const domain::NewOrder> orders,
-                  domain::TimePoint now) -> std::int64_t {
-  std::int64_t made = 0;
+                  domain::TimePoint now) -> std::vector<CreatedOrder> {
+  std::vector<CreatedOrder> made;
   for (const auto& o : orders) {
     // orders_one_open: an open order of the goods makes this a no-op.
     const auto res = tx.Execute(
@@ -94,10 +94,10 @@ auto insertOrders(pg::Transaction& tx, std::span<const domain::NewOrder> orders,
         "  (goods_id, amount, source, created_at, changed_at) "
         "SELECT id, $4, 'auto', $5, $5 FROM factoryctl.goods "
         "WHERE kind = 'item' AND name = $1 AND damage = $2 AND variant = $3 "
-        "ON CONFLICT DO NOTHING",
+        "ON CONFLICT DO NOTHING RETURNING id",
         o.item.name, o.item.damage, o.item.variant, o.amount,
         pg::TimePointTz{now});
-    made += static_cast<std::int64_t>(res.RowsAffected());
+    if (!res.IsEmpty()) made.push_back({res.AsSingleRow<std::int64_t>(), o});
   }
   return made;
 }

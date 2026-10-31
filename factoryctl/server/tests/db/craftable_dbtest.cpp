@@ -94,7 +94,7 @@ UTEST_F(CraftableTest, AgentLearnsBetweenScans) {
 }
 
 UTEST_F(CraftableTest, TargetsAndOrdersShowIt) {
-  ASSERT_TRUE(setTarget(db(), dirt, {.threshold = 1000, .batch = 64}));
+  ASSERT_TRUE(setTarget(db(), dirt, {.threshold = 1000, .batch = 64}, t0));
   const auto targets = listTargets(db());
   ASSERT_EQ(targets.size(), 1);
   EXPECT_FALSE(targets[0].goods.craftable);

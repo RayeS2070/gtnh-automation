@@ -143,4 +143,21 @@ auto needsCancelTask(const OrderState& order) -> bool {
          !order.cpu.empty();
 }
 
+auto describe(const OrderState& order) -> std::string {
+  switch (order.status) {
+    case OrderStatus::kQueued: return "queued";
+    case OrderStatus::kSent: return "sent to the agent";
+    case OrderStatus::kComputing: return "AE computes the crafting plan";
+    case OrderStatus::kAccepted: return "accepted";
+    case OrderStatus::kCrafting:
+      return order.cpu.empty() ? "crafting" : "crafting on " + order.cpu;
+    case OrderStatus::kDone: return "done";
+    case OrderStatus::kFailed:
+      return order.message.empty() ? "failed" : "failed: " + order.message;
+    case OrderStatus::kCanceled: return "canceled";
+    case OrderStatus::kLost: return "lost: no result from the agent in time";
+  }
+  return "?";
+}
+
 }  // namespace factoryctl::domain

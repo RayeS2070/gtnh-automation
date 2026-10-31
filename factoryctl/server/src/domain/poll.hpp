@@ -105,6 +105,16 @@ struct Alarm {
   auto operator==(const Alarm&) const -> bool = default;
 };
 
+// One step of an order's history, for people.
+struct StatusChange {
+  std::int64_t order = 0;
+  OrderStatus from = OrderStatus::kQueued;
+  OrderStatus to = OrderStatus::kQueued;
+  std::string text;  // describe() of the order then
+
+  auto operator==(const StatusChange&) const -> bool = default;
+};
+
 struct TickInput {
   PollReport report;
   std::vector<Target> targets;  // enabled ones
@@ -124,6 +134,8 @@ struct TickOutput {
   std::vector<CancelTask> cancel;
   std::vector<NewOrder> created;  // queued; sent with the next poll
   std::vector<Alarm> alarms;
+  // Every status change, in order: results, CPUs, time limits, sending.
+  std::vector<StatusChange> changes;
   // Learned in this report, in order (results, then probes): to store.
   std::vector<Craftability> craftability;
   std::vector<std::string> errors;  // results that did not fit, for the log

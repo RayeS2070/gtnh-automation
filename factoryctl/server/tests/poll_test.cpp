@@ -300,4 +300,43 @@ TEST(Poll, CraftThatLosesItsPatternRaisesAnAlarmOnce) {
   EXPECT_TRUE(tick(orders, next, kSettings).alarms.empty()) << "known already";
 }
 
+// --- the history of orders ------------------------------------------------------
+
+TEST(Poll, EveryStatusChangeIsTold) {
+  // Accepted and on a CPU in one report: two steps of the history, not one.
+  std::vector orders{order(1, OrderStatus::kSent), order(2, OrderStatus::kQueued)};
+  const TickInput in{
+      .report = {.cpus = {onCpu(kStick, 900)},
+                 .results = {{1, AgentStatus::kAccepted, ""}}},
+      .now = t0};
+  EXPECT_EQ(tick(orders, in, kSettings).changes,
+            (std::vector<StatusChange>{
+                {1, OrderStatus::kSent, OrderStatus::kAccepted, "accepted"},
+                {1, OrderStatus::kAccepted, OrderStatus::kCrafting,
+                 "crafting on CPU_022"},
+                {2, OrderStatus::kQueued, OrderStatus::kSent, "sent to the agent"}}));
+}
+
+TEST(Poll, FailureAndLossAreTold) {
+  std::vector orders{order(1, OrderStatus::kComputing),
+                     order(2, OrderStatus::kSent, kRod)};
+  const auto late = t0 + kSettings.timeouts.sent + 1s;
+  const TickInput in{
+      .report = {.results = {{1, AgentStatus::kFailed, "not craftable", false}}},
+      .now = late};
+  EXPECT_EQ(tick(orders, in, kSettings).changes,
+            (std::vector<StatusChange>{
+                {1, OrderStatus::kComputing, OrderStatus::kFailed,
+                 "failed: not craftable"},
+                {2, OrderStatus::kSent, OrderStatus::kLost,
+                 "lost: no result from the agent in time"}}));
+}
+
+TEST(Poll, NothingChangedNothingTold) {
+  std::vector orders{order(1, OrderStatus::kCrafting)};
+  orders[0].cpu = "CPU_022";
+  const TickInput in{.report = {.cpus = {onCpu(kStick, 900)}}, .now = t0};
+  EXPECT_TRUE(tick(orders, in, kSettings).changes.empty());
+}
+
 }  // namespace

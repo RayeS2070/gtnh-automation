@@ -86,6 +86,9 @@ enum class CancelAction {
 
 auto requestCancel(OrderState& order, TimePoint now) -> CancelAction;
 
+// The order's status for a person: "crafting on CPU_014", "failed: <why>".
+auto describe(const OrderState& order) -> std::string;
+
 // Whether the next poll response carries a cancel task for this order: the
 // agent cancels by CPU name, so the craft must be on a CPU.
 auto needsCancelTask(const OrderState& order) -> bool;

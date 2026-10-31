@@ -26,10 +26,15 @@ auto loadOpenOrders(pg::Transaction& tx) -> std::vector<domain::OrderState>;
 auto saveOrders(pg::Transaction& tx, std::span<const domain::OrderState> orders)
     -> void;
 
+struct CreatedOrder {
+  std::int64_t id = 0;
+  domain::NewOrder order;
+};
+
 // New automatic orders, queued. One whose goods have an open order already
-// (a manual one made meanwhile) is skipped. Returns how many were made.
+// (a manual one made meanwhile) is skipped. Returns those made.
 auto insertOrders(pg::Transaction& tx, std::span<const domain::NewOrder> orders,
-                  domain::TimePoint now) -> std::int64_t;
+                  domain::TimePoint now) -> std::vector<CreatedOrder>;
 
 // Enabled targets.
 auto loadTargets(pg::Transaction& tx) -> std::vector<domain::Target>;

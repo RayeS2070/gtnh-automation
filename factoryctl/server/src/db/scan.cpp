@@ -5,6 +5,8 @@
 #include <userver/storages/postgres/io/chrono.hpp>
 #include <userver/storages/postgres/transaction.hpp>
 
+#include "db/events.hpp"
+
 namespace factoryctl::db {
 
 namespace {
@@ -109,6 +111,15 @@ auto finishScan(pg::Cluster& db, std::int64_t scan, domain::TimePoint now)
       "UPDATE factoryctl.stock SET craftable = false "
       "WHERE scan_id < $1 AND craftable",
       scan);
+  const auto seen = tx.Execute("SELECT count(*) FROM factoryctl.stock "
+                               "WHERE scan_id = $1",
+                               scan)
+                        .AsSingleRow<std::int64_t>();
+  const Event told{
+      .at = now,
+      .source = "scan",
+      .text = std::format("scan {} finished: {} goods seen", scan, seen)};
+  addEvents(tx, {&told, 1});
   tx.Commit();
   return {};
 }

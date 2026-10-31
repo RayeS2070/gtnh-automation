@@ -6,7 +6,10 @@
 #include <userver/logging/log.hpp>
 #include <userver/storages/postgres/cluster.hpp>
 #include <userver/storages/postgres/component.hpp>
+#include <userver/storages/postgres/transaction.hpp>
+#include <userver/utils/datetime.hpp>
 
+#include "db/events.hpp"
 #include "db/sql.hpp"
 
 namespace factoryctl::db {
@@ -63,9 +66,16 @@ Schema::Schema(const userver::components::ComponentConfig& config,
   const auto outcome = ensureSchema(*db);
   // Component construction is how userver fails a start: it takes exceptions.
   if (!outcome) throw std::runtime_error(outcome.error());
-  LOG_INFO() << (*outcome == SchemaOutcome::kCreated
-                     ? "created database schema"
-                     : "database schema is up to date");
+  const auto text = *outcome == SchemaOutcome::kCreated
+                        ? "server started: created the database schema"
+                        : "server started";
+  LOG_INFO() << text;
+  auto tx = db->Begin(pg::ClusterHostType::kMaster, {});
+  const Event told{.at = userver::utils::datetime::Now(),
+                   .source = "server",
+                   .text = text};
+  addEvents(tx, {&told, 1});
+  tx.Commit();
 }
 
 }  // namespace factoryctl::db

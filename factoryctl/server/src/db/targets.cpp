@@ -2,6 +2,9 @@
 
 #include <format>
 #include <userver/storages/postgres/cluster.hpp>
+#include <userver/storages/postgres/transaction.hpp>
+
+#include "db/events.hpp"
 
 namespace factoryctl::db {
 
@@ -52,13 +55,23 @@ auto listTargets(pg::Cluster& db) -> std::vector<TargetRow> {
   return out;
 }
 
-auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s)
-    -> std::expected<void, std::string> {
+auto describe(const TargetSettings& s) -> std::string {
+  auto text = s.threshold <= 0
+                  ? std::format("order {} whenever nothing is on order", s.batch)
+                  : std::format("keep {}, order {}", s.threshold, s.batch);
+  if (s.priority == domain::Priority::kLow) text += ", low priority";
+  if (s.fill) text += ", fill";
+  if (!s.enabled) text += ", paused";
+  return text;
+}
+
+auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s,
+               domain::TimePoint now) -> std::expected<void, std::string> {
   // Checked here, not left to the table's CHECKs: an error, not an exception.
   if (s.threshold < 0) return std::unexpected("threshold must be >= 0");
   if (s.batch <= 0) return std::unexpected("batch must be > 0");
-  const auto res = db.Execute(
-      kMaster,
+  auto tx = db.Begin(kMaster, {});
+  const auto res = tx.Execute(
       "INSERT INTO factoryctl.targets"
       "  (goods_id, threshold, batch, priority, enabled, note, fill,"
       "   updated_at) "
@@ -73,14 +86,29 @@ auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s)
   if (res.RowsAffected() == 0) {
     return std::unexpected(std::format("no goods {}", goodsId));
   }
+  const Event told{.at = now,
+                   .source = "target",
+                   .text = "target: " + describe(s),
+                   .goodsId = goodsId};
+  addEvents(tx, {&told, 1});
+  tx.Commit();
   return {};
 }
 
-auto deleteTarget(pg::Cluster& db, std::int64_t goodsId) -> bool {
-  return db.Execute(kMaster,
-                    "DELETE FROM factoryctl.targets WHERE goods_id = $1",
-                    goodsId)
-             .RowsAffected() > 0;
+auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now)
+    -> bool {
+  auto tx = db.Begin(kMaster, {});
+  if (tx.Execute("DELETE FROM factoryctl.targets WHERE goods_id = $1", goodsId)
+          .RowsAffected() == 0) {
+    return false;
+  }
+  const Event told{.at = now,
+                   .source = "target",
+                   .text = "target removed",
+                   .goodsId = goodsId};
+  addEvents(tx, {&told, 1});
+  tx.Commit();
+  return true;
 }
 
 }  // namespace factoryctl::db
