@@ -121,6 +121,12 @@ components_manager:
             method: POST
             task_processor: main-task-processor
 
+        handler-api-cpus:
+            path: /api/v1/cpus
+            method: GET
+            task_processor: main-task-processor
+            low-free-cpus: $low-free-cpus
+
         # The web client: `npm run build` in factoryctl/web, served from web-dir.
         fs-cache-web:
             dir: $web-dir

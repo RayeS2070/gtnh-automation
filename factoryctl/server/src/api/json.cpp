@@ -16,6 +16,10 @@ auto fail(std::string_view field, std::string_view what)
   return std::unexpected(std::format("{}: {}", field, what));
 }
 
+auto utc(domain::TimePoint t) -> std::string {
+  return std::format("{:%FT%TZ}", std::chrono::floor<std::chrono::seconds>(t));
+}
+
 }  // namespace
 
 auto toJson(const db::StockRow& row) -> json::ValueBuilder {
@@ -77,10 +81,6 @@ auto parseTargetSettings(const json::Value& body)
 }
 
 auto toJson(const db::OrderRow& row) -> json::ValueBuilder {
-  const auto utc = [](domain::TimePoint t) {
-    return std::format("{:%FT%TZ}",
-                       std::chrono::floor<std::chrono::seconds>(t));
-  };
   json::ValueBuilder e;
   e["id"] = row.id;
   e["goods"] = toJson(row.goods);
@@ -94,6 +94,17 @@ auto toJson(const db::OrderRow& row) -> json::ValueBuilder {
   e["cpu"] = row.cpu;
   e["remaining"] = row.remaining;
   e["cancelRequested"] = row.cancelRequested;
+  return e;
+}
+
+auto toJson(const db::CpuRow& row) -> json::ValueBuilder {
+  json::ValueBuilder e;
+  e["name"] = row.name;
+  e["busy"] = row.busy;
+  e["goods"] = row.goods ? toJson(*row.goods) : json::ValueBuilder{};
+  e["remaining"] = row.remaining;
+  e["seenAt"] = utc(row.seenAt);
+  e["order"] = row.order ? json::ValueBuilder{*row.order} : json::ValueBuilder{};
   return e;
 }
 

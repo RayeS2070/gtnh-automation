@@ -114,3 +114,19 @@ export async function placeOrder(goodsId: number, amount: number, requestedBy: s
 export async function cancelOrder(id: number): Promise<'canceled' | 'asked' | 'nothing'> {
   return (await call<{ result: 'canceled' | 'asked' | 'nothing' }>('POST', `/api/v1/orders/${id}/cancel`)).result
 }
+
+// A crafting CPU as the agent saw it in its last poll.
+export type Cpu = {
+  name: string
+  busy: boolean
+  goods: StockItem | null // what it crafts; null when idle, or for goods no scan has seen yet
+  remaining: number // left to deliver
+  seenAt: string // UTC, ISO 8601: the poll that reported it
+  order: number | null // our open order of those goods; null for a craft put on in game
+}
+
+export const isIdle = (c: Cpu) => !c.busy && c.goods === null
+
+export async function fetchCpus(): Promise<{ items: Cpu[]; lowFreeCpus: number }> {
+  return await call('GET', '/api/v1/cpus')
+}

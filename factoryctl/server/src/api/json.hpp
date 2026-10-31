@@ -11,6 +11,7 @@
 #include <userver/formats/json/value.hpp>
 #include <userver/formats/json/value_builder.hpp>
 
+#include "db/cpus.hpp"
 #include "db/manual.hpp"
 #include "db/stock.hpp"
 #include "db/targets.hpp"
@@ -36,6 +37,10 @@ auto parseTargetSettings(const userver::formats::json::Value& body)
 // "requestedBy", "createdAt", "changedAt", "message", "cpu", "remaining",
 // "cancelRequested"}; times as UTC "2026-10-30T06:40:20Z".
 auto toJson(const db::OrderRow& row) -> userver::formats::json::ValueBuilder;
+
+// {"name", "busy", "goods": the goods' fields or null, "remaining",
+//  "seenAt" (UTC, as for orders), "order": our open order's id or null}
+auto toJson(const db::CpuRow& row) -> userver::formats::json::ValueBuilder;
 
 // The body of POST /api/v1/orders: {"goodsId": 1267, "amount": 128,
 // "requestedBy": "Pavel"}; requestedBy may be left out.

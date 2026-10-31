@@ -80,6 +80,31 @@ TEST(ApiJson, TargetSettingsErrors) {
   EXPECT_NE(error(R"([])").find("object"), std::string::npos);
 }
 
+TEST(ApiJson, CpuRow) {
+  using namespace std::chrono;
+  CpuRow busy{.name = "CPU_014",
+              .busy = true,
+              .goods = StockRow{1267,
+                                {"gregtech:gt.blockcasings10", 11, ""},
+                                "Extreme Density Space-Bending Casing",
+                                1583,
+                                true},
+              .remaining = 138,
+              .seenAt = sys_days{October / 31 / 2026} + 11h + 500ms,
+              .order = 7};
+  const auto v = toJson(busy).ExtractValue();
+  EXPECT_EQ(v["name"].As<std::string>(), "CPU_014");
+  EXPECT_TRUE(v["busy"].As<bool>());
+  EXPECT_EQ(v["goods"]["goodsId"].As<int>(), 1267);
+  EXPECT_EQ(v["remaining"].As<int>(), 138);
+  EXPECT_EQ(v["seenAt"].As<std::string>(), "2026-10-31T11:00:00Z");
+  EXPECT_EQ(v["order"].As<int>(), 7);
+
+  const auto idle = toJson(CpuRow{.name = "CPU_001"}).ExtractValue();
+  EXPECT_TRUE(idle["goods"].IsNull());
+  EXPECT_TRUE(idle["order"].IsNull());
+}
+
 TEST(ApiJson, OrderRow) {
   using namespace std::chrono;
   OrderRow row;

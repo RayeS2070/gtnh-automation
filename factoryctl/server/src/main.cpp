@@ -9,6 +9,7 @@
 
 #include "agent/poll_handler.hpp"
 #include "agent/scan_handler.hpp"
+#include "api/cpus_handler.hpp"
 #include "api/orders_handler.hpp"
 #include "api/stock_handler.hpp"
 #include "api/targets_handler.hpp"
@@ -32,6 +33,7 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::TargetHandler>()
           .Append<factoryctl::api::OrdersHandler>()
           .Append<factoryctl::api::OrderCancelHandler>()
+          .Append<factoryctl::api::CpusHandler>()
           // The web client (factoryctl/web, built): everything not matched
           // above.
           .Append<userver::components::FsCache>("fs-cache-web")

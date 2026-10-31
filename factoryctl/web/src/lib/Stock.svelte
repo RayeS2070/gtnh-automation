@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { fetchStock, fetchTargets, type StockItem, type StockQuery, type Target } from './api'
+  import {
+    fetchCpus,
+    fetchStock,
+    fetchTargets,
+    type Cpu,
+    type StockItem,
+    type StockQuery,
+    type Target,
+  } from './api'
   import { amount, compact, isDrop, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import OrderForm from './OrderForm.svelte'
@@ -35,6 +43,21 @@
   }
   loadTargets()
 
+  // What the CPUs craft, by goods: ordering what is on a CPU already is seldom meant.
+  let crafting = $state(new Map<number, Cpu[]>())
+  async function loadCpus() {
+    try {
+      const map = new Map<number, Cpu[]>()
+      for (const c of (await fetchCpus()).items) {
+        if (c.goods) map.set(c.goods.goodsId, [...(map.get(c.goods.goodsId) ?? []), c])
+      }
+      crafting = map
+    } catch (e) {
+      error = String(e)
+    }
+  }
+  loadCpus()
+
   // Answers to older queries are dropped: typing fast must not show a stale list.
   let asked = 0
   async function loadStock(q: StockQuery) {
@@ -68,6 +91,7 @@
     every(kRefreshMs, () => {
       loadStock(query())
       loadTargets()
+      loadCpus()
     }),
   )
 
@@ -107,6 +131,12 @@
       <div class="num">{amount(selected.amount)}{unit(selected)}</div>
       <button class="close" title="Close" onclick={() => (selected = null)}>✕</button>
     </div>
+    {#each crafting.get(selected.goodsId) ?? [] as c (c.name)}
+      <p class="oncpu">
+        Already crafting on {c.name}: {amount(c.remaining)}{unit(selected)} left,
+        {#if c.order !== null}<a href="#/orders">order #{c.order}</a>{:else}put on in game{/if}.
+      </p>
+    {/each}
     {#if placed}<p class="ok">{placed}</p>{/if}
     {#key `${selected.goodsId}:${formsVersion}`}
       <div class="forms">
@@ -163,6 +193,12 @@
             <span class="target" class:off={!target.enabled}>≥ {compact(target.threshold)}</span>
           {/if}
           {#if !item.craftable}<span class="nopattern">no pattern</span>{/if}
+          {#if crafting.has(item.goodsId)}
+            {@const on = crafting.get(item.goodsId)!}
+            <span class="oncpu" title={on.map((c) => c.name).join(', ')}>
+              ⚙ {on.length === 1 ? on[0].name : `${on.length} CPUs`}
+            </span>
+          {/if}
         </span>
       </span>
     </button>
@@ -286,6 +322,13 @@
   .nopattern {
     margin-left: 0.3rem;
     color: var(--warn);
+  }
+  .oncpu {
+    margin-left: 0.3rem;
+    color: var(--accent);
+  }
+  p.oncpu {
+    margin: 0.3rem 0;
   }
   .nopattern-note {
     flex: 1 1 26rem;
