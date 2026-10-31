@@ -1,6 +1,9 @@
 worker-threads: 2
 worker-fs-threads: 1
 logger-level: info
+# json: one object per line (timestamp, level, module, text and tags), for jq; tskv is userver's
+# own, raw is plain text.
+logger-format: json
 server-port: 8080
 # The development database from compose.yaml; FACTORYCTL_DB overrides it.
 db-connection: postgresql://factoryctl:factoryctl@localhost:15432/factoryctl

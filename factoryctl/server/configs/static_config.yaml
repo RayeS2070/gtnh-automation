@@ -18,6 +18,7 @@ components_manager:
                 default:
                     file_path: '@stderr'
                     level: $logger-level
+                    format: $logger-format
                     overflow_behavior: discard
 
         dynamic-config:

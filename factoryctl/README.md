@@ -112,7 +112,18 @@ entry in `~/.ssh/config` is the simplest: `deploy/deploy.sh myserver`.
 On the host the server listens on `127.0.0.1:8080` only: the agent runs on the same machine
 (`server = 'http://127.0.0.1:8080'` in `agent/config.lua`), people open the web client through
 `ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is the `factoryctl_pgdata`
-volume. Logs: `docker compose logs server` in `~/factoryctl`.
+volume.
+
+Logs are JSON, one object per line (`logger-format` in `config_vars.yaml`; `tskv` and `raw` are
+the other formats): `timestamp`, `level`, `module`, `text`, and tags. Lines the agent sent have
+`"source": "agent"` and `agent_uptime`. Most lines are userver's records of each request; to read
+the rest, in `~/factoryctl`:
+
+```sh
+docker compose logs server --no-log-prefix -f | jq -r 'select(.text != "") |
+  "\(.timestamp[11:19]) \(.level) \(if .source == "agent" then "[agent] " else "" end)\(.text)"'
+docker compose logs server --no-log-prefix | jq -c 'select(.level == "ERROR" or .level == "WARNING")'
+```
 
 ## Agent (in game)
 
