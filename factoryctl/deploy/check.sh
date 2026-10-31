@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Starts the server natively and the image (factoryctl:latest) in a container, both against the
+# test database, and checks that they answer and log no errors. Unit tests do not start the
+# components: a bad static config (once, a comma in a schema) only shows here.
+#   deploy/check.sh          deploy.sh runs it before sending anything to the host
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+db=${FACTORYCTL_TEST_DB:-postgresql://factoryctl:factoryctl@127.0.0.1:15432/factoryctl_test}
+native_port=18081
+image_port=18091
+tmp=$(mktemp -d)
+pid=
+container=
+
+cleanup() {
+    [[ -n $pid ]] && kill "$pid" 2>/dev/null || true
+    [[ -n $container ]] && docker rm -f "$container" >/dev/null 2>&1 || true
+    rm -rf "$tmp"
+}
+trap cleanup EXIT
+
+fail() {
+    echo "check: $*" >&2
+    exit 1
+}
+
+# Waits for the server on $1, then asks every page. $2 prints its log.
+probe() {
+    local port=$1 log=$2 ok=
+    for _ in $(seq 120); do
+        if curl -sf "localhost:$port/health" >/dev/null; then ok=1; break; fi
+        sleep 0.5
+    done
+    [[ -n $ok ]] || { $log 2>&1 | tail -5 >&2; fail "no answer on :$port"; }
+    for path in / /health /api/v1/stock /api/v1/targets /api/v1/orders /api/v1/cpus \
+        /api/v1/events /data/data.bin; do
+        local code
+        code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$port$path")
+        [[ $code == 200 ]] || fail ":$port$path answered $code"
+    done
+    # After the pages: errors they caused count too.
+    $log > "$tmp/log" 2>&1 || true
+    if grep -q '"level":"ERROR"' "$tmp/log"; then
+        grep '"level":"ERROR"' "$tmp/log" | head -3 >&2
+        fail "errors in the log of :$port"
+    fi
+}
+
+native_log() { cat "$tmp/native.log"; }
+image_log() { docker logs "$container"; }
+
+echo "check: native"
+(cd "$here" && cmake --build --preset linux_clang_debug --target factoryctl_server >/dev/null)
+printf 'server-port: %s\ndb-connection: %s\n' "$native_port" "$db" > "$tmp/native.yaml"
+(cd "$here" && exec build/linux/linux_clang_debug/server/factoryctl_server \
+    --config server/configs/static_config.yaml --config_vars server/configs/config_vars.yaml \
+    --config_vars_override "$tmp/native.yaml") > "$tmp/native.log" 2>&1 &
+pid=$!
+probe "$native_port" native_log
+kill "$pid"
+pid=
+
+echo "check: container"
+printf 'server-port: %s\ndb-connection: %s\nweb-dir: /app/web\ndata-dir: /app/data\n' \
+    "$image_port" "$db" > "$tmp/image.yaml"
+# Not --rm: a container that dies at start keeps its log for probe to show.
+container=$(docker run -d --network host \
+    -v "$tmp/image.yaml:/app/configs/deploy_vars.yaml:ro" \
+    -v "$here/../assets/data:/app/data:ro" factoryctl:latest)
+probe "$image_port" image_log
+
+echo "check: ok"

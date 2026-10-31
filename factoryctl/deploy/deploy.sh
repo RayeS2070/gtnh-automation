@@ -20,6 +20,8 @@ on_host() { ssh "${ssh_opts[@]}" "$host" "$@"; }
 rsync_to() { rsync -a -e "ssh ${ssh_opts[*]}" "$@"; }
 
 docker build -t factoryctl:latest "$here"
+# Natively and in a container, against the test database: nothing leaves if it fails.
+"$here/deploy/check.sh"
 
 on_host mkdir -p "$remote/data"
 # Icons: the calculator's export, about 42 MB; rsync sends it only when it changed.
