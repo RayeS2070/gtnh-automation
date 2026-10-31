@@ -8,7 +8,7 @@
     type StockQuery,
     type Target,
   } from './api'
-  import { amount, compact, isDrop, shownLabel, unit } from './format'
+  import { amount, compact, isDrop, left, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import OrderForm from './OrderForm.svelte'
   import { every, kRefreshMs } from './refresh'
@@ -129,7 +129,7 @@
     </div>
     {#each crafting.get(selected.goodsId) ?? [] as c (c.name)}
       <p class="oncpu">
-        Already crafting on {c.name}: {amount(c.remaining)}{unit(selected)} left,
+        Already crafting on {c.name}: {left(c.remaining, selected)},
         {#if c.order !== null}<a href="#/orders">order #{c.order}</a>{:else}put on in game{/if}.
       </p>
     {/each}

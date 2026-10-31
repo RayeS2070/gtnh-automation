@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fetchCpus, isIdle, type Cpu } from './api'
-  import { amount, shownLabel, unit } from './format'
+  import { amount, left, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
 
@@ -54,7 +54,7 @@
             {/if}
           </td>
           <td class="num">
-            {#if c.goods || c.busy}{amount(c.remaining)}{c.goods ? unit(c.goods) : ''} left{/if}
+            {#if c.goods || c.busy}{left(c.remaining, c.goods)}{/if}
           </td>
           <td class="small">
             {#if c.order !== null}<a href="#/orders">order #{c.order}</a>

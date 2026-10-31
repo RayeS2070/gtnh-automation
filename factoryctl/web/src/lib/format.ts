@@ -23,6 +23,13 @@ export function unit(item: { variant: string }): string {
   return isDrop(item) ? ' mB' : ''
 }
 
+// What a CPU has left to deliver. Below 0 while it finishes a batch bigger than asked (fluid
+// crafts in 2.9): the surplus.
+export function left(remaining: number, item: { variant: string } | null): string {
+  const u = item ? unit(item) : ''
+  return remaining < 0 ? `finishing, ${amount(-remaining)}${u} over` : `${amount(remaining)}${u} left`
+}
+
 const kCompact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 
 // Short, for tight places: 1.5K, 23M.

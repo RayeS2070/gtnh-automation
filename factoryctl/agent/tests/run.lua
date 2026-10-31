@@ -536,6 +536,89 @@ suite('agent probes', function()
     eq(table.concat(calls, ' '), 'getCpus getItemInNetwork', 'measured after the CPUs were read')
 end)
 
+-- AE fluids (GTNH 2.9): no drops, fluids as fluids ----------------------------------------------
+---An AE fluid as OC 1.12 converts it (ConverterAEFluidStack): no damage, amount and size both.
+local function aeFluid(name, label, size, craftable)
+    return { name = name, label = label, amount = size, size = size, hasTag = false,
+        isCraftable = craftable }
+end
+
+suite('ae fluids', function()
+    local me = require('fc.me')
+    check(not me.aeFluids({ getFluidsInNetwork = function() end }), '2.8.4: no getFluidInNetwork')
+    check(me.aeFluids({ getFluidInNetwork = function() end }), '2.9: getFluidInNetwork')
+
+    -- finalOutput() of a fluid craft finishing a bigger batch, as it came from the game
+    local out = me.item(aeFluid('plasma.niobium', 'Niobium Plasma', -3968, false))
+    eq(out.fluid, 'plasma.niobium', 'an AE fluid carries its name as the fluid')
+    eq(out.size, -3968, 'a negative size is passed on: the server knows what it means')
+    eq(out.damage, 0, 'damage 0, as a drop')
+    eq(me.item({ name = 'minecraft:stick', damage = 0, label = 'Stick', size = 1 }).fluid, nil,
+        'an item is no fluid')
+
+    local fluids = me.fluids({ getFluidsInNetwork = function()
+        return { aeFluid('water', 'Water', 4503599627370495.0, false),
+            aeFluid('plasma.niobium', 'Niobium Plasma', 0, true),
+            aeFluid('steam', 'Steam', 10, false) }
+    end }, 500)
+    eq(#fluids, 2, 'the threshold rule: enough of it or craftable')
+    eq(fluids[1].fluid, 'water', 'keyed by name')
+    eq(fluids[2].craftable, true, 'craftable passed on')
+    local none, err = me.fluids({ getFluidsInNetwork = function() error('gone') end }, 500)
+    check(none == nil and err:find('getFluidsInNetwork') ~= nil, 'a failed call is an error')
+
+    -- a scan: the fluids first, in one batch that does not close the scan
+    local agent = require('fc.agent')
+    local net = fake.network()
+    local proxy = fake.cpus({})
+    proxy.getItemsInNetworkById = net.getItemsInNetworkById
+    proxy.getFluidInNetwork = function(name)
+        if name == 'plasma.niobium' then return aeFluid(name, 'Niobium Plasma', 144, true) end
+    end
+    proxy.getFluidsInNetwork = function() return { aeFluid('water', 'Water', 1000, false) } end
+    local scanTask = '{id=7,threshold=500,maxId=11500,chunk=1000,slow={from=250,to=320,chunk=5}}'
+    local srv = fake.server({ '{poll=10,orders={},cancel={},scan=' .. scanTask .. '}' })
+    local a = agent.new({ me = proxy, post = srv.post, decode = decode })
+    a:poll()
+    eq(srv.requests[2].path, '/agent/v1/scan', 'then the scan')
+    check(srv.requests[2].body:find('"fluid":"water"', 1, true) ~= nil, 'fluids in the first batch')
+    check(srv.requests[2].body:find('"last":false', 1, true) ~= nil, 'which does not close the scan')
+    check(srv.requests[#srv.requests].body:find('"last":true', 1, true) ~= nil, 'the items do')
+    eq(#net.calls, 28, 'and every item chunk is still asked')
+
+    -- an order and a cancel of a fluid: by the AE fluid's name, not the drop filter
+    local job = fake.job()
+    local ae = fake.crafting({ ['plasma.niobium'] = { { job = job } } })
+    local cpus = fake.cpus({ { name = 'CPU_021', busy = true,
+        finalOutput = aeFluid('plasma.niobium', 'Niobium Plasma', 1000, false) } })
+    ae.getCpus, ae.getFluidInNetwork = cpus.getCpus, proxy.getFluidInNetwork
+    srv = fake.server({
+        '{poll=10,orders={{id=5,amount=1000,filter={name="ae2fc:fluid_drop",'
+            .. 'label="drop of Niobium Plasma"},fluid="plasma.niobium"}},cancel={},'
+            .. 'probe={{name="ae2fc:fluid_drop",fluid="plasma.niobium",label="drop of Niobium Plasma"}}}',
+        '{poll=10,orders={},cancel={{order=5,cpu="CPU_021",filter={name="ae2fc:fluid_drop",'
+            .. 'label="drop of Niobium Plasma"},fluid="plasma.niobium"}}}',
+    })
+    a = agent.new({ me = ae, post = srv.post, decode = decode })
+    a:poll()
+    eq(ae.lastFilter and ae.lastFilter.name, 'plasma.niobium', 'getCraftables by the fluid name')
+    check(ae.lastFilter.label == nil, '... alone')
+    eq(ae.requests[1], 1000, 'the fluid is requested')
+    a:poll()
+    check(srv.requests[2].body:find('"fluid":"plasma.niobium","name":"ae2fc:fluid_drop","size":144', 1, true) ~= nil,
+        'the probe: getFluidInNetwork, keyed like a drop')
+    eq(cpus.canceled[1], 'CPU_021', 'the cancel matched finalOutput() of the fluid craft')
+
+    -- 2.8.4: the same tasks stay drops
+    local old = fake.crafting({ ['ae2fc:fluid_drop'] = { { job = fake.job() } } })
+    old.getCpus = fake.cpus({}).getCpus
+    srv = fake.server({ '{poll=10,orders={{id=6,amount=1,filter={name="ae2fc:fluid_drop",'
+        .. 'label="drop of Water"},fluid="water"}},cancel={}}' })
+    a = agent.new({ me = old, post = srv.post, decode = decode })
+    a:poll()
+    eq(old.lastFilter.label, 'drop of Water', '2.8.4: the drop filter as the server sent it')
+end)
+
 -- log forwarding: the agent's log goes to the server with the polls --------------------------------
 suite('logbuf', function()
     local logbuf = require('fc.logbuf')

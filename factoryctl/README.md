@@ -28,6 +28,13 @@ Replaces `../maintainer/` and, for items and fluids, the InfluxDB exporter.
 - polls every `poll-interval`, and at once when one of its crafts ends (it looks at its own jobs
   every second; on GTNH 2.9 network events can take the place of that).
 
+Fluids: GTNH 2.8.4 keeps them in AE as ae2fc drops, found in the item scan; 2.9 keeps them as
+fluids. The agent tells them apart by `getFluidInNetwork`, which 2.8.4 does not have, and on 2.9
+scans fluids with one `getFluidsInNetwork()`, measures them with `getFluidInNetwork(name)` and
+orders them by name. Both get the same key on the server (the drop's, by the fluid's internal
+name), so stock, targets and icons do not depend on the version. A CPU finishing a fluid batch
+bigger than asked shows a negative `finalOutput().size`: the surplus, shown as such.
+
 Results and log lines stay with the agent until a poll gets through. Every order is requested
 at most once: one whose result never comes is marked lost, never sent again by itself.
 

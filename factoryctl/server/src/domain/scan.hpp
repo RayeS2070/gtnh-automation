@@ -17,7 +17,8 @@ struct ScannedStack {
   std::int32_t damage = 0;
   std::string label;
   std::int64_t size = 0;
-  std::string fluid;  // fluidDrop.name of a fluid drop, else empty
+  std::string fluid;  // the fluid's name: of a drop (fluidDrop.name) or of an
+                      // AE fluid (2.9, `name` then is the fluid's too)
   bool craftable = true;  // isCraftable: AE has a pattern for it
 };
 
@@ -31,9 +32,10 @@ struct ScannedGoods {
   auto operator==(const ScannedGoods&) const -> bool = default;
 };
 
-// A fluid drop is keyed by its fluid (see ItemKey). A drop without one has
-// never been seen; it falls back to its label rather than share a key with
-// every other drop.
+// A fluid is keyed by its name, the same whether it came as a drop (2.8.4) or
+// as an AE fluid (2.9): {ae2fc:fluid_drop, 0, name}, see ItemKey. A drop
+// without a fluid has never been seen; it falls back to its label rather than
+// share a key with every other drop.
 auto keyOf(const ScannedStack& stack) -> ItemKey;
 
 // Stacks of the same key become one, sizes summed, the first label kept; the

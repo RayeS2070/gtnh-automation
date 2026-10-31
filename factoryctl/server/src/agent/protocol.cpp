@@ -47,7 +47,9 @@ auto maybeFlag(const json::Value& v, std::string_view path)
   return v.As<bool>();
 }
 
-auto stack(const json::Value& v, std::string_view path)
+// `signedSize`: a CPU's finalOutput() goes below 0 while it finishes a batch
+// bigger than asked (in game, 2.9: fluid crafts).
+auto stack(const json::Value& v, std::string_view path, bool signedSize = false)
     -> Result<domain::ScannedStack> {
   if (!v.IsObject()) return fail(path, "not an object");
   domain::ScannedStack s;
@@ -69,7 +71,9 @@ auto stack(const json::Value& v, std::string_view path)
 
   const auto size = integer(v["size"], std::format("{}.size", path));
   if (!size) return std::unexpected(size.error());
-  if (*size < 0) return fail(std::format("{}.size", path), "negative");
+  if (*size < 0 && !signedSize) {
+    return fail(std::format("{}.size", path), "negative");
+  }
   s.size = *size;
 
   if (!v["fluid"].IsMissing()) {
@@ -139,8 +143,8 @@ auto cpu(const json::Value& v, std::string_view path) -> Result<domain::Cpu> {
   c.busy = *busy;
   if (!v["output"].IsMissing()) {
     // finalOutput() is a stack like the scanned ones; its size is what is
-    // left to deliver.
-    const auto out = stack(v["output"], std::format("{}.output", path));
+    // left to deliver, below 0 when the batch makes more than asked.
+    const auto out = stack(v["output"], std::format("{}.output", path), true);
     if (!out) return std::unexpected(out.error());
     c.crafting = domain::keyOf(*out);
     c.remaining = out->size;
@@ -298,6 +302,7 @@ auto replyPoll(const PollReply& reply) -> Result<std::string> {
     e["id"] = o.id;
     e["amount"] = o.amount;
     e["filter"] = filter(o);
+    if (!o.item.variant.empty()) e["fluid"] = o.item.variant;
     orders.PushBack(std::move(e));
   }
   b["orders"] = std::move(orders);
@@ -308,6 +313,7 @@ auto replyPoll(const PollReply& reply) -> Result<std::string> {
     e["order"] = o.id;
     e["cpu"] = o.cpu;
     e["filter"] = filter(o);
+    if (!o.item.variant.empty()) e["fluid"] = o.item.variant;
     cancel.PushBack(std::move(e));
   }
   b["cancel"] = std::move(cancel);

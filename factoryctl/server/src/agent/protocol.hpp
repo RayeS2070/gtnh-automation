@@ -22,7 +22,9 @@ namespace factoryctl::agent {
 //   {"scan": 42, "last": false,
 //    "items": [{"name": "...", "damage": 0, "label": "...", "size": 5,
 //               "fluid": "molten.platinum"}]}
-// `last` and `fluid` may be left out; `damage` too (0).
+// `last` and `fluid` may be left out; `damage` too (0). `fluid` makes it a
+// fluid: a drop (2.8.4) or, in 2.9, an AE fluid ({"name": "plasma.niobium",
+// "fluid": "plasma.niobium"}); both get the same key.
 struct ScanBatch {
   std::int64_t scan = 0;
   bool last = false;
@@ -39,7 +41,8 @@ auto parseScan(const userver::formats::json::Value& body)
 //    "stock": [{"name", "damage", "fluid", "size"}],
 //    "log": [{"t": <uptime>, "level": "inf", "text": "..."}]}
 // `output` is finalOutput(), left out for a free CPU; it is keyed like a
-// scanned stack, its size is what is left to deliver. `stock` measures the
+// scanned stack, its size is what is left to deliver (below 0 while a batch
+// bigger than asked finishes). `stock` measures the
 // probe list of the last reply, after the CPUs were read; no size: not found.
 // `log` is the agent's log since the last poll that got through.
 // `results`, `stock`, `log` and `message` may be left out. Statuses: computing,
@@ -69,16 +72,17 @@ struct PollReply {
 };
 
 // The answer to a poll, a Lua table:
-//   {poll=10, orders={{id=18, amount=1000, filter={...}}},
-//    cancel={{order=17, cpu="CPU_022", filter={...}}},
+//   {poll=10, orders={{id=18, amount=1000, filter={...}, fluid=...}},
+//    cancel={{order=17, cpu="CPU_022", filter={...}, fluid=...}},
 //    probe={{name=..., damage=...}, {name="ae2fc:fluid_drop", fluid=...,
 //            label=...}},
 //    scan={id=42, threshold=500, maxId=11500, chunk=1000,
 //          slow={from=250, to=320, chunk=5}}}
 // `filter` goes to getCraftables as is: {name, damage} for an item,
-// {name, label} for a fluid drop (drops differ in NBT only). A cancel task
-// has it too: the agent cancels only if the CPU still shows that item. No
-// `scan` when there is none to run.
+// {name, label} for a fluid drop (drops differ in NBT only). A fluid has
+// `fluid` too, its name: in 2.9 the agent asks for the AE fluid by it instead
+// of the drop. A cancel task has them too: the agent cancels only if the CPU
+// still shows that item. No `scan` when there is none to run.
 auto replyPoll(const PollReply& reply)
     -> std::expected<std::string, std::string>;
 

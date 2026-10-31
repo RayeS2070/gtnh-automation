@@ -7,27 +7,50 @@ local me = {}
 ---@field damage integer
 ---@field label string
 ---@field size number
----@field fluid string? # fluidDrop.name of a fluid drop: the server keys drops by it
+---@field fluid string? # the fluid's name, of a drop or an AE fluid: the server keys fluids by it
 ---@field craftable boolean? # scanned items: AE has a pattern for the item
 
----@param stack table # an ItemStack from OC
+---Whether AE keeps fluids as fluids (GTNH 2.9) rather than as ae2fc drops (2.8.4). Told by a
+---method 2.8.4 does not have.
+---@param proxy table # me_interface
+function me.aeFluids(proxy)
+    return proxy.getFluidInNetwork ~= nil
+end
+
+---The fluid of a stack: a drop's fluidDrop.name, or the name of an AE fluid (2.9: finalOutput()
+---of a fluid craft, getFluidsInNetwork). An AE fluid has `amount` and no `damage`, an item stack
+---always has `damage`.
+---@param stack table
+---@return string?
+function me.fluidOf(stack)
+    if stack.fluidDrop then
+        return stack.fluidDrop.name
+    end
+    if stack.damage == nil and stack.amount ~= nil then
+        return stack.name
+    end
+    return nil
+end
+
+---@param stack table # an ItemStack (or an AE fluid) from OC
 ---@return fc.Item
 function me.item(stack)
     return {
         name = stack.name,
         damage = stack.damage or 0,
         label = stack.label or '',
-        size = stack.size or 0,
-        fluid = stack.fluidDrop and stack.fluidDrop.name or nil,
+        size = stack.size or stack.amount or 0,
+        fluid = me.fluidOf(stack),
     }
 end
 
----The item a stack belongs to, as the server keys it: a fluid drop by its fluid.
+---The item a stack belongs to, as the server keys it: a fluid by its name.
 ---@param stack table
 ---@return string
 function me.key(stack)
-    if stack.fluidDrop then
-        return 'fluid:' .. tostring(stack.fluidDrop.name)
+    local fluid = me.fluidOf(stack)
+    if fluid then
+        return 'fluid:' .. tostring(fluid)
     end
     return ('%s:%d'):format(stack.name, stack.damage or 0)
 end
@@ -53,6 +76,25 @@ function me.chunk(proxy, first, last, threshold)
     if not ok then
         return nil, ('getItemsInNetworkById(%d..%d): %s'):format(first, last, tostring(stacks))
     end
+    return me.kept(stacks, threshold)
+end
+
+---The AE fluids worth sending (2.9), in one call: there are some hundreds, not thousands.
+---@param proxy table
+---@return fc.Item[]? items
+---@return string? err
+function me.fluids(proxy, threshold)
+    local ok, stacks = pcall(proxy.getFluidsInNetwork)
+    if not ok then
+        return nil, 'getFluidsInNetwork: ' .. tostring(stacks)
+    end
+    return me.kept(stacks, threshold)
+end
+
+---The stacks worth sending, as items.
+---@param stacks table[]?
+---@return fc.Item[]
+function me.kept(stacks, threshold)
     -- Kept or left out per item, not per stack: one item may come as several stacks (in game:
     -- a stored MFE with NBT, not craftable, next to its craftable entry of size 0). Deciding per
     -- stack sent only the 0.
@@ -60,7 +102,7 @@ function me.chunk(proxy, first, last, threshold)
     for _, s in ipairs(stacks or {}) do
         local k = me.key(s)
         local sum = sums[k] or { size = 0, isCraftable = false }
-        sum.size = sum.size + (s.size or 0)
+        sum.size = sum.size + (s.size or s.amount or 0)
         sum.isCraftable = sum.isCraftable or s.isCraftable == true
         sums[k] = sum
     end

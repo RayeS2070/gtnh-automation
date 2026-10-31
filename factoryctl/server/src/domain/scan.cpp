@@ -12,9 +12,9 @@ constexpr std::string_view kFluidDrop = "ae2fc:fluid_drop";
 }  // namespace
 
 auto keyOf(const ScannedStack& stack) -> ItemKey {
+  if (!stack.fluid.empty()) return {std::string{kFluidDrop}, 0, stack.fluid};
   if (stack.name != kFluidDrop) return {stack.name, stack.damage, ""};
-  return {stack.name, stack.damage,
-          stack.fluid.empty() ? stack.label : stack.fluid};
+  return {stack.name, stack.damage, stack.label};
 }
 
 auto mergeBatch(std::span<const ScannedStack> stacks)

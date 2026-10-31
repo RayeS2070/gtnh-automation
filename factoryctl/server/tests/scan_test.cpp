@@ -18,6 +18,13 @@ TEST(Scan, DropKeyHasTheFluid) {
             (ItemKey{"ae2fc:fluid_drop", 0, "molten.platinum"}));
 }
 
+TEST(Scan, FluidKeyIsTheDropOne) {
+  // GTNH 2.9: AE stores fluids as fluids, not drops. The key stays the drop's,
+  // so stock, targets and icons do not depend on the game version.
+  EXPECT_EQ(keyOf({"plasma.niobium", 0, "Niobium Plasma", 1, "plasma.niobium"}),
+            (ItemKey{"ae2fc:fluid_drop", 0, "plasma.niobium"}));
+}
+
 TEST(Scan, DropWithoutFluidFallsBackToLabel) {
   // Never seen in game; summing every drop under one key would be worse.
   EXPECT_EQ(keyOf({"ae2fc:fluid_drop", 0, "drop of Water", 1, ""}),

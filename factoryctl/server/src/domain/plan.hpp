@@ -15,7 +15,8 @@ namespace factoryctl::domain {
 // An item as the ME network knows it. Fluid drops (ae2fc:fluid_drop) all have
 // damage 0 and differ in NBT only, which OC does not show: their `variant` is
 // the fluid's internal name (fluidDrop.name, e.g. molten.platinum); for other
-// items it stays empty.
+// items it stays empty. GTNH 2.9 has no drops, AE keeps fluids as fluids:
+// they get the drop's key all the same, so data does not depend on the version.
 struct ItemKey {
   std::string name;
   std::int32_t damage = 0;

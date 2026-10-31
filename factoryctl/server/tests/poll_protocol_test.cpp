@@ -49,6 +49,19 @@ TEST(PollProtocol, CpusAndResults) {
   EXPECT_EQ(r->results[1].message, "ambiguous");
 }
 
+TEST(PollProtocol, CpuFinishingABiggerBatch) {
+  // In game (2.9): a fluid craft whose recipe makes more than was asked shows
+  // a negative size while the batch finishes.
+  const auto r = poll(R"({"cpus": [
+      {"name": "CPU_021", "busy": false,
+       "output": {"name": "plasma.niobium", "label": "Niobium Plasma",
+                  "size": -3968, "fluid": "plasma.niobium"}}]})");
+  ASSERT_TRUE(r.has_value()) << r.error();
+  EXPECT_EQ(r->cpus[0].crafting,
+            (ItemKey{"ae2fc:fluid_drop", 0, "plasma.niobium"}));
+  EXPECT_EQ(r->cpus[0].remaining, -3968);
+}
+
 TEST(PollProtocol, StockProbes) {
   const auto r = poll(R"({"cpus": [], "stock": [
       {"name": "bartworks:gt.bwMetaGeneratedstickLong", "damage": 11358,
@@ -196,7 +209,7 @@ TEST(PollProtocol, ReplyOrdersWithFilters) {
             "{poll=10,orders={"
             "{id=18,amount=1000,filter={name=\"minecraft:stick\",damage=0}},"
             "{id=19,amount=144,filter={name=\"ae2fc:fluid_drop\","
-            "label=\"drop of Xenoxene\"}}},cancel={},probe={}}");
+            "label=\"drop of Xenoxene\"},fluid=\"xenoxene\"}},cancel={},probe={}}");
 }
 
 TEST(PollProtocol, ReplyProbes) {

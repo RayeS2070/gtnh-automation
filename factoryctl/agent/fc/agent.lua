@@ -27,6 +27,8 @@ function agent.new(deps)
     a.info = deps.info or function() end
     a.jobs = jobs.new(a.warn)
     a.logs = deps.logs
+    a.aeFluids = me.aeFluids(a.me)
+    a.info('fluids: %s', a.aeFluids and 'AE fluids (2.9)' or 'drops (2.8.4)')
     return a
 end
 
@@ -46,11 +48,26 @@ function agent:call(path, body)
     return reply
 end
 
----Runs a scan task: every chunk, the last batch closes the scan. A failed chunk ends the scan;
----the server starts another one later.
+---Runs a scan task: AE fluids first (2.9: drops come with the items in 2.8.4), then every
+---chunk; the last batch closes the scan. A failed call ends the scan; the server starts another
+---one later.
 function agent:scan(task)
     self.info('scan %d', task.id)
     local sent = 0
+    if self.aeFluids then
+        local fluids, err = me.fluids(self.me, task.threshold)
+        if not fluids then
+            self.warn('scan %d stopped: %s', task.id, err)
+            return
+        end
+        local _, perr = self:call('/agent/v1/scan', { scan = task.id, last = false, items = fluids })
+        if perr then
+            self.warn('scan %d stopped: %s', task.id, perr)
+            return
+        end
+        sent = sent + #fluids
+        self.yield()
+    end
     for first, last in scan.chunks(task) do
         local items, err = me.chunk(self.me, first, last, task.threshold)
         if not items then
@@ -70,6 +87,16 @@ function agent:scan(task)
         self.yield()
     end
     self.info('scan %d done: %d stacks', task.id, sent)
+end
+
+---The getCraftables filter of a task. The server's is for a drop ({name, label}); in 2.9 a
+---fluid is an AE fluid, found by its name. It is what finalOutput() shows too (cancel).
+---@param task { filter: table, fluid: string? }
+function agent:filter(task)
+    if task.fluid and self.aeFluids then
+        return { name = task.fluid }
+    end
+    return task.filter
 end
 
 ---One poll. Returns the reply, or nil and why.
@@ -95,10 +122,12 @@ function agent:poll()
     end
     self.probes = reply.probe -- measured in the next poll
     for _, task in ipairs(reply.orders or {}) do
+        task.filter = self:filter(task)
         self.info('order %d: %d x %s', task.id, task.amount, task.filter.label or task.filter.name)
         self.jobs:start(self.me, task)
     end
     for _, task in ipairs(reply.cancel or {}) do
+        task.filter = self:filter(task)
         self.info('cancel order %d on %s', task.order, task.cpu)
         self.jobs:cancel(self.me, task)
     end
