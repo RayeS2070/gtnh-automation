@@ -5,11 +5,10 @@
 
 | Project | What it does |
 | --- | --- |
-| [qftctl](qftctl/) | Controls a Quantum Force Transformer: picks recipes by stock levels, manages Neptunium/Fermium plasma focusing. |
 | [nanoresinctl](nanoresinctl/) | Keeps molten rare-earth metals stocked in an ME network by switching bundled redstone colors. |
 | [space-mining-calc](space-mining-calc/) | C++ calculator of the best Space Elevator mining module settings. Not an in-game program. |
 | [maintainer](maintainer/) | Work in progress: keeping item stock via AE2 crafting with an external checker service. |
-| [factoryctl](factoryctl/) | Remote production control: OC agents (crafting orders; Space Elevator pumping), a C++ server (userver, PostgreSQL) and a web client. Replaces maintainer and the old pumpingctl. |
+| [factoryctl](factoryctl/) | Remote production control: OC agents (crafting orders; Space Elevator pumping; the Quantum Force Transformer, ex-qftctl), a C++ server (userver, PostgreSQL) and a web client. Replaces maintainer and the old pumpingctl. |
 
 Each project has its own README with installation and usage.
 
@@ -94,8 +93,8 @@ project. Open the repository root as the workspace.
 The programs run on Lua 5.3 inside OpenOS. Locally you can only check syntax and run pure logic:
 
 ```sh
-luac -p qftctl/main.lua
-cd qftctl && lua tests/run.lua
+luac -p factoryctl/qft/main.lua
+cd factoryctl/qft && lua tests/run.lua
 ```
 
 ## License

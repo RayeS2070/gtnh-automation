@@ -4,7 +4,7 @@
 ---    slot, as getConfiguration() returns it (configure one or two slots by hand first);
 ---  * the QFT controller: parameters, sensor information, work progress;
 ---  * a few fluids and items of each fluid interface / ME controller, as 2.9 gives them.
----Changes nothing. Run from the qftctl directory:
+---Changes nothing. Run from the QFT agent directory (/home/factoryctl/qft):
 ---  tools/qft-dump.lua [file]      (default /home/qft-dump.txt)
 local component = require('component')
 local shell = require('shell')

@@ -1,10 +1,15 @@
 -- OpenOS keeps required modules in package.loaded until reboot, so after an update or an edit
 -- the old code would keep running. Drop our own modules so every start loads them from disk.
 for name in pairs(package.loaded) do
-    if name:match('^qft%.') or name:match('^config%.') then
+    if name:match('^qft%.') or name:match('^config%.') or name:match('^fc%.') then
         package.loaded[name] = nil
     end
 end
+
+-- This program's directory: qft/ and config/ are here, the shared fc/ in ../agent.
+local here = (debug.getinfo(1, 'S').source:match('^[@=](/.*)/[^/]*$'))
+    or require('shell').getWorkingDirectory()
+package.path = ('%s/?.lua;%s/../agent/?.lua;%s'):format(here, here, package.path)
 
 local computer = require('computer')
 local event = require('event')

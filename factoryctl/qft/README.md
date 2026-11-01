@@ -1,4 +1,4 @@
-# qftctl
+# QFT agent (qftctl)
 
 An OpenComputers program that controls a **Quantum Force Transformer** (QFT) in the
 GregTech: New Horizons modpack.
@@ -34,10 +34,10 @@ to know which is which, and which stocking hatch holds which plasma. So you tell
 Install with the [repository installer](../README.md#installing-in-game):
 
 ```
-gtnh-install qftctl
+gtnh-install factoryctl
 ```
 
-This installs into `/home/qftctl`, or updates an existing installation. `gtnh-install qftctl --config`
+This installs into `/home/qftctl`, or updates an existing installation. `gtnh-install factoryctl --config`
 also overwrites the files in `config/` with the ones from the repository.
 
 The program code is always replaced. The files in `config/` are downloaded only when they are
@@ -52,8 +52,8 @@ Without an Internet Card, copy `main.lua`, `config/` and `qft/` into one directo
 `tools/qft-dump.lua` writes what the program sees (stocking buses and hatches with their slots,
 the controller, a few stacks of each network) into `/home/qft-dump.txt`; it changes nothing.
 
-Run the program **from its directory** (`cd /home/qftctl`): modules are loaded relative to
-the current directory.
+Run the program **from its directory** (`cd /home/factoryctl/qft`). It takes the modules shared
+with the other agents from `../agent`.
 
 ## Usage
 
@@ -310,7 +310,7 @@ Type stubs and the general setup are described in the [repository README](../REA
 Local tests (pure logic and the runner with fake components, no game needed):
 
 ```sh
-cd qftctl && lua tests/run.lua
+cd factoryctl/qft && lua tests/run.lua
 ```
 
 Notes for AI agents working on the code are in [AGENTS.md](AGENTS.md).

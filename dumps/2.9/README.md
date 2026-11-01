@@ -30,7 +30,7 @@ the `gtnh/` docs yet.
   - Verified (2.9.0 server): the **basic** stocking bus and hatch have the same drivers and
     16 slots; `isAdvanced()` only tells whether auto-pull is there.
 - **OC sees the AE2 storage bus.** `me_storagebus` has
-  `setStorageConfiguration(side[, slot][, detail])`. It is no longer needed for qftctl, since
+  `setStorageConfiguration(side[, slot][, detail])`. It is no longer needed for the QFT agent (`factoryctl/qft`), since
   the stocking bus itself is configurable.
 - **Parametrized GT machines** have `getParameters()` / `setParameter(key, val)` in the `main`
   branch stubs of `gtnh/` (`base-gregtech-machine.lua`). The pumping agent (`factoryctl/pumps`)
@@ -42,7 +42,7 @@ the `gtnh/` docs yet.
 
 - **GT stocking bus/hatch** have only `setWorkAllowed` and `setCircuitConfiguration` (the
   latter works in game but is missing from the `gtnh-2.8` stubs). What they show cannot be
-  configured from OC, which is why qftctl has one bus per recipe on 2.8.4.
+  configured from OC, which is why the QFT agent had one bus per recipe on 2.8.4.
 - **OC does not see the storage bus.** No component appears.
 - **A storage bus on an ME interface sees the interface's whole network,** even when the
   interface has items configured.

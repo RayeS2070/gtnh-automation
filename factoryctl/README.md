@@ -52,6 +52,10 @@ the fluid levels without the server:
   computer; until it gave any, `pumps/config.lua` has the defaults, and they become the server's
   first settings. Cycles, modules and the pumping network's stock go to the server, for the web.
 
+**QFT agent** (`qft/`, ex-qftctl, Lua on its own computer next to one Quantum Force Transformer).
+It decides by itself too: recipes by the stock of products and raw materials, plasma focusing,
+the safe stop before every switch. See [qft/README.md](qft/README.md).
+
 **Server** (`server/`, C++ with userver). One poll is one transaction:
 
 - results first, then CPUs: orders move `queued → sent → computing/accepted → crafting → done`
