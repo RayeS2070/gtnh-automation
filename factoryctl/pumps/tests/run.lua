@@ -322,6 +322,7 @@ suite('pumps', function()
     local body = w.requests[1].body
     eq(w.requests[1].path, '/agent/v1/pumps/poll', 'its path')
     check(body:find('"offer":{', 1, true) ~= nil, 'the server gets the defaults to take')
+    check(body:find('"settings":-1', 1, true) ~= nil, 'the first poll of a run reports no version')
     check(body:find('"recipes":[', 1, true) ~= nil, 'and the recipes')
     check(body:find('"state":"running"', 1, true) ~= nil, 'running modules in the report')
     check(body:find('"progress":200', 1, true) ~= nil, 'with their progress')
@@ -356,9 +357,15 @@ suite('pumps', function()
     w2.saved = w.saved
     local p2 = pumps.new(w2.deps, clock.now)
     eq(p2.settings.version, 1, 'saved settings at the start: no server needed')
+    -- the first reply of a run is taken even at the same version: the saved copy may be short
+    w2.replies[1] = '{poll=10,settings={version=1,batch=40,threshold=0.9,targets={'
+        .. '{fluid="neon",target=1000000000,priority=1,enabled=true}}}}'
     clock.now = clock.now + 100
     p2:step(clock.now, clock.time)
     eq(pa.params['recipe0.gasType'], 6, 'neon (planet 5, gas 6) by the saved targets')
+    clock.now = clock.now + 1 -- past the pulse: the poll waits for it
+    p2:step(clock.now, clock.time)
+    eq(p2.settings.batch, 40, 'the first reply of a run is taken at the same version')
     check(w2.requests[1] == nil or w2.requests[1].body:find('"offer"', 1, true) == nil,
         'settings of the server are not offered back')
 

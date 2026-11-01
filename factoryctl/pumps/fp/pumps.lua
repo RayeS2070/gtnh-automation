@@ -234,7 +234,9 @@ function pumps:poll(now)
     local lines = self.deps.logs and self.deps.logs:entries() or {}
     local body = {
         run = self.deps.run,
-        settings = self.settings.version,
+        -- -1 until a poll of this run got through: the server sends its settings whatever the
+        -- saved version says. A copy saved by an older agent may lack fields it did not know.
+        settings = self.synced and self.settings.version or -1,
         modules = self:snapshot(),
         cycles = self.ended,
         stock = self:targetStock(now),
@@ -275,11 +277,13 @@ function pumps:poll(now)
     end
     self.recipesSent = true
     self.offerWanted = reply.offer == true
+    local fresh = not self.synced
+    self.synced = true
     if reply.settings then
         local s, serr = settings.check(reply.settings, self.warn)
         if not s then
             self.warn('settings from the server refused: %s', tostring(serr))
-        elseif s.version ~= self.settings.version then
+        elseif s.version ~= self.settings.version or fresh then
             self.settings = s
             local saved, werr = settings.save(self.deps.store, s)
             if not saved then

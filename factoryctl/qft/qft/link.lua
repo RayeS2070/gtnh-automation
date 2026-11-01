@@ -158,7 +158,8 @@ end
 ---@return table link
 function link.new(deps)
     local l = setmetatable({ deps = deps, warn = deps.warn or function() end,
-        info = deps.info or function() end, catalogSent = false, offerWanted = false }, link)
+        info = deps.info or function() end, catalogSent = false, offerWanted = false,
+        synced = false }, link)
     l.offer = link.defaults(deps.recipes, deps.mode) -- before anything is applied
     l.settings = l.offer
     local text = deps.store.read()
@@ -216,7 +217,9 @@ function link:poll(report)
     local body = {
         setup = { name = d.name, coords = d.coords },
         run = d.run,
-        settings = self.settings.version,
+        -- -1 until a poll of this run got through: the server sends its settings whatever the
+        -- saved version says. A copy saved by an older agent may lack fields it did not know.
+        settings = self.synced and self.settings.version or -1,
         state = { phase = report.phase, mode = report.mode, want = report.want,
             recipe = running and running.recipe, fermium = running and running.fermium or false,
             neptunium = running and running.neptunium, cycleSeconds = report.cycleSeconds },
@@ -242,12 +245,14 @@ function link:poll(report)
         d.logs:confirm()
     end
     self.catalogSent = true
+    local fresh = not self.synced -- the first reply of a run: taken even at the same version
+    self.synced = true
     self.offerWanted = reply.offer == true
     if reply.settings then
         local s, serr = link.check(reply.settings)
         if not s then
             self.warn('settings from the server refused: %s', tostring(serr))
-        elseif s.version ~= self.settings.version then
+        elseif s.version ~= self.settings.version or fresh then
             self:take(s, 'server')
             local saved, werr = d.store.write(d.store.encode(s))
             if not saved then

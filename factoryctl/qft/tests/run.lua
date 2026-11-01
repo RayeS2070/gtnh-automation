@@ -739,6 +739,19 @@ do
     check(l2.settings.version == 1 and deps2.recipes.glue.outputs[1].target == 500,
         'saved settings at the start: no server needed')
     check(l2.offer.recipes[1].outputs[1].target == 100, 'the offer is still the config\'s')
+
+    -- a copy saved by an older agent lacks a field (enabled): the first poll of a run asks for
+    -- the server's settings and takes them even at the same version
+    local requestsBefore = #requests
+    replies[requestsBefore + 1] = '{poll=10,settings={version=1,mode="deficit",recipes={{id="glue",'
+        .. 'enabled=false,outputs={{circuit=1,target=500,priority=1}}}}}}'
+    local reply2 = l2:poll({ phase = 'idle', mode = 'deficit', plasma = {} })
+    check(requests[requestsBefore + 1].body:find('"settings":-1', 1, true) ~= nil,
+        'the first poll of a run reports no version')
+    check(reply2 and reply2.changed and deps2.recipes.glue.off == true,
+        'the server\'s settings taken though the version is the same')
+    l2:poll({ phase = 'idle', mode = 'deficit', plasma = {} })
+    check(requests[#requests].body:find('"settings":1', 1, true) ~= nil, 'then the version as usual')
 end
 
 print(failures == 0 and 'all tests passed' or (failures .. ' test(s) failed'))
