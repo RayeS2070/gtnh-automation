@@ -10,6 +10,7 @@ slots.kSize = 16 -- slots of a stocking input bus or hatch, basic and advanced a
 ---@class qft.Slots
 ---@field items { name: string, damage: integer }[] # Bus slots 1.., in the order of the inputs.
 ---@field fluids { name: string }[] # Hatch slots 1...
+---@field plasma { name: string }[]? # Plasma hatch slots: the plasma of the decision, none: off.
 
 ---The slots of a recipe, from its inputs and the raw materials network.
 ---@param recipe qft.Recipe # Inputs carry `resource` (config.normalize).

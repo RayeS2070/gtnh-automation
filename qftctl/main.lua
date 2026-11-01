@@ -70,7 +70,7 @@ local function plasmaEnough(ctx, name, id, running)
         return nil
     end
     local stock, err = resource.amount(index,
-        { kind = 'fluid', label = ctx.components.plasma[name].fluid })
+        { kind = 'fluid', label = ctx.components.plasma[name] })
     if not stock then
         logOnce(ctx, 'err', name .. ': ' .. err)
         return false, err
@@ -103,7 +103,8 @@ local function decide(ctx, id, st, current)
     if delta < 0 then
         logOnce(ctx, 'inf', ('%s: no plasma, shielding tier %d < recipe tier %d: no effect')
             :format(id, ctx.components.shieldingTier, recipe.tier))
-        return { recipe = id, fermium = false, slots = set }
+        return { recipe = id, fermium = false,
+            slots = { items = set.items, fluids = set.fluids, plasma = {} } }
     end
     local same = current ~= nil and current.recipe == id
 
@@ -135,7 +136,23 @@ local function decide(ctx, id, st, current)
     logChange(ctx, 'neptunium', focus or false, '%s: neptunium %s, %s', id,
         focus and ('focus ' .. focus) or 'off', nwhy)
 
-    return { recipe = id, fermium = fermium, neptunium = focus, slots = set }
+    -- The plasma hatch is set to the plasma of the decision; its name comes from the network, as
+    -- for any input. Not found: there is none to use.
+    local plasma = {}
+    for _, p in ipairs({ { 'fermium', fermium }, { 'neptunium', focus } }) do
+        if p[2] then
+            local detail, perr = resource.identify(ctx.source,
+                { kind = 'fluid', label = ctx.components.plasma[p[1]] })
+            if detail then
+                plasma[#plasma + 1] = detail
+            else
+                logOnce(ctx, 'err', ('%s: %s'):format(p[1], perr))
+                if p[1] == 'fermium' then fermium = false else focus = nil end
+            end
+        end
+    end
+    return { recipe = id, fermium = fermium, neptunium = focus,
+        slots = { items = set.items, fluids = set.fluids, plasma = plasma } }
 end
 
 ---Reads the kinds of resources the program needs from a network: fluids, items, or both.

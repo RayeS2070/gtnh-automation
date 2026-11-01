@@ -2,9 +2,9 @@
 ---Inputs are switched only while the machine stands still: plasma is consumed during the run,
 ---and losing it mid-run spoils the cycle.
 ---
----GTNH 2.9: one stocking input bus and one hatch serve every recipe. Before a recipe starts their
----slots are set to its inputs (only the slots that differ: every call costs a tick), the Neptunium
----circuit goes into the bus. On 2.9 Neptunium burns no plasma without a circuit (GT5-Unofficial
+---GTNH 2.9: one stocking input bus and one hatch serve every recipe, one more hatch the plasma.
+---Before a recipe starts their slots are set to its inputs and to the plasma it uses (only the
+---slots that differ: every call costs a tick), the Neptunium circuit goes into the bus. On 2.9 Neptunium burns no plasma without a circuit (GT5-Unofficial
 ---5.09.54.264); the circuit still goes in before the hatches are enabled and out only after they
 ---are off. Moving the focus while running only changes the circuit: at worst one cycle runs with
 ---the old focus.
@@ -40,8 +40,9 @@ local kTicksPerSecond = 20
 ---@field since number # When the phase was entered.
 ---@field lastActive number # Last time the machine was seen active.
 ---@field warned boolean # Stall warning already printed for this phase.
----@field configured { bus: table<integer, string>, hatch: table<integer, string> } # Slot keys
----                  # as set; unknown at the start, so every slot is written once.
+---@field configured { bus: table<integer, string>, hatch: table<integer, string>,
+---                  plasma: table<integer, string> } # Slot keys as set; unknown at the start,
+---                  # so every slot is written once.
 
 ---Calls a component method. OC proxies take no self, so this is proxy.method(...), not ':'.
 ---A failing call is logged and reported, it does not kill the program.
@@ -88,24 +89,26 @@ function runner.describe(d)
         .. (d.neptunium and (' + neptunium@' .. d.neptunium) or '')
 end
 
----Every input the program may enable: the bus, the hatch and the plasma hatches.
+---Every input the program may enable: the bus, the hatch and the plasma hatch.
 ---@return { proxy: table, what: string }[]
 local function allInputs(components)
-    local list = { { proxy = components.bus, what = 'bus' }, { proxy = components.hatch, what = 'hatch' } }
-    for name, plasma in pairs(components.plasma) do
-        list[#list + 1] = { proxy = plasma.hatch, what = 'plasma.' .. name }
-    end
-    return list
+    return { { proxy = components.bus, what = 'bus' }, { proxy = components.hatch, what = 'hatch' },
+        { proxy = components.plasma.hatch, what = 'plasma' } }
 end
 
----Sets the slots of the bus or the hatch to `list` (slot i = list[i], the rest cleared); only
----the slots that differ from what was set. A failed call leaves that slot unknown.
+---The proxy behind a slot set: the bus, the hatch or the plasma hatch.
+local function holder(r, which)
+    return which == 'plasma' and r.components.plasma.hatch or r.components[which]
+end
+
+---Sets the slots of the bus, the hatch or the plasma hatch to `list` (slot i = list[i], the rest
+---cleared); only the slots that differ from what was set. A failed call leaves that slot unknown.
 ---@param r qft.Runner
----@param which 'bus' | 'hatch'
+---@param which 'bus' | 'hatch' | 'plasma'
 ---@param list table[]
 ---@return boolean ok
 local function configure(r, which, list)
-    local proxy, set = r.components[which], r.configured[which]
+    local proxy, set = holder(r, which), r.configured[which]
     for i = 1, slots.kSize do
         local want = list[i]
         local key = slots.key(want)
@@ -146,7 +149,7 @@ end
 ---@param now number
 ---@return qft.Runner
 function runner.new(components, now)
-    local r = { components = components, configured = { bus = {}, hatch = {} } }
+    local r = { components = components, configured = { bus = {}, hatch = {}, plasma = {} } }
     beginStop(r, now)
     return r
 end
@@ -177,8 +180,9 @@ end
 local function start(r, want, now)
     local c = r.components
     -- Slots and circuit first, with everything still off.
+    local plasma = want.slots.plasma or {}
     if not (configure(r, 'bus', want.slots.items) and configure(r, 'hatch', want.slots.fluids)
-            and setCircuit(c.bus, 'bus', want.neptunium or -1)) then
+            and configure(r, 'plasma', plasma) and setCircuit(c.bus, 'bus', want.neptunium or -1)) then
         beginStop(r, now)
         return false
     end
@@ -186,11 +190,9 @@ local function start(r, want, now)
     if #want.slots.fluids > 0 then
         steps[#steps + 1] = { c.hatch, 'hatch' }
     end
-    if want.fermium then
-        steps[#steps + 1] = { r.components.plasma.fermium.hatch, 'plasma.fermium' }
-    end
-    if want.neptunium then
-        steps[#steps + 1] = { r.components.plasma.neptunium.hatch, 'plasma.neptunium' }
+    -- The plasma hatch holds only the plasma of this decision: none, it stays off.
+    if #plasma > 0 then
+        steps[#steps + 1] = { c.plasma.hatch, 'plasma' }
     end
     steps[#steps + 1] = { r.components.controller, 'controller' }
 

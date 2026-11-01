@@ -19,16 +19,11 @@ return {
     -- programmed circuit for Neptunium. Basic or advanced, both do.
     bus = bind.manual { type = 'me_inputbus', prompt = 'ME stocking input bus of the QFT (items)' },
     hatch = bind.manual { type = 'me_inputhatch', prompt = 'ME stocking input hatch of the QFT (fluids)' },
-    -- Plasma has hatches of its own, set by hand to it. It is stocked from the `source` network;
-    -- `fluid` is the label used to check the stock.
+    -- Plasma: one more ME stocking input hatch, set by the program to the plasma a recipe uses
+    -- (none: off). Plasma is stocked from the `source` network; these are its labels there.
     plasma = {
-        neptunium = {
-            hatch = bind.manual { type = 'me_inputhatch', prompt = 'ME stocking input hatch with Neptunium Plasma' },
-            fluid = 'Neptunium Plasma',
-        },
-        fermium = {
-            hatch = bind.manual { type = 'me_inputhatch', prompt = 'ME stocking input hatch with Fermium Plasma' },
-            fluid = 'Fermium Plasma',
-        },
+        hatch = bind.manual { type = 'me_inputhatch', prompt = 'ME stocking input hatch for plasma (set by the program)' },
+        neptunium = 'Neptunium Plasma',
+        fermium = 'Fermium Plasma',
     },
 }

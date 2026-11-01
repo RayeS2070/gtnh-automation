@@ -23,7 +23,9 @@ end
 -- What config.checkValues needs of the components.
 local function components()
     return { shieldingTier = 1, bus = bind.manual { type = 'me_inputbus', prompt = 'bus' },
-        hatch = bind.manual { type = 'me_inputhatch', prompt = 'hatch' } }
+        hatch = bind.manual { type = 'me_inputhatch', prompt = 'hatch' },
+        plasma = { hatch = bind.manual { type = 'me_inputhatch', prompt = 'plasma' },
+            neptunium = 'Neptunium Plasma', fermium = 'Fermium Plasma' } }
 end
 
 local function recipes()
@@ -175,6 +177,9 @@ do
         :find('17 item inputs'), 'more items than bus slots refused')
     check(table.concat(config.checkValues({ shieldingTier = 1 }, {}), ' '):find('bus must be'),
         'the bus and the hatch are required components')
+    check(table.concat(config.checkValues({ shieldingTier = 1, plasma = {
+        neptunium = { hatch = bind.manual { type = 'me_inputhatch', prompt = 'n' } } } }, {}), ' ')
+        :find('plasma: hatch must be'), 'old per-plasma hatches refused')
     local old = components()
     old.recipes = {}
     check(table.concat(config.checkValues(old, {}), ' '):find('recipes are gone'),
@@ -363,7 +368,7 @@ local function fakeSetup()
         controller = fakeMachine(true),
         bus = fakeMachine(),
         hatch = fakeMachine(),
-        plasma = { fermium = { hatch = fakeMachine() }, neptunium = { hatch = fakeMachine() } },
+        plasma = { hatch = fakeMachine(), neptunium = 'Neptunium Plasma', fermium = 'Fermium Plasma' },
     }
     return c
 end
@@ -371,6 +376,11 @@ end
 local kRubberSlots = { items = { { name = 'gregtech:gt.metaitem.01', damage = 2010 } },
     fluids = { { name = 'oxygen' }, { name = 'hydrogen' } } }
 local kOtherSlots = { items = { { name = 'bw:dust', damage = 47 } }, fluids = {} }
+local kFermium, kNeptunium = { name = 'plasma.fermium' }, { name = 'plasma.neptunium' }
+-- A decision's slots with the plasma it uses.
+local function withPlasma(base, ...)
+    return { items = base.items, fluids = base.fluids, plasma = { ... } }
+end
 local R = { recipe = 'rubber', fermium = false, slots = kRubberSlots }
 local O = { recipe = 'other', fermium = false, slots = kOtherSlots }
 
@@ -385,7 +395,8 @@ do
 
     c.controller.active = false
     runner.step(r, R, 2)
-    check(c.plasma.fermium.hatch.allowed == false, 'idle switches every input off')
+    check(c.plasma.hatch.allowed == false, 'idle switches every input off')
+    check(c.plasma.hatch.slots[1] == nil, 'no plasma in the decision: the plasma hatch stays empty')
     check(r.phase == 'running' and r.running.recipe == 'rubber', 'idle -> running in the same tick')
     check(c.bus.slots[1] and c.bus.slots[1].damage == 2010 and c.bus.slots[2] == nil,
         'bus slots set to the items')
@@ -463,22 +474,24 @@ do
     local c = fakeSetup()
     c.controller.active = false
     local r = runner.new(c, 0)
-    runner.step(r, { recipe = 'rubber', fermium = true, slots = kRubberSlots }, 1)
-    check(c.plasma.fermium.hatch.allowed == true and c.plasma.neptunium.hatch.allowed == false,
-        'fermium decision enables only the fermium hatch')
+    local F = { recipe = 'rubber', fermium = true, slots = withPlasma(kRubberSlots, kFermium) }
+    runner.step(r, F, 1)
+    check(c.plasma.hatch.allowed == true and c.plasma.hatch.slots[1].name == 'plasma.fermium'
+        and c.plasma.hatch.slots[2] == nil, 'fermium decision: the plasma hatch holds fermium only')
 
     c.controller.active = true
     c.controller.getWorkMaxProgress = function() return 1200 end
-    runner.step(r, { recipe = 'rubber', fermium = true, slots = kRubberSlots }, 2)
+    runner.step(r, F, 2)
     check(r.cycleSeconds == 60, 'cycle length read from the controller in seconds')
 
     runner.step(r, R, 3)
-    check(r.phase == 'stopping' and c.plasma.fermium.hatch.allowed == true,
-        'dropping fermium waits for the cycle to end')
+    check(r.phase == 'stopping' and c.plasma.hatch.allowed == true
+        and c.plasma.hatch.slots[1].name == 'plasma.fermium', 'dropping fermium waits for the cycle to end')
     c.controller.active = false
     runner.step(r, R, 4)
-    check(c.plasma.fermium.hatch.allowed == false and r.running.recipe == 'rubber'
-        and r.running.fermium == false, 'restarted without fermium after the cycle')
+    check(c.plasma.hatch.allowed == false and c.plasma.hatch.slots[1] == nil
+        and r.running.recipe == 'rubber' and r.running.fermium == false,
+        'restarted without fermium after the cycle: slot cleared, hatch off')
 end
 
 -- Neptunium: chances ported from the source, checked against the wiki Summary table
@@ -519,11 +532,13 @@ do
     local c = fakeSetup()
     c.controller.active = false
     local r = runner.new(c, 0)
-    local N1 = { recipe = 'rubber', fermium = false, neptunium = 1, slots = kRubberSlots }
-    local N3 = { recipe = 'rubber', fermium = false, neptunium = 3, slots = kRubberSlots }
+    local N1 = { recipe = 'rubber', fermium = false, neptunium = 1,
+        slots = withPlasma(kRubberSlots, kNeptunium) }
+    local N3 = { recipe = 'rubber', fermium = false, neptunium = 3,
+        slots = withPlasma(kRubberSlots, kNeptunium) }
     -- the circuit must be set before the hatch: check the order inside the hatch call
     local circuitAtEnable
-    local hatch = c.plasma.neptunium.hatch
+    local hatch = c.plasma.hatch
     local set = hatch.setWorkAllowed
     hatch.setWorkAllowed = function(v)
         if v then circuitAtEnable = c.bus.circuit end
@@ -531,6 +546,7 @@ do
     end
     runner.step(r, N1, 1)
     check(circuitAtEnable == 1 and hatch.allowed, 'circuit set before the neptunium hatch')
+    check(hatch.slots[1].name == 'plasma.neptunium', 'the plasma hatch holds neptunium')
 
     c.controller.active = true
     runner.step(r, N3, 2)
@@ -556,7 +572,7 @@ do
     c.bus.setCircuitConfiguration = function() return nil, 'no slot' end
     r = runner.new(c, 0)
     runner.step(r, N1, 1)
-    check(r.phase == 'stopping' and c.plasma.neptunium.hatch.allowed == false,
+    check(r.phase == 'stopping' and c.plasma.hatch.allowed == false,
         'refused circuit: never starts neptunium')
 end
 

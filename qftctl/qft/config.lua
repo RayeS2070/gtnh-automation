@@ -51,12 +51,14 @@ function config.checkValues(components, recipes)
     if not isInt(components.shieldingTier, 1, kMaxTier) then
         add('components: shieldingTier must be an integer 1..%d', kMaxTier)
     end
-    for name, plasma in pairs(components.plasma or {}) do
-        if not bind.isBinding(plasma.hatch) then
-            add('components.plasma.%s: hatch must be a binding', name)
-        end
-        if type(plasma.fluid) ~= 'string' then
-            add('components.plasma.%s: fluid must be a label', name)
+    local plasma = components.plasma
+    if type(plasma) ~= 'table' or not bind.isBinding(plasma.hatch) then
+        add('components.plasma: hatch must be a binding (one hatch, the program sets the plasma)')
+    else
+        for _, name in ipairs({ 'neptunium', 'fermium' }) do
+            if type(plasma[name]) ~= 'string' then
+                add('components.plasma.%s must be the label of the plasma', name)
+            end
         end
     end
     for _, part in ipairs({ 'bus', 'hatch' }) do

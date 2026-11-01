@@ -26,7 +26,8 @@ to know which is which, and which stocking hatch holds which plasma. So you tell
     advanced, for every recipe: the program sets their slots to the inputs of the recipe it
     starts. Take any other stocking bus or hatch with recipe inputs off the QFT, or it feeds
     every recipe;
-  - the ME stocking input hatches with Neptunium Plasma and Fermium Plasma, set by hand.
+  - one more ME stocking input hatch for plasma: the program sets it to the plasma a recipe
+    uses (Fermium, Neptunium, both or none) and enables it only then.
 
 ## Installation
 
@@ -96,7 +97,8 @@ If nothing is needed, the QFT stops. The log says when the mode changes.
 Switching is safe for plasma. The program stops the controller (`setWorkAllowed(false)`: the
 current cycle finishes, no new one starts) and waits until the machine is inactive. Only
 then does it switch the inputs off, set the slots of the stocking bus and hatch to the next
-recipe (only the slots that differ), put the Neptunium circuit into the bus and start again. On start the program first
+recipe and the plasma hatch to its plasma (only the slots that differ), put the Neptunium
+circuit into the bus and start again. On start the program first
 stops the machine and switches every input off. On Ctrl+C it stops the controller and leaves
 the inputs as they are.
 
