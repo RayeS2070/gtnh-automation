@@ -7,10 +7,9 @@
 | --- | --- |
 | [qftctl](qftctl/) | Controls a Quantum Force Transformer: picks recipes by stock levels, manages Neptunium/Fermium plasma focusing. |
 | [nanoresinctl](nanoresinctl/) | Keeps molten rare-earth metals stocked in an ME network by switching bundled redstone colors. |
-| [pumpingctl](pumpingctl/) | Space Elevator pump module control (third-party script, being reworked). **Does not run yet**, see below. |
 | [space-mining-calc](space-mining-calc/) | C++ calculator of the best Space Elevator mining module settings. Not an in-game program. |
 | [maintainer](maintainer/) | Work in progress: keeping item stock via AE2 crafting with an external checker service. |
-| [factoryctl](factoryctl/) | Remote production control: an OC agent, a C++ server (userver, PostgreSQL) and a web client. Replaces maintainer. Early setup. |
+| [factoryctl](factoryctl/) | Remote production control: OC agents (crafting orders; Space Elevator pumping), a C++ server (userver, PostgreSQL) and a web client. Replaces maintainer and the old pumpingctl. |
 
 Each project has its own README with installation and usage.
 
@@ -55,10 +54,6 @@ the manifest, or it will not be installed. Check locally with `lua tools/check-m
 
 ## Known issues
 
-- **pumpingctl does not run.** The script reads `threshold`, `maxBatchSize` and `color` as
-  globals, but they are declared inside `const`, so the first fluid check fails with an
-  arithmetic error on `nil`. More problems are listed for the rework; the script is not
-  fixed yet.
 - **maintainer has unresolved licensing.** It was imported from another repository and has
   several authors besides the owner of this repository. Their permission to publish the code
   under the Apache License 2.0 has not been obtained. Sort this out before the repository

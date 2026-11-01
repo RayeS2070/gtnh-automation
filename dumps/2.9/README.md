@@ -29,9 +29,10 @@ the `gtnh/` docs yet.
   `setStorageConfiguration(side[, slot][, detail])`. It is no longer needed for qftctl, since
   the stocking bus itself is configurable.
 - **Parametrized GT machines** have `getParameters()` / `setParameter(key, val)` in the `main`
-  branch stubs of `gtnh/` (`base-gregtech-machine.lua`). pumpingctl depends on them. The Space
-  Elevator pump module has not been dumped on any version, so its parameter keys
-  (`recipe<N>.planetType`, `recipe<N>.gasType`, `batch`) come only from the third-party script.
+  branch stubs of `gtnh/` (`base-gregtech-machine.lua`). The pumping agent (`factoryctl/pumps`)
+  depends on them. The Space Elevator pump module's dump (2.9, in game) has both; its parameter
+  keys (`batch`, `recipe<N>.planetType`, `.gasType`, `.parallel`) are from GT5-Unofficial's
+  `TileEntityModulePump`, not from a dump: `getParameters()` was not printed yet.
 
 ## 2.8.4
 
