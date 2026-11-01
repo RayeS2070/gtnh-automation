@@ -23,8 +23,12 @@ the `gtnh/` docs yet.
   - Verified: the configured slots see the full amount in the network, no stack cap.
   - Verified: 16 slots each, on the advanced variants.
   - Not verified: how long a new configuration takes to apply (`getRefreshTime`).
-  - Not recorded yet: the exact fields of the `detail` table. Read `getConfiguration(1)` of a
-    slot configured by hand before writing code against it.
+  - The `detail` table (OC `DriverMEInputHatch.scala`, 2.9.0): bus `{name = 'mod:item', damage = N}`
+    (or `id`), hatch `{name = 'fluid.name'}`; no detail clears the slot. Slots count from 1.
+    `getConfiguration` returns the whole stack. A slot applies at once
+    (`setSlotConfigAndUpdate`); `refreshTime` is the auto-pull period.
+  - Verified (2.9.0 server): the **basic** stocking bus and hatch have the same drivers and
+    16 slots; `isAdvanced()` only tells whether auto-pull is there.
 - **OC sees the AE2 storage bus.** `me_storagebus` has
   `setStorageConfiguration(side[, slot][, detail])`. It is no longer needed for qftctl, since
   the stocking bus itself is configurable.
