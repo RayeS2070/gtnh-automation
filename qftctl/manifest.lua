@@ -10,6 +10,7 @@ return {
         'qft/runner.lua',
         'qft/setup.lua',
         'qft/store.lua',
+        'tools/qft-dump.lua', -- facts for the move to GTNH 2.9; changes nothing
     },
     config = {
         'config/ids.lua',
