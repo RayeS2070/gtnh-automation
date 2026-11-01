@@ -76,7 +76,9 @@ file means the defaults); `deploy/host_dynamic_config.yaml` lists every key with
 items or fluids, by name or amount; the chosen goods' target and order forms above it; targets (threshold, batch,
 priority, fill, pause); one-off orders and cancel; the order list with status, CPU and
 progress; the CPUs and what they craft (a tile and the order form say when goods are on a CPU
-already); the Logs tab and each order's history (events: what our code tells on purpose, not the
+already); the Pumping tab (modules with their slots and progress; fluids with the pumping
+network's stock, target, fill, what is in flight and what was pumped in 24 h; targets, batch and
+threshold edited there); the Logs tab and each order's history (events: what our code tells on purpose, not the
 server's whole log). Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
 Item icons come from the GTNH Calculator's export (`../assets/data`, served at `/data/`): the
 page reads `data.bin` the way the calculator does and draws icons from `atlas.webp`. The export

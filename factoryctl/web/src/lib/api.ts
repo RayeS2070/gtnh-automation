@@ -189,3 +189,54 @@ export async function fetchEvents(q: EventQuery = {}): Promise<FactoryEvent[]> {
   if (q.limit !== undefined) params.set('limit', String(q.limit))
   return (await call<{ items: FactoryEvent[] }>('GET', `/api/v1/events?${params}`)).items
 }
+
+// The pumping agent (factoryctl/pumps): it decides; the server keeps its settings and reports.
+export type PumpSettings = { version: number; batch: number; threshold: number }
+
+export type PumpModule = {
+  address: string
+  tier: number
+  state: string // idle | pulse | starting | running | backoff
+  progress: number | null // ticks of the cycle, running only
+  maxProgress: number | null
+  seenAt: string
+  slots: { fluid: string; parallel: number }[]
+}
+
+export type PumpTarget = { target: number; priority: number; enabled: boolean }
+
+export type PumpFluid = {
+  fluid: string // internal name, as a drop's variant
+  label: string
+  planet: number
+  gas: number
+  rate: number // mB per second of a cycle, one parallel
+  goodsId: number | null
+  amount: number | null // the pumping network, last report
+  inFlight: number // what running cycles bring
+  produced: number // done cycles, last 24 h
+  target: PumpTarget | null
+}
+
+export type Pumps = {
+  settings: PumpSettings | null
+  failed: number // cycles, last 24 h
+  modules: PumpModule[]
+  fluids: PumpFluid[]
+}
+
+export async function fetchPumps(): Promise<Pumps> {
+  return call<Pumps>('GET', '/api/v1/pumps')
+}
+
+export async function putPumpSettings(batch: number, threshold: number): Promise<void> {
+  await call('PUT', '/api/v1/pumps/settings', { batch, threshold })
+}
+
+export async function putPumpTarget(fluid: string, target: PumpTarget): Promise<void> {
+  await call('PUT', `/api/v1/pumps/targets/${encodeURIComponent(fluid)}`, target)
+}
+
+export async function deletePumpTarget(fluid: string): Promise<void> {
+  await call('DELETE', `/api/v1/pumps/targets/${encodeURIComponent(fluid)}`)
+}

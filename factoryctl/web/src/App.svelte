@@ -2,11 +2,19 @@
   import Cpus from './lib/Cpus.svelte'
   import Logs from './lib/Logs.svelte'
   import Orders from './lib/Orders.svelte'
+  import Pumps from './lib/Pumps.svelte'
   import Stock from './lib/Stock.svelte'
   import Targets from './lib/Targets.svelte'
 
-  // Pages by the URL hash (#/stock, #/targets, #/orders, #/cpus, #/logs): no router needed for a few tabs.
-  const pages = { stock: 'Stock', targets: 'Targets', orders: 'Orders', cpus: 'CPUs', logs: 'Logs' } as const
+  // Pages by the URL hash (#/stock, #/targets, ...): no router needed for a few tabs.
+  const pages = {
+    stock: 'Stock',
+    targets: 'Targets',
+    orders: 'Orders',
+    cpus: 'CPUs',
+    pumps: 'Pumping',
+    logs: 'Logs',
+  } as const
   type Page = keyof typeof pages
 
   const fromHash = (): Page => {
@@ -36,6 +44,8 @@
     <Orders />
   {:else if page === 'cpus'}
     <Cpus />
+  {:else if page === 'pumps'}
+    <Pumps />
   {:else if page === 'logs'}
     <Logs />
   {:else}
