@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (7);
+INSERT INTO factoryctl.schema_version VALUES (8);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -127,7 +127,7 @@ CREATE TABLE factoryctl.events (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     at           timestamptz NOT NULL,
     level        factoryctl.event_level NOT NULL,
-    source       text NOT NULL,  -- agent | server | order | scan | target
+    source       text NOT NULL,  -- agent | server | order | scan | target | pumps
     text         text NOT NULL,
     order_id     bigint REFERENCES factoryctl.orders ON DELETE SET NULL,
     goods_id     bigint REFERENCES factoryctl.goods ON DELETE SET NULL,
@@ -135,3 +135,77 @@ CREATE TABLE factoryctl.events (
 );
 CREATE INDEX events_by_time ON factoryctl.events (at);
 CREATE INDEX events_of_order ON factoryctl.events (order_id) WHERE order_id IS NOT NULL;
+
+-- The pumping agent (factoryctl/pumps): it decides; the server keeps its
+-- settings and what it reports. Fluids by internal name (goods.variant).
+-- One row: the settings, `version` up with every change (the agent takes
+-- newer ones). No row: the agent offers its own.
+CREATE TABLE factoryctl.pump_settings (
+    one        boolean PRIMARY KEY DEFAULT true CHECK (one),
+    version    bigint NOT NULL CHECK (version > 0),
+    batch      integer NOT NULL CHECK (batch BETWEEN 1 AND 128),
+    threshold  double precision NOT NULL CHECK (threshold > 0 AND threshold <= 1),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE factoryctl.pump_targets (
+    fluid    text PRIMARY KEY,
+    target   bigint NOT NULL CHECK (target >= 0),
+    priority double precision NOT NULL CHECK (priority > 0),
+    enabled  boolean NOT NULL DEFAULT true
+);
+
+-- What the modules can pump, as the agent says (its fp/recipes.lua).
+CREATE TABLE factoryctl.pump_recipes (
+    fluid  text PRIMARY KEY,
+    planet integer NOT NULL,
+    gas    integer NOT NULL,
+    label  text NOT NULL,
+    rate   bigint NOT NULL
+);
+
+-- The modules as of the last poll; replaced on every poll. Slots of the
+-- cycle a module runs, as parallel arrays.
+CREATE TABLE factoryctl.pump_modules (
+    address      text PRIMARY KEY,
+    tier         integer NOT NULL,
+    state        text NOT NULL,
+    fluids       text[] NOT NULL,
+    parallels    integer[] NOT NULL,
+    progress     bigint,
+    max_progress bigint,
+    seen_at      timestamptz NOT NULL
+);
+
+-- Cycles that ended, once each: (run, seq) is the agent's. Kept for
+-- events-keep, as events.
+CREATE TABLE factoryctl.pump_cycles (
+    run      text NOT NULL,
+    seq      bigint NOT NULL,
+    module   text NOT NULL,
+    batch    integer NOT NULL,
+    result   text NOT NULL CHECK (result IN ('done', 'failed')),
+    message  text NOT NULL DEFAULT '',
+    duration double precision,
+    ended_at timestamptz NOT NULL,  -- when the server heard of it
+    PRIMARY KEY (run, seq)
+);
+CREATE INDEX pump_cycles_by_time ON factoryctl.pump_cycles (ended_at);
+
+CREATE TABLE factoryctl.pump_cycle_slots (
+    run      text NOT NULL,
+    seq      bigint NOT NULL,
+    slot     integer NOT NULL,
+    fluid    text NOT NULL,
+    parallel integer NOT NULL,
+    expected bigint NOT NULL,  -- mB the cycle brings in this slot
+    PRIMARY KEY (run, seq, slot),
+    FOREIGN KEY (run, seq) REFERENCES factoryctl.pump_cycles ON DELETE CASCADE
+);
+
+-- The pumping network's stock of the target fluids, as last reported.
+CREATE TABLE factoryctl.pump_stock (
+    fluid  text PRIMARY KEY,
+    amount bigint NOT NULL,
+    at     timestamptz NOT NULL
+);

@@ -14,6 +14,7 @@
 #include "db/cpus.hpp"
 #include "db/events.hpp"
 #include "db/manual.hpp"
+#include "db/pumps.hpp"
 #include "db/stock.hpp"
 #include "db/targets.hpp"
 
@@ -66,6 +67,32 @@ struct OrderRequest {
 
 auto parseOrderRequest(const userver::formats::json::Value& body)
     -> std::expected<OrderRequest, std::string>;
+
+// GET /api/v1/pumps:
+//   {"settings": {"version", "batch", "threshold"} or null, "failed": cycles,
+//    "modules": [{"address", "tier", "state", "progress", "maxProgress",
+//                 "seenAt", "slots": [{"fluid", "parallel"}]}],
+//    "fluids": [{"fluid", "label", "planet", "gas", "rate", "goodsId",
+//                "amount", "inFlight", "produced",
+//                "target": {"target", "priority", "enabled"} or null}]}
+// null for what is not known (no goods of the fluid, no stock reported).
+auto toJson(const db::PumpsView& v) -> userver::formats::json::ValueBuilder;
+
+// The body of PUT /api/v1/pumps/settings: {"batch": 30, "threshold": 0.95}.
+struct PumpGeneral {
+  std::int32_t batch = 0;
+  double threshold = 0;
+};
+
+auto parsePumpGeneral(const userver::formats::json::Value& body)
+    -> std::expected<PumpGeneral, std::string>;
+
+// The body of PUT /api/v1/pumps/targets/{fluid}: {"target": 10000000000,
+// "priority": 1, "enabled": true}; priority (1) and enabled (true) may be
+// left out.
+auto parsePumpTarget(const userver::formats::json::Value& body,
+                     std::string fluid)
+    -> std::expected<domain::PumpTarget, std::string>;
 
 // A positive id from a path argument.
 auto parseId(std::string_view text) -> std::optional<std::int64_t>;

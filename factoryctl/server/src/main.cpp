@@ -8,11 +8,13 @@
 #include <userver/utils/daemon_run.hpp>
 
 #include "agent/poll_handler.hpp"
+#include "agent/pumps_poll_handler.hpp"
 #include "agent/scan_handler.hpp"
 #include "api/cpus_handler.hpp"
 #include "api/events_handler.hpp"
 #include "api/orders_handler.hpp"
 #include "api/stock_handler.hpp"
+#include "api/pumps_handler.hpp"
 #include "api/targets_handler.hpp"
 #include "config/file_updater.hpp"
 #include "db/events_cleanup.hpp"
@@ -40,6 +42,10 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::TargetHandler>()
           .Append<factoryctl::api::TargetGroupsHandler>()
           .Append<factoryctl::api::TargetGroupHandler>()
+          .Append<factoryctl::api::PumpsHandler>()
+          .Append<factoryctl::api::PumpSettingsHandler>()
+          .Append<factoryctl::api::PumpTargetHandler>()
+          .Append<factoryctl::agent::PumpsPollHandler>()
           .Append<factoryctl::api::OrdersHandler>()
           .Append<factoryctl::api::OrderCancelHandler>()
           .Append<factoryctl::api::CpusHandler>()

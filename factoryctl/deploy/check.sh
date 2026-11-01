@@ -34,7 +34,7 @@ probe() {
     done
     [[ -n $ok ]] || { $log 2>&1 | tail -5 >&2; fail "no answer on :$port"; }
     for path in / /health /api/v1/stock /api/v1/targets /api/v1/target-groups /api/v1/orders \
-        /api/v1/cpus /api/v1/events /data/data.bin; do
+        /api/v1/cpus /api/v1/events /api/v1/pumps /data/data.bin; do
         local code
         code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$port$path")
         [[ $code == 200 ]] || fail ":$port$path answered $code"

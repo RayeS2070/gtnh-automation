@@ -361,6 +361,15 @@ suite('pumps', function()
     check(w2.requests[1] == nil or w2.requests[1].body:find('"offer"', 1, true) == nil,
         'settings of the server are not offered back')
 
+    -- a server without settings asks for the agent's, whatever their version
+    w2.replies[#w2.requests + 1] = '{poll=10,offer=true}'
+    clock.now = clock.now + 20
+    p2:step(clock.now, clock.time)
+    clock.now = clock.now + 20
+    p2:step(clock.now, clock.time)
+    check(w2.requests[#w2.requests].body:find('"offer":{', 1, true) ~= nil,
+        'asked for: offered, version 1 and all')
+
     -- nothing to pump: idle, looked at again later, no busy loop
     local clock3 = fake.clock()
     local pc = fake.pump(clock3, 'cccc', 'projectmodulepumpt1')
@@ -384,6 +393,24 @@ suite('pumps', function()
     local p4 = pumps.new(w4.deps, clock4.now)
     p4:step(clock4.now, clock4.time)
     check(p4.modules.dddd == nil and not p4.ignored.dddd, 'not taken, not ignored for good')
+
+    -- a module that keeps failing is warned of once, and again when it works
+    local clock5 = fake.clock()
+    local dead = fake.pump(clock5, 'eeee', 'projectmodulepumpt1', { noStart = true })
+    local w5 = fakeWorld(clock5, { eeee = dead }, { oil = 0 })
+    local said = {}
+    w5.deps.warn = function(fmt, ...) said[#said + 1] = fmt:format(...) end
+    w5.deps.info = function(fmt, ...) said[#said + 1] = fmt:format(...) end
+    local p5 = pumps.new(w5.deps, clock5.now)
+    for _ = 1, 400 do
+        clock5.now = clock5.now + math.max(p5:step(clock5.now, clock5.time), 0.1)
+    end
+    local failures5 = 0
+    for _, line in ipairs(said) do
+        if line:find('failed', 1, true) then failures5 = failures5 + 1 end
+    end
+    eq(failures5, 1, 'the same failure is told once')
+    check(#p5.ended + #w5.requests > 0, 'its cycles still go to the server')
 
     -- stop: nothing left allowed
     p:stop()

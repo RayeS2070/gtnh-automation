@@ -5,16 +5,20 @@ add_library(factoryctl_lib STATIC
         src/agent/protocol.cpp
         src/agent/scan_handler.cpp
         src/agent/poll_handler.cpp
+        src/agent/pumps_protocol.cpp
+        src/agent/pumps_poll_handler.cpp
         src/api/stock_handler.cpp
         src/api/json.cpp
         src/api/targets_handler.cpp
         src/api/orders_handler.cpp
         src/api/cpus_handler.cpp
         src/api/events_handler.cpp
+        src/api/pumps_handler.cpp
         src/domain/plan.cpp
         src/domain/order.cpp
         src/domain/scan.cpp
         src/domain/poll.cpp
+        src/domain/pumps.cpp
         src/db/sql.cpp
         src/db/schema.cpp
         src/db/scan.cpp
@@ -25,6 +29,7 @@ add_library(factoryctl_lib STATIC
         src/db/cpus.cpp
         src/db/events.cpp
         src/db/events_cleanup.cpp
+        src/db/pumps.cpp
         src/config/dynamic.cpp
         src/config/file_updater.cpp
         src/http/compression.cpp
@@ -64,6 +69,7 @@ add_executable(factoryctl_unittest
         tests/sql_test.cpp
         tests/config_test.cpp
         tests/compression_test.cpp
+        tests/pumps_test.cpp
 )
 target_link_libraries(factoryctl_unittest
         PRIVATE
@@ -86,6 +92,7 @@ add_executable(factoryctl_dbtest
         tests/db/craftable_dbtest.cpp
         tests/db/cpus_dbtest.cpp
         tests/db/events_dbtest.cpp
+        tests/db/pumps_dbtest.cpp
 )
 target_link_libraries(factoryctl_dbtest
         PRIVATE

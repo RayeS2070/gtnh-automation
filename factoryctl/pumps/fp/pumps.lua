@@ -143,6 +143,22 @@ function pumps:record(m, c)
         result = c.result, message = c.message, duration = c.duration, slots = slots }
 end
 
+---A failure is warned of when it is new: a module without energy fails every 30 s, and the log
+---would say so every time. A done cycle clears it.
+function pumps:tell(m, c)
+    if c.result ~= 'failed' then
+        if m.failure then
+            self.info('pump %s works again', m.address:sub(1, 8))
+        end
+        m.failure = nil
+        return
+    end
+    if m.failure ~= c.message then
+        self.warn('pump %s: cycle %d failed: %s', m.address:sub(1, 8), c.seq, tostring(c.message))
+    end
+    m.failure = c.message
+end
+
 local function sortedModules(self)
     local list = {}
     for _, m in pairs(self.modules) do
@@ -158,10 +174,7 @@ function pumps:stepModules(now)
         if ended then
             self.stock = nil -- what it pumped is in the network now
             self.ended[#self.ended + 1] = self:record(m, ended)
-            if ended.result == 'failed' then
-                self.warn('pump %s: cycle %d failed: %s', m.address:sub(1, 8), ended.seq,
-                    tostring(ended.message))
-            end
+            self:tell(m, ended)
         end
         if m.state == 'idle' and now >= m.at then
             local have, busy = self:have(now)
@@ -174,7 +187,7 @@ function pumps:stepModules(now)
                 local c = m:start(slots, self.settings.batch, self.seq, now)
                 if not c then
                     self.ended[#self.ended + 1] = self:record(m, m.cycle)
-                    self.warn('pump %s: %s', m.address:sub(1, 8), tostring(m.cycle.message))
+                    self:tell(m, m.cycle)
                 end
             end
         end
@@ -221,8 +234,9 @@ function pumps:poll(now)
         stock = self:targetStock(now),
         log = lines,
     }
-    -- The server has none yet: it takes these, so config.lua's targets need no typing in.
-    if self.settings.version == 0 then
+    -- The server has none yet: it takes these, so config.lua's targets need no typing in. A
+    -- server that lost its own (a new database) asks for them with offer=true.
+    if self.settings.version == 0 or self.offerWanted then
         body.offer = settings.plain(self.settings)
     end
     if not self.recipesSent then
@@ -254,6 +268,7 @@ function pumps:poll(now)
         self.deps.logs:confirm()
     end
     self.recipesSent = true
+    self.offerWanted = reply.offer == true
     if reply.settings then
         local s, serr = settings.check(reply.settings, self.warn)
         if not s then

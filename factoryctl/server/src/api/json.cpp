@@ -179,6 +179,98 @@ auto parseOrderRequest(const json::Value& body)
   return r;
 }
 
+auto toJson(const db::PumpsView& v) -> json::ValueBuilder {
+  using userver::formats::common::Type;
+  json::ValueBuilder b;
+  if (v.settings) {
+    b["settings"]["version"] = v.settings->version;
+    b["settings"]["batch"] = v.settings->batch;
+    b["settings"]["threshold"] = v.settings->threshold;
+  } else {
+    b["settings"] = json::ValueBuilder{};
+  }
+  b["failed"] = v.failed;
+  json::ValueBuilder modules(Type::kArray);
+  for (const auto& row : v.modules) {
+    const auto& m = row.module;
+    json::ValueBuilder e;
+    e["address"] = m.address;
+    e["tier"] = m.tier;
+    e["state"] = m.state;
+    e["progress"] = m.progress ? json::ValueBuilder{*m.progress} : json::ValueBuilder{};
+    e["maxProgress"] =
+        m.maxProgress ? json::ValueBuilder{*m.maxProgress} : json::ValueBuilder{};
+    e["seenAt"] = utc(row.seenAt);
+    json::ValueBuilder slots(Type::kArray);
+    for (const auto& s : m.slots) {
+      json::ValueBuilder one;
+      one["fluid"] = s.fluid;
+      one["parallel"] = s.parallel;
+      slots.PushBack(std::move(one));
+    }
+    e["slots"] = std::move(slots);
+    modules.PushBack(std::move(e));
+  }
+  b["modules"] = std::move(modules);
+  json::ValueBuilder fluids(Type::kArray);
+  for (const auto& f : v.fluids) {
+    json::ValueBuilder e;
+    e["fluid"] = f.recipe.fluid;
+    e["label"] = f.recipe.label;
+    e["planet"] = f.recipe.planet;
+    e["gas"] = f.recipe.gas;
+    e["rate"] = f.recipe.rate;
+    e["goodsId"] = f.goodsId ? json::ValueBuilder{*f.goodsId} : json::ValueBuilder{};
+    e["amount"] = f.amount ? json::ValueBuilder{*f.amount} : json::ValueBuilder{};
+    e["inFlight"] = f.inFlight;
+    e["produced"] = f.produced;
+    if (f.target) {
+      e["target"]["target"] = f.target->target;
+      e["target"]["priority"] = f.target->priority;
+      e["target"]["enabled"] = f.target->enabled;
+    } else {
+      e["target"] = json::ValueBuilder{};
+    }
+    fluids.PushBack(std::move(e));
+  }
+  b["fluids"] = std::move(fluids);
+  return b;
+}
+
+auto parsePumpGeneral(const json::Value& body)
+    -> std::expected<PumpGeneral, std::string> {
+  if (!body.IsObject()) return fail("settings", "not an object");
+  PumpGeneral g;
+  const auto& batch = body["batch"];
+  if (batch.IsMissing()) return fail("batch", "missing");
+  if (!batch.IsInt()) return fail("batch", "not an integer");
+  g.batch = batch.As<std::int32_t>();
+  const auto& threshold = body["threshold"];
+  if (threshold.IsMissing()) return fail("threshold", "missing");
+  if (!threshold.IsDouble()) return fail("threshold", "not a number");
+  g.threshold = threshold.As<double>();
+  return g;
+}
+
+auto parsePumpTarget(const json::Value& body, std::string fluid)
+    -> std::expected<domain::PumpTarget, std::string> {
+  if (!body.IsObject()) return fail("target", "not an object");
+  domain::PumpTarget t{.fluid = std::move(fluid)};
+  const auto& target = body["target"];
+  if (target.IsMissing()) return fail("target", "missing");
+  if (!target.IsInt64()) return fail("target", "not an integer");
+  t.target = target.As<std::int64_t>();
+  if (const auto& v = body["priority"]; !v.IsMissing()) {
+    if (!v.IsDouble()) return fail("priority", "not a number");
+    t.priority = v.As<double>();
+  }
+  if (const auto& v = body["enabled"]; !v.IsMissing()) {
+    if (!v.IsBool()) return fail("enabled", "not a boolean");
+    t.enabled = v.As<bool>();
+  }
+  return t;
+}
+
 auto parseId(std::string_view text) -> std::optional<std::int64_t> {
   std::int64_t id = 0;
   const auto [end, ec] =

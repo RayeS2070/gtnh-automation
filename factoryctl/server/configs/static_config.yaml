@@ -99,6 +99,26 @@ components_manager:
             method: POST
             task_processor: main-task-processor
 
+        handler-agent-pumps-poll:
+            path: /agent/v1/pumps/poll
+            method: POST
+            task_processor: main-task-processor
+
+        handler-api-pumps:
+            path: /api/v1/pumps
+            method: GET
+            task_processor: main-task-processor
+
+        handler-api-pump-settings:
+            path: /api/v1/pumps/settings
+            method: PUT
+            task_processor: main-task-processor
+
+        handler-api-pump-target:
+            path: /api/v1/pumps/targets/{fluid}
+            method: PUT,DELETE
+            task_processor: main-task-processor
+
         handler-api-stock:
             path: /api/v1/stock
             method: GET

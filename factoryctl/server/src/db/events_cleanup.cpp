@@ -9,6 +9,7 @@
 
 #include "config/dynamic.hpp"
 #include "db/events.hpp"
+#include "db/pumps.hpp"
 #include "db/schema.hpp"
 
 namespace factoryctl::db {
@@ -33,9 +34,12 @@ EventsCleanup::~EventsCleanup() { task_.Stop(); }
 
 auto EventsCleanup::run() -> void {
   const auto keep = config_.GetCopy(config::kEvents).keep;
-  const auto gone =
-      deleteEventsBefore(*db_, userver::utils::datetime::Now() - keep);
+  const auto before = userver::utils::datetime::Now() - keep;
+  const auto gone = deleteEventsBefore(*db_, before);
   if (gone > 0) LOG_INFO() << "events: " << gone << " older ones deleted";
+  // Pump cycles are history the same way: kept as long.
+  const auto cycles = deletePumpCyclesBefore(*db_, before);
+  if (cycles > 0) LOG_INFO() << "pump cycles: " << cycles << " older ones deleted";
 }
 
 }  // namespace factoryctl::db

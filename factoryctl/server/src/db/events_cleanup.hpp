@@ -8,7 +8,8 @@
 
 namespace factoryctl::db {
 
-// Deletes events older than config::kEvents keep, every hour and at start.
+// Deletes events and pump cycles older than config::kEvents keep, every hour
+// and at start.
 class EventsCleanup final : public userver::components::ComponentBase {
  public:
   static constexpr std::string_view kName = "events-cleanup";

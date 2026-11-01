@@ -38,6 +38,20 @@ bigger than asked shows a negative `finalOutput().size`: the surplus, shown as s
 Results and log lines stay with the agent until a poll gets through. Every order is requested
 at most once: one whose result never comes is marked lost, never sent again by itself.
 
+**Pumping agent** (`pumps/`, Lua on its own computer, next to the Space Elevator pump modules and
+the small pumping ME network). Unlike the crafting agent it decides by itself, so the modules keep
+the fluid levels without the server:
+
+- every module runs on its own: a pulse of work allowed (0.1 s) starts one cycle of `batch`
+  seconds; when it stops, the next one starts. No sleeps: one `event.pull` waits for whatever is
+  due next (a pulse to end, a cycle to end, a poll);
+- a cycle's slots (T1: 1 slot of 4 parallels, T2: 4 × 4, T3: 4 × 64) get the fluids below
+  `threshold × target`, ranked by `1 − fill^priority`, a different fluid in each slot and on each
+  module first; what running cycles bring counts as stock already;
+- settings (targets, priorities, batch, threshold) come from the server and are saved on the
+  computer; until it gave any, `pumps/config.lua` has the defaults, and they become the server's
+  first settings. Cycles, modules and the pumping network's stock go to the server, for the web.
+
 **Server** (`server/`, C++ with userver). One poll is one transaction:
 
 - results first, then CPUs: orders move `queued → sent → computing/accepted → crafting → done`
@@ -73,6 +87,8 @@ is of another game version, so a few goods have no icon.
 | Path | |
 |---|---|
 | `POST /agent/v1/poll`, `POST /agent/v1/scan` | the agent; answers are Lua tables, always HTTP 200 with `ok` |
+| `POST /agent/v1/pumps/poll` | the pumping agent: modules, cycles, stock up; newer settings down |
+| `GET /api/v1/pumps`, `PUT /api/v1/pumps/settings`, `PUT|DELETE /api/v1/pumps/targets/{fluid}` | pumping: modules, fluids (stock, target, in flight, pumped in 24 h); edits raise the settings' version |
 | `GET /api/v1/stock?q=&kind=&sort=&dir=&limit=` | stock: every word of `q` in the label, any order; `kind` all/items/fluids; `sort` label/amount; `dir` asc/desc; everything without `limit` |
 | `GET /api/v1/cpus` | the CPUs of the agent's last poll: what each crafts, what is left, our open order of it; and `lowFreeCpus` |
 | `GET /api/v1/events?level=&source=&q=&order=&before=&limit=` | events, newest first: the agent's lines, every order status change, alarms, scans, targets (kept `FACTORYCTL_EVENTS.keep`, 30 days) |
@@ -175,3 +191,14 @@ OpenComputers refuses private and local addresses by default (`internet.filterin
 config on the game server): allow the factoryctl server's address there.
 
 Local tests with fake components built from real dumps: `cd agent && lua tests/run.lua`.
+
+The pumping agent goes on a computer of its own, with an Internet Card and Adapters at the pump
+modules and at the pumping network's ME controller (or interface):
+
+```
+gtnh-install factoryctl
+cd /home/factoryctl/pumps && edit config.lua && main
+```
+
+Its local tests: `cd pumps && lua tests/run.lua`; against a running server, with fake modules and
+simulated time: `lua tests/live.lua http://localhost:8080`.
