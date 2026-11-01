@@ -236,7 +236,7 @@ TEST(PollProtocol, ReplyCancelAndScan) {
   EXPECT_EQ(replyPoll(reply),
             "{poll=2,orders={},cancel={{order=17,cpu=\"CPU_022\","
             "filter={name=\"minecraft:stick\",damage=0}}},probe={},"
-            "scan={id=42,threshold=500,maxId=11500,chunk=1000,"
+            "scan={id=42,threshold=500,maxId=12000,chunk=1000,"
             "slow={from=250,to=320,chunk=5}}}");
 }
 

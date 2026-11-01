@@ -66,7 +66,7 @@ FACTORYCTL_POLL:
   stalled-timeout: 10m
   low-free-cpus: 8
   scan-threshold: 500
-  scan-max-id: 11500
+  scan-max-id: 12000
   scan-chunk: 1000
   scan-slow-from: 250
   scan-slow-to: 320

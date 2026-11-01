@@ -19,7 +19,7 @@ namespace factoryctl::domain {
 struct ScanParams {
   std::int64_t threshold =
       500;  // stacks below it and not craftable are left out
-  std::int32_t maxId = 11500;
+  std::int32_t maxId = 12000;
   std::int32_t chunk = 1000;
   std::int32_t slowFrom = 250;  // ids with a great many NBT variants:
   std::int32_t slowTo = 320;  // small chunks, or the server runs out of memory

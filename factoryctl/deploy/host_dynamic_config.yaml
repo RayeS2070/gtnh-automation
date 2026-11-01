@@ -18,7 +18,7 @@ FACTORYCTL_POLL:              # the agent's poll; periods like 10s, 5m, 1h, at l
 #   stalled-timeout: 10m      # alarm when a craft does not progress
 #   low-free-cpus: 8          # low priority orders only while this many CPUs are idle
 #   scan-threshold: 500       # smaller stacks are scanned only if craftable
-#   scan-max-id: 11500        # highest item id the agent asks for
+#   scan-max-id: 12000        # highest item id the agent asks for
 #   scan-chunk: 1000          # ids per getItemsInNetworkById call
 #   scan-slow-from: 250       # ids with a great many NBT variants: small chunks there,
 #   scan-slow-to: 320         # or the game server runs out of memory
