@@ -66,6 +66,32 @@ suite('chunks', function()
     eq(covered, 11501, 'every id 0..maxId once')
 end)
 
+-- network: which ME component the agents use -------------------------------------------------
+suite('network', function()
+    local network = require('fc.network')
+    local function lister(byKind)
+        return function(kind) return byKind[kind] or {} end
+    end
+    local a, k = network.find(lister({ me_interface = { ['aaaa-1'] = 'me_interface' },
+        me_controller = { ['cccc-1'] = 'me_controller' } }))
+    eq(a, 'cccc-1', 'the controller before an interface')
+    eq(k, 'me_controller', '... and its kind')
+    a, k = network.find(lister({ fluid_interface = { ['ffff-1'] = 'fluid_interface' },
+        me_controller = { ['cccc-1'] = 'me_controller' } }))
+    eq(a, 'ffff-1', 'a fluid interface first')
+    a, k = network.find(lister({ me_interface = { ['aaaa-1'] = 1 } }))
+    eq(k, 'me_interface', 'a plain interface as the last resort')
+    a, k = network.find(lister({ fluid_interface = { ['ffff-1'] = 1, ['ffff-2'] = 1 } }))
+    check(a == nil and k:find('2 components fluid_interface') ~= nil, 'two of a kind: a prefix is needed')
+    a = network.find(lister({ fluid_interface = { ['ffff-1'] = 1, ['ffff-2'] = 1 } }), 'ffff-2')
+    eq(a, 'ffff-2', 'the prefix picks one')
+    a = network.find(lister({ fluid_interface = { ['ffff-1'] = 1 }, me_controller = { ['cccc-1'] = 1 } }),
+        'cccc')
+    eq(a, 'cccc-1', 'a prefix reaches past the preferred kind')
+    a, k = network.find(lister({}), 'dead')
+    check(a == nil and k:find('at dead') ~= nil, 'nothing: says what was looked for')
+end)
+
 -- fake me_interface from the dumps ----------------------------------------------------------
 local fake = {}
 

@@ -11,6 +11,7 @@ return {
         'agent/fc/log.lua',
         'agent/fc/logbuf.lua',
         'agent/fc/me.lua',
+        'agent/fc/network.lua',
         'agent/fc/probe.lua',
         'agent/fc/scan.lua',
         'agent/fc/trigger.lua',

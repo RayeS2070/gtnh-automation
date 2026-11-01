@@ -181,7 +181,8 @@ docker compose logs server --no-log-prefix | jq -c 'select(.level == "ERROR" or 
 
 ## Agent (in game)
 
-Needs an Internet Card and an Adapter next to an ME interface. Install with the repository's
+Needs an Internet Card and an Adapter next to a fluid interface or the ME controller: on GTNH 2.9
+only those answer for fluids (an ME interface still does for items). Install with the repository's
 installer and set the server address in `agent/config.lua`:
 
 ```
@@ -195,7 +196,7 @@ config on the game server): allow the factoryctl server's address there.
 Local tests with fake components built from real dumps: `cd agent && lua tests/run.lua`.
 
 The pumping agent goes on a computer of its own, with an Internet Card and Adapters at the pump
-modules and at the pumping network's ME controller (or interface):
+modules and at the pumping network's fluid interface or ME controller:
 
 ```
 gtnh-install factoryctl

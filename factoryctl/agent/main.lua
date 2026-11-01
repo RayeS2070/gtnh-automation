@@ -1,5 +1,6 @@
 ---factoryctl agent: runs crafting orders of the factoryctl server and scans the ME network for
----it. Needs an Internet Card and an Adapter next to an ME interface. Ctrl+C stops it.
+---it. Needs an Internet Card and an Adapter next to a fluid interface or the ME controller (an ME
+---interface does for items only). Ctrl+C stops it.
 ---  main
 -- OpenOS keeps required modules in package.loaded until reboot: drop ours so an update runs.
 for name in pairs(package.loaded) do
@@ -16,28 +17,11 @@ local agent = require('fc.agent')
 local http = require('fc.http')
 local log = require('fc.log')
 local logbuf = require('fc.logbuf')
+local network = require('fc.network')
 local trigger = require('fc.trigger')
 local config = require('config')
 
 local kRetry = 10 -- seconds before polling again after a failed poll
-
-local function findInterface(prefix)
-    local found = {}
-    for _, kind in ipairs({ 'fluid_interface', 'me_controller' }) do
-        for address in component.list(kind, true) do
-            if not prefix or address:sub(1, #prefix) == prefix then
-                found[#found + 1] = address
-            end
-        end
-    end
-    if #found == 0 then
-        return nil, 'no me_interface or me_controller' .. (prefix and (' at ' .. prefix) or '')
-    end
-    if #found > 1 and not prefix then
-        return nil, ('%d ME components: set `interface` in config.lua'):format(#found)
-    end
-    return component.proxy(found[1])
-end
 
 local function main()
     log.clock = computer.uptime
@@ -52,11 +36,16 @@ local function main()
         log.err('no Internet Card')
         return 1
     end
-    local proxy, err = findInterface(config.interface)
-    if not proxy then
-        log.err('%s', err)
+    local address, kind = network.find(function(k) return component.list(k, true) end,
+        config.interface)
+    if not address then
+        log.err('%s', kind)
         return 1
     end
+    if kind == 'me_interface' then
+        log.wrn('an me_interface: fluids of GTNH 2.9 need a fluid_interface or the me_controller')
+    end
+    local proxy = component.proxy(address)
 
     local a = agent.new({
         me = proxy,
@@ -67,7 +56,7 @@ local function main()
         info = log.inf,
         logs = logs,
     })
-    log.inf('agent for %s, ME %s; Ctrl+C to stop', config.server, proxy.address:sub(1, 8))
+    log.inf('agent for %s, %s %s; Ctrl+C to stop', config.server, kind, address:sub(1, 8))
 
     -- 2.8.4 has no events from AE: look at our own jobs every second and poll at once when one
     -- ends. On 2.9 an event-driven trigger replaces this one (see fc/trigger.lua).
