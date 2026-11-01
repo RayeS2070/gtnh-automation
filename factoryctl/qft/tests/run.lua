@@ -300,6 +300,52 @@ do
     check(#problemsOf(-1) == 1, 'config: negative catalysts refused')
 end
 
+-- config.build: recipes from the catalog and the player's choice
+do
+    local catalog = {
+        plat = { name = 'Platinum Dust', tier = 1, seconds = 20,
+            inputs = { { item = 'Powder', name = 'bw:dust', damage = 47, amount = 32 },
+                { fluid = 'Oxygen', name = 'oxygen', amount = 100 } },
+            outputs = { { item = 'Platinum Dust', name = 'gt:meta', damage = 2085, amount = 64,
+                molten = { fluid = 'Molten Platinum', name = 'molten.platinum', amount = 9216 } },
+                { item = 'Inert Dust', name = 'bw:dust', damage = 10113, amount = 1 } } },
+    }
+    local r, problems = config.build(catalog, { plat = { trigger = 'surplus', catalysts = 2,
+        outputs = { [1] = { weight = 3 } } } }, false)
+    check(#problems == 0, 'build: no problems')
+    local p = r.plat
+    check(p.name == 'Platinum Dust' and p.tier == 1 and p.catalysts == 2, 'build: name, tier, catalysts')
+    check(p.inputs[1].item == 'Powder' and p.inputs[1].name == 'bw:dust' and p.inputs[1].damage == 47
+        and p.inputs[1].amount == 32 and p.inputs[2].fluid == 'Oxygen', 'build: inputs with names')
+    check(p.outputs[1].item == 'Platinum Dust' and p.outputs[1].circuit == 1 and p.outputs[1].weight == 3,
+        'build: outputs, circuit = place, settings by circuit')
+    r = config.build(catalog, { plat = { trigger = 'surplus', catalysts = 1 } }, true)
+    check(r.plat.outputs[1].fluid == 'Molten Platinum' and r.plat.outputs[1].name == 'molten.platinum',
+        'fluid mode: a dust with a molten form counts as the fluid')
+    check(r.plat.outputs[2].item == 'Inert Dust', 'fluid mode: one without stays an item')
+    r = config.build(catalog, { plat = { trigger = 'deficit', catalysts = 1, countInputs = false,
+        name = 'Platinum Group' } }, false)
+    check(r.plat.name == 'Platinum Group' and r.plat.inputs[1].amount == nil,
+        'build: own name, inputs not counted')
+    local _, bad = config.build(catalog, { nope = {}, plat = { outputs = { [7] = {} } } }, false)
+    check(#bad == 2 and table.concat(bad, ' '):find('no such recipe') and table.concat(bad, ' '):find('2 outputs'),
+        'build: an unknown id and a circuit past the outputs are problems')
+    assert(#config.normalize(config.build(catalog, { plat = { trigger = 'surplus', catalysts = 1 } }, false)) == 0)
+end
+
+-- resource.amount by internal name: the game's label need not match the catalog's
+do
+    local snap = resource.snapshot({ { label = 'Platinum Dust', name = 'gt:meta', damage = 2085, size = 7 } },
+        { { label = 'Molten Styrene-Butadiene Rubber', name = 'molten.sbr', amount = 500 } })
+    check(resource.amount(snap, { kind = 'fluid', label = 'Molten Styrene-Butadiene Rubber (SBR)',
+        name = 'molten.sbr' }) == 500, 'a fluid found by name under another label')
+    check(resource.amount(snap, { kind = 'item', label = 'Platinum', name = 'gt:meta', damage = 2085 }) == 7,
+        'an item found by name and damage')
+    local zero, _, absent = resource.amount(snap, { kind = 'item', label = 'Platinum Dust',
+        name = 'gt:meta', damage = 1 })
+    check(zero == 0 and absent, 'another damage: absent')
+end
+
 -- bind: a slot may take any of several component types
 do
     local net = bind.manual { type = { 'fluid_interface', 'me_controller' }, prompt = 'net' }

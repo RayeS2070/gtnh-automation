@@ -1,133 +1,74 @@
----Recipe data for craft calculations. Edited by hand, only read by the program.
-local RecipeId = require('config.ids')
-
----An output is either `item = <label>` or `fluid = <label>`, as the game shows it.
----If the label is ambiguous (the program says so), add `name` and, for items, `damage`.
----Items are counted in pieces, fluids in mB: `target` uses the same unit.
----@class qft.RecipeOutput
----@field item string? # Label of an item output.
----@field fluid string? # Label of a fluid output.
----@field name string? # Internal id, only to resolve an ambiguous label.
----@field damage integer? # Items only: metadata, only to resolve an ambiguous label.
----@field resource qft.Resource # Built from the fields above when the config is loaded.
----@field circuit integer # Position of the output in NEI = programmed circuit for Neptunium focusing.
----@field target number? # Deficit only: stop producing once this amount is reached; nil = not tracked.
----@field priority number? # Deficit only: urgency exponent, 1 - (amount/target)^priority.
----                        # Higher = more urgent at the same fill level. Default 1.
----@field weight number? # Surplus only: how much this output is wanted, for Neptunium focusing.
----                      # Only the ratio between outputs matters; absent = 0, not wanted.
-
----An input is described like an output, plus how much of it one cycle takes. Every input of the
----recipe is listed: the stocking bus (items) and hatch (fluids) are set from them before the
----recipe starts, in this order. The slot needs the internal name: the program finds it in the
----raw materials network by the label; `name` (and `damage`) here spare that lookup and work when
----the network has none of it.
----@class qft.RecipeInput
----@field item string?
----@field fluid string?
----@field name string?
----@field damage integer?
----@field resource qft.Resource # Built when the config is loaded.
----@field amount number? # Per parallel per cycle: pieces or mB, as in NEI. Counted: the recipe
----                      # waits for stock for a cycle. Absent: supplied without limit, not counted
----                      # (surplus recipes need it on every input).
-
----Why a recipe runs:
----  'deficit' maintains products: runs when a tracked output is below its target.
----  'surplus' processes raw materials: runs when no product is short and its inputs are in stock.
----@alias qft.Trigger 'deficit' | 'surplus'
-
----@class qft.Recipe
----@field name string # Display name.
----@field trigger qft.Trigger
----@field tier integer # Recipe tier (1..4): the pulse manipulator tier that unlocks it.
----@field catalysts integer # Catalysts in the bulk catalyst housing = parallels; 0 = recipe disabled.
----@field inputs qft.RecipeInput[] # Every input, from the source network: 16 items, 16 fluids at most.
----@field outputs qft.RecipeOutput[]
-
----@type table<qft.RecipeId, qft.Recipe>
+---Which recipes this QFT runs, and how. What a recipe takes and gives (inputs, outputs, tier) is in
+---qft/catalog.lua, generated from the modpack's data: pick recipes by its ids. Edited by hand.
+---
+---  trigger     'deficit' keeps products stocked: runs when a tracked output is below its target;
+---              'surplus' processes raw materials: runs while its inputs are in stock
+---  catalysts   catalysts in the bulk catalyst housing = parallels; 0 = never run it
+---  name        shown instead of the catalog's (its first output's label)
+---  countInputs false: inputs are supplied without limit, not counted (deficit only)
+---  outputs     by circuit (the output's place in the catalog = in NEI): deficit `target` (keep this
+---              much; none = not tracked) and `priority` (urgency exponent, default 1); surplus
+---              `weight` (how much Neptunium should favour it; none = 0). With the factoryctl server
+---              these are only the first values: its settings (the QFT tab) replace them.
+---Items count in pieces, fluids in mB. In Fluid Mode (components.fluidMode) a dust output with a
+---molten form counts as that fluid.
 return {
-    [RecipeId.AdhesionPromoter] = {
+    ['hyper_stable_self_healing_adhesive'] = {
         name = 'Adhesion Promoter',
         trigger = 'deficit',
-        tier = 1, -- wiki,
         catalysts = 4,
-        inputs = {
-            -- TODO(user): every input of the recipe, e.g. { fluid = 'Oxygen' } or
-            -- { item = 'Some Dust', amount = 32 } (amount: counted, see qft.RecipeInput).
-        },
         outputs = {
-            { item = 'Hyper-Stable Self-Healing Adhesive', circuit = 1, target = 4096, priority = 3 },
-            { fluid = 'Ethyl Cyanoacrylate (Super Glue)',  circuit = 2, priority = 1 },
-            { fluid = 'Advanced Glue',                     circuit = 3, priority = 1 },
-            { fluid = 'Molten Indalloy 140',               circuit = 4, target = 1e8,  priority = 2 },
-            { fluid = 'Molten Soldering Alloy',            circuit = 5, target = 1e7,  priority = 1 }
-        }
+            [1] = { target = 4096, priority = 3 },  -- Hyper-Stable Self-Healing Adhesive
+            [2] = { priority = 1 },                 -- Ethyl Cyanoacrylate (Super Glue)
+            [3] = { priority = 1 },                 -- Advanced Glue
+            [4] = { target = 1e8, priority = 2 },   -- Molten Indalloy 140
+            [5] = { target = 1e7, priority = 1 },   -- Molten Soldering Alloy
+        },
     },
-    [RecipeId.RubberPolymer] = {
+    ['molten_silicone_rubber'] = {
         name = 'Rubber Polymer',
         trigger = 'deficit',
-        tier = 1, -- wiki
         catalysts = 1,
-        -- Supplied without limit: inputs without an amount, set in the bus and hatch, not counted.
-        inputs = {
-            -- TODO(user): every input of the recipe, e.g. { fluid = 'Oxygen' }.
-        },
+        countInputs = false,
         outputs = {
-            { fluid = 'Molten Silicone Rubber',          circuit = 1, target = 10e8, priority = 2 },
-            { fluid = 'Molten Styrene-Butadiene Rubber', circuit = 2, target = 10e6, priority = 1 },
-            { fluid = 'Molten Polyphenylene Sulfide',    circuit = 3, target = 10e8, priority = 2 },
-            { fluid = 'Molten Rubber',                   circuit = 4, target = 10e6, priority = 1 },
+            [1] = { target = 10e8, priority = 2 },  -- Molten Silicone Rubber
+            [2] = { target = 10e6, priority = 1 },  -- Molten Styrene-Butadiene Rubber
+            [3] = { target = 10e8, priority = 2 },  -- Molten Polyphenylene Sulfide
+            [4] = { target = 10e6, priority = 1 },  -- Molten Rubber
         },
     },
-    [RecipeId.PlatinumGroup] = {
+    ['platinum_dust'] = {
         name = 'Platinum Group',
         trigger = 'surplus',
-        tier = 1, -- wiki
         catalysts = 1,
-        inputs = {
-            { item = 'Platinum Metallic Powder Dust', amount = 32 },
-        },
         outputs = {
-            { fluid = 'Molten Platinum',  circuit = 1, weight = 100 },
-            { fluid = 'Molten Palladium', circuit = 2, weight = 100 },
-            { fluid = 'Molten Iridium',   circuit = 3, weight = 200 },
-            { fluid = 'Molten Osmium',    circuit = 4, weight = 200 },
-            { fluid = 'Molten Rhodium',   circuit = 5, weight = 50 },
-            { fluid = 'Molten Ruthenium', circuit = 6, weight = 50 }
-        }
+            [1] = { weight = 100 },  -- Platinum
+            [2] = { weight = 100 },  -- Palladium
+            [3] = { weight = 200 },  -- Iridium
+            [4] = { weight = 200 },  -- Osmium
+            [5] = { weight = 50 },   -- Rhodium
+            [6] = { weight = 50 },   -- Ruthenium
+        },
     },
-    [RecipeId.InertNaquadah] = {
+    ['inert_naquadah_dust'] = {
         name = 'Simple Naquadah',
         trigger = 'surplus',
-        tier = 2, -- wiki
         catalysts = 16,
-        inputs = {
-            { item = 'Naquadah Oxide Mixture Dust', amount = 32 },
-            { item = 'Sodium Dust',                 amount = 64 },
-            { item = 'Carbon Dust',                 amount = 1 }
-        },
         outputs = {
-            { item = 'Inert Naquadah Dust', circuit = 1, weight = 600 },
-            { fluid = 'Molten Titanium',    circuit = 2, weight = 100 },
-            { fluid = 'Molten Adamantium',  circuit = 3, weight = 100 },
-            { fluid = 'Molten Gallium',     circuit = 4, weight = 200 },
-        }
+            [1] = { weight = 600 },  -- Inert Naquadah Dust
+            [2] = { weight = 100 },  -- Titanium
+            [3] = { weight = 100 },  -- Adamantium
+            [4] = { weight = 200 },  -- Gallium
+        },
     },
-    [RecipeId.InertEnrichedNaquadah] = {
+    ['inert_enriched_naquadah_dust'] = {
         name = 'Inert Enriched Naquadah',
         trigger = 'surplus',
-        tier = 2, -- wiki
         catalysts = 4,
-        inputs = {
-            { item = 'Enriched-Naquadah Oxide Mixture Dust', amount = 32 },
-            { item = 'Zinc Dust',                            amount = 64 },
-            { item = 'Carbon Dust',                          amount = 1 }
-        },
         outputs = {
-            { item = 'Inert Enriched Naquadah Dust', circuit = 1, weight = 900 },
-            { fluid = 'Molten Trinium',              circuit = 2, weight = 100 },
-            { fluid = 'Waste Liquid',                circuit = 3, weight = 0 },
-        }
-    }
+            [1] = { weight = 900 },  -- Inert Enriched Naquadah Dust
+            [2] = { weight = 100 },  -- Trinium
+            [3] = { weight = 0 },    -- Waste Liquid
+        },
+    },
 }

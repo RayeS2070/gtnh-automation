@@ -149,8 +149,8 @@ Saved addresses live in `/etc/qftctl.bindings`. Deleting that file is the same a
 
 ## Setup step by step
 
-1. **Configuration check.** Before anything else the program checks that `config/ids.lua`
-   and `config/recipes.lua` list the same recipes and that the values make sense (see
+1. **Configuration check.** Before anything else the program checks that every recipe in
+   `config/recipes.lua` is in the catalog and that the values make sense (see
    [Configuration](#configuration)). If not, it prints the problems and stops.
 2. **Walk over the components.** Setup goes over every component in `config/components.lua`
    in alphabetical order of its path (`network.production`, `network.source`,
@@ -186,13 +186,12 @@ Safety checks during setup:
 
 ## Configuration
 
-The configuration is split into three files. You edit them by hand; the program only reads them.
+The configuration is two files. You edit them by hand; the program only reads them.
 
 | File | What it holds |
 | --- | --- |
-| `config/ids.lua` | Recipe identifiers, the keys of `config/recipes.lua`. |
-| `config/components.lua` | Which components the setup needs and how to find them. |
-| `config/recipes.lua` | Recipe data: trigger, inputs, outputs, targets and weights. |
+| `config/components.lua` | Which components the setup needs and how to find them; the server, the name, Fluid Mode. |
+| `config/recipes.lua` | Which catalog recipes this QFT runs: trigger, catalysts, first targets and weights. |
 
 ### Components
 
@@ -219,80 +218,48 @@ hatch = bind.manual{ type = 'me_inputhatch', prompt = 'ME stocking input hatch o
 
 ### Recipes
 
-A recipe that maintains products:
+What a recipe takes and gives is not typed in: `qft/catalog.lua` holds every QFT recipe of the
+modpack (inputs with their internal names, outputs in NEI order, the focus tier), generated
+from the GTNH calculator's data by `tools/qft-recipes.py` (run it again when the modpack moves
+on; recipes with an ore dictionary input are left out: a bus slot takes one item).
+`config/recipes.lua` picks the recipes this QFT runs by their catalog ids and says how:
 
 ```lua
-[RecipeId.RubberPolymer] = {
-    name = 'Rubber Polymer',
+['molten_silicone_rubber'] = {
+    name = 'Rubber Polymer',   -- shown instead of the catalog's name (its first output)
     trigger = 'deficit',
-    tier = 1,      -- recipe tier (pulse manipulator tier that unlocks it)
-    catalysts = 8, -- catalysts in the bulk catalyst housing = parallels; 0 = never run it
-    inputs = {     -- every input: the stocking bus and hatch are set from them
-        { item = 'Some Dust' },  -- no amount: supplied without limit, not counted
-        { fluid = 'Oxygen' },
-    },
-    outputs = {
-        { fluid = 'Molten Silicone Rubber', circuit = 1, target = 10e9, priority = 1 }, -- 10e9 mB
-        { fluid = 'Molten Rubber',          circuit = 4 },                -- no target: not tracked
+    catalysts = 1,             -- catalysts in the bulk catalyst housing = parallels; 0 = never
+    countInputs = false,       -- supplied without limit: inputs not counted (deficit only)
+    outputs = {                -- by circuit = the output's place in the catalog (in NEI)
+        [1] = { target = 10e8, priority = 2 },
+        [4] = { target = 10e6 },   -- an output without a target is not tracked
     },
 },
-```
-
-A recipe that processes raw materials:
-
-```lua
-[RecipeId.PlatinumGroup] = {
+['platinum_dust'] = {
     name = 'Platinum Group',
     trigger = 'surplus',
-    tier = 1,
     catalysts = 1,
-    inputs = {
-        { item = 'Platinum Metallic Powder Dust', amount = 32 }, -- per parallel per cycle
-    },
-    outputs = {
-        { fluid = 'Molten Platinum',  circuit = 1, weight = 2 },
-        { fluid = 'Molten Palladium', circuit = 2, weight = 1 },
-        { fluid = 'Molten Iridium',   circuit = 3 },             -- no weight: not wanted
-        -- ... every output, see `circuit` below
-    },
+    outputs = { [1] = { weight = 100 }, [3] = { weight = 200 } },  -- no weight: not wanted
 },
 ```
-
-An output is `item = <label>` or `fluid = <label>`, as the game shows it. Items are counted in
-pieces, fluids in mB, and `target` uses the same unit. If a label is ambiguous (the program
-reports which internal ids it matches), add `name` and, for items, `damage`. Items that differ
-only by NBT are reported as ambiguous. AE2FC fluid drops are ignored. The products network
-is asked for items only when some tracked output is an item.
-
-`circuit` is the position of the output in NEI: the programmed circuit number that focuses it
-with Neptunium.
 
 | Field | Trigger | Meaning |
 | --- | --- | --- |
-| `target` | deficit | Amount to keep in the products network. An output without `target` is not tracked; at least one output needs it. |
-| `priority` | deficit | Default 1. Shapes how urgent a tracked output is at the same fill level: higher means more urgent. |
-| `weight` | surplus | How much the output is wanted, for Neptunium. Only the ratio between outputs matters; absent means 0. Equal weights mean Neptunium never pays. |
+| `target` | deficit | Amount to keep in the products network. At least one output needs it. |
+| `priority` | deficit | Default 1. Higher means more urgent at the same fill level. |
+| `weight` | surplus | How much the output is wanted, for Neptunium. Only the ratio matters. |
 
-A field of the other trigger is an error: it usually means the trigger is wrong.
-
-`inputs` lists **every** input of the recipe: before it starts the program sets the stocking
-bus slots to its items and the hatch slots to its fluids, in this order (16 of each at most).
-An input is described like an output. A slot needs the internal name: the program finds it in
-the raw materials network by the label; `name` (and `damage` for an item) in the config spare
-that lookup and work while the network has none of it. `amount` is how much one parallel takes
-per cycle, in pieces or mB as in NEI: an input with an amount is counted (the recipe waits for
-stock for a cycle), one without is supplied without limit. A surplus recipe needs the amount
-of every input: it decides when the recipe runs.
+With the factoryctl server these values are only the first ones: its settings (the QFT tab)
+replace them. Before a recipe starts, the stocking bus and hatch slots are set to its inputs.
+Inputs are counted (the recipe waits for stock for a cycle) unless `countInputs = false`; a
+surplus recipe always counts them. Outputs and inputs are found in the networks by their
+internal names, so a label that reads differently in game does not matter. In Fluid Mode
+(`fluidMode` in `config/components.lua`) a dust output with a molten form counts as that fluid
+(the catalog's `molten`, guessed from the label).
 
 ### Adding a recipe
 
-A recipe goes into two places, no new blocks:
-
-1. `config/ids.lua` — add an id: `MyRecipe = 'my_recipe'`.
-2. `config/recipes.lua` — add `[RecipeId.MyRecipe] = { name, trigger, tier, catalysts, inputs, outputs }`.
-
-If you forget one of them, the program tells you which recipe is missing where; a mistyped
-`RecipeId.X` stops it with `unknown recipe id: X`.
+Find its id in `qft/catalog.lua` and add an entry to `config/recipes.lua`. No new blocks.
 
 ## Troubleshooting
 
@@ -302,9 +269,7 @@ If you forget one of them, the program tells you which recipe is missing where; 
   other's slot. Run `main setup --all` and connect the blocks one at a time.
 - **`config is inconsistent: ...`** — the config files disagree about recipes, or a value is
   wrong; the message says which.
-- **`... is not in the network: its slot cannot be set`** — an input of the recipe is not in the
-  raw materials network, so its internal name is unknown. Add `name` (and `damage`) to the
-  input, or stock some of it.
+
 
 ## Not verified in game yet
 

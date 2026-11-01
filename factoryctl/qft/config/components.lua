@@ -16,6 +16,9 @@ return {
     controller = bind.manual { type = 'gt_machine', prompt = 'Quantum Force Transformer controller' },
     -- Tier of the Shielding Core Casings (1..4). Focusing works only if it is >= the recipe tier.
     shieldingTier = 1,
+    -- Fluid Mode of the QFT (screwdriver): dust outputs come as molten metal (qft/catalog.lua says
+    -- which). Set it as the machine is set.
+    fluidMode = true,
     network = {
         source = bind.manual { type = kNetwork, prompt = 'Fluid interface of the RAW MATERIALS network' },
         production = bind.manual { type = kNetwork, prompt = 'Fluid interface of the PRODUCTS network' },

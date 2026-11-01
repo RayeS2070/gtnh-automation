@@ -1,4 +1,5 @@
----Loads both config parts and checks that they agree on recipe ids.
+---Loads the config: the components, and the recipes built from the catalog and the player's
+---choice; checks the values.
 local bind = require('qft.bind')
 local resource = require('qft.resource')
 local slots = require('qft.slots')
@@ -9,27 +10,58 @@ local config = {}
 ---@field components table
 ---@field recipes table<qft.RecipeId, qft.Recipe>
 
----@param ids table<string, string>
----@param components table
----@param recipes table
----@return string[] # Problems found, empty when every id has a recipe and every recipe an id.
-function config.validate(ids, components, recipes)
-    local _ = components -- recipes no longer have components of their own (GTNH 2.9)
-    local known = {}
-    local problems = {}
-    for _, id in pairs(ids) do
-        known[id] = true
-        if recipes[id] == nil then
-            problems[#problems + 1] = ('ids: recipe "%s" is missing in recipes'):format(id)
-        end
-    end
-    for id in pairs(recipes) do
-        if not known[id] then
-            problems[#problems + 1] = ('recipes: recipe "%s" is not in config/ids.lua'):format(id)
+---Builds the recipes the program runs from the catalog (qft/catalog.lua, generated) and the
+---player's choice (config/recipes.lua): the catalog says what a recipe takes and gives, the
+---choice how to run it. In Fluid Mode (components.fluidMode) a dust output with a molten form
+---is counted as that fluid.
+---@param catalog table<string, table>
+---@param chosen table<string, table> # config/recipes.lua
+---@param fluidMode boolean
+---@return table<string, qft.Recipe> recipes
+---@return string[] problems
+function config.build(catalog, chosen, fluidMode)
+    local recipes, problems = {}, {}
+    for id, c in pairs(chosen) do
+        local base = catalog[id]
+        if type(c) ~= 'table' then
+            problems[#problems + 1] = ('recipes.%s: must be a table'):format(id)
+        elseif not base then
+            problems[#problems + 1] = ('recipes.%s: no such recipe in qft/catalog.lua (its ids are '
+                .. 'listed there)'):format(tostring(id))
+        else
+            local inputs = {}
+            for i, input in ipairs(base.inputs) do
+                inputs[i] = { [input.item and 'item' or 'fluid'] = input.item or input.fluid,
+                    name = input.name, damage = input.damage,
+                    amount = c.countInputs ~= false and input.amount or nil }
+            end
+            local outputs = {}
+            local set = type(c.outputs) == 'table' and c.outputs or {}
+            for i, out in ipairs(base.outputs) do
+                local entry
+                if fluidMode and out.molten then
+                    entry = { fluid = out.molten.fluid, name = out.molten.name }
+                else
+                    entry = { [out.item and 'item' or 'fluid'] = out.item or out.fluid,
+                        name = out.name, damage = out.damage }
+                end
+                local o = set[i] or {}
+                entry.circuit, entry.target, entry.priority, entry.weight = i, o.target, o.priority,
+                    o.weight
+                outputs[i] = entry
+            end
+            for circuit in pairs(set) do
+                if not base.outputs[circuit] then
+                    problems[#problems + 1] = ('recipes.%s.outputs[%s]: the recipe has %d outputs')
+                        :format(id, tostring(circuit), #base.outputs)
+                end
+            end
+            recipes[id] = { name = c.name or base.name, trigger = c.trigger, tier = base.tier,
+                catalysts = c.catalysts, inputs = inputs, outputs = outputs }
         end
     end
     table.sort(problems)
-    return problems
+    return recipes, problems
 end
 
 local function isInt(v, min, max)
@@ -74,8 +106,10 @@ function config.checkValues(components, recipes)
         end
     end
     if components.recipes ~= nil then
-        add('components: recipes are gone: one bus and one hatch serve every recipe now; their '
-            .. 'inputs go to config/recipes.lua')
+        add('components: recipes are gone: one bus and one hatch serve every recipe now')
+    end
+    if components.fluidMode ~= nil and type(components.fluidMode) ~= 'boolean' then
+        add('components: fluidMode must be true or false')
     end
     for id, recipe in pairs(recipes) do
         if not isInt(recipe.tier, 1, kMaxTier) then
@@ -188,11 +222,10 @@ end
 ---@return qft.Config? cfg
 ---@return string[] problems
 function config.load()
-    local cfg = {
-        components = require('config.components'),
-        recipes = require('config.recipes'),
-    }
-    local problems = config.validate(require('config.ids'), cfg.components, cfg.recipes)
+    local components = require('config.components')
+    local recipes, problems = config.build(require('qft.catalog'), require('config.recipes'),
+        components.fluidMode == true)
+    local cfg = { components = components, recipes = recipes }
     if #problems == 0 then
         problems = config.checkValues(cfg.components, cfg.recipes)
     end

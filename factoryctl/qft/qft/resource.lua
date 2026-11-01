@@ -17,7 +17,10 @@ local resource = {}
 ---@field amount number # Items: count (`size`); fluids: mB (`amount`).
 ---@field hasTag boolean
 
----@alias qft.Snapshot { item: table<string, qft.Stack[]>?, fluid: table<string, qft.Stack[]>? }
+---@alias qft.Snapshot { item: table<string, qft.Stack[]>?, fluid: table<string, qft.Stack[]>?,
+---  id: { item: table<string, qft.Stack[]>, fluid: table<string, qft.Stack[]> } }
+---`item`/`fluid` by label; `id` by internal name ("mod:name:damage" for items, the name for
+---fluids): a resource named fully is found by it, whatever label the game gives it.
 
 -- AE2FC lists stored fluids as items too ("fluid drops"); their fluid type lives in NBT, so
 -- every drop looks like an NBT-only duplicate. Fluids are read with getFluidsInNetwork.
@@ -74,24 +77,24 @@ end
 ---@param fluids table[]?
 ---@return qft.Snapshot
 function resource.snapshot(items, fluids)
-    local snap = {}
+    local snap = { id = { item = {}, fluid = {} } }
     if items then
         snap.item = {}
         for _, s in ipairs(items) do
             if not kIgnoredItems[s.name] then
-                add(snap.item, s.label or '?', {
-                    name = s.name, damage = s.damage or 0, amount = s.size or 0,
-                    hasTag = s.hasTag == true,
-                })
+                local stack = { name = s.name, damage = s.damage or 0, amount = s.size or 0,
+                    hasTag = s.hasTag == true }
+                add(snap.item, s.label or '?', stack)
+                add(snap.id.item, ('%s:%d'):format(stack.name, stack.damage), stack)
             end
         end
     end
     if fluids then
         snap.fluid = {}
         for _, f in ipairs(fluids) do
-            add(snap.fluid, f.label or '?', {
-                name = f.name, damage = 0, amount = f.amount or 0, hasTag = f.hasTag == true,
-            })
+            local stack = { name = f.name, damage = 0, amount = f.amount or 0, hasTag = f.hasTag == true }
+            add(snap.fluid, f.label or '?', stack)
+            add(snap.id.fluid, stack.name or '?', stack)
         end
     end
     return snap
@@ -99,6 +102,16 @@ end
 
 local function identity(kind, stack)
     return kind == 'item' and ('%s:%d'):format(stack.name, stack.damage) or stack.name
+end
+
+---The stacks that may be the resource: by internal name when the resource has it in full (an
+---item's damage too), else by label.
+local function candidates(snap, res)
+    if res.name and (res.kind == 'fluid' or res.damage) and snap.id then
+        local key = res.kind == 'item' and ('%s:%d'):format(res.name, res.damage) or res.name
+        return snap.id[res.kind][key] or {}
+    end
+    return snap[res.kind][res.label] or {}
 end
 
 ---Amount of a resource in a snapshot. Absent means 0: AE does not list empty stacks.
@@ -115,7 +128,7 @@ function resource.amount(snap, res)
         return nil, res.kind .. 's of this network were not read'
     end
     local total, ids, seen, count = 0, {}, {}, 0
-    for _, stack in ipairs(byLabel[res.label] or {}) do
+    for _, stack in ipairs(candidates(snap, res)) do
         if (res.name == nil or stack.name == res.name)
                 and (res.damage == nil or stack.damage == res.damage) then
             local id = identity(res.kind, stack)
