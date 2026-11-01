@@ -23,7 +23,7 @@ local kRetry = 10 -- seconds before polling again after a failed poll
 
 local function findInterface(prefix)
     local found = {}
-    for _, kind in ipairs({ 'me_interface', 'me_controller' }) do
+    for _, kind in ipairs({ 'fluid_interface', 'me_controller' }) do
         for address in component.list(kind, true) do
             if not prefix or address:sub(1, #prefix) == prefix then
                 found[#found + 1] = address
