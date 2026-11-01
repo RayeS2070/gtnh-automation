@@ -16,7 +16,7 @@ local kModes = { auto = true, deficit = true, surplus = true }
 ---@class qft.LinkSettings
 ---@field version integer # The server's; 0: never had any from it.
 ---@field mode qft.Mode
----@field recipes { id: string, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
+---@field recipes { id: string, enabled: boolean?, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
 
 ---The settings config/recipes.lua stands for: what the agent offers a server that has none.
 ---@param recipes table<string, qft.Recipe>
@@ -34,7 +34,7 @@ function link.defaults(recipes, mode)
                 weight = o.weight }
         end
         table.sort(outputs, function(a, b) return a.circuit < b.circuit end)
-        out.recipes[#out.recipes + 1] = { id = id, outputs = outputs }
+        out.recipes[#out.recipes + 1] = { id = id, enabled = true, outputs = outputs }
     end
     return out
 end
@@ -57,6 +57,9 @@ function link.check(raw)
         if type(r) ~= 'table' or type(r.id) ~= 'string' then
             return nil, ('recipes[%d]: no id'):format(i)
         end
+        if r.enabled ~= nil and type(r.enabled) ~= 'boolean' then
+            return nil, ('recipes[%d]: enabled must be true or false'):format(i)
+        end
         local outputs = {}
         for j, o in ipairs(type(r.outputs) == 'table' and r.outputs or {}) do
             local circuit = math.tointeger(o.circuit)
@@ -72,13 +75,14 @@ function link.check(raw)
             outputs[#outputs + 1] = { circuit = circuit, target = o.target, priority = o.priority,
                 weight = o.weight }
         end
-        out.recipes[#out.recipes + 1] = { id = r.id, outputs = outputs }
+        out.recipes[#out.recipes + 1] = { id = r.id, enabled = r.enabled ~= false, outputs = outputs }
     end
     return out
 end
 
 ---Puts the settings into the recipes in place: a deficit output takes target and priority (no
----target: not tracked), a surplus output its weight. A recipe the settings do not name keeps its
+---target: not tracked), a surplus output its weight; `enabled = false` switches the recipe off
+---(recipe.off: plan treats it as disabled, a running one finishes its cycle and yields). A recipe the settings do not name keeps its
 ---config values; a recipe or circuit the config does not know is warned of and skipped.
 ---@param recipes table<string, qft.Recipe>
 ---@param s qft.LinkSettings
@@ -89,6 +93,7 @@ function link.apply(recipes, s, warn)
         if not recipe then
             warn('settings: no recipe %s in config/recipes.lua; skipped', entry.id)
         else
+            recipe.off = entry.enabled == false
             local byCircuit = {}
             for _, o in ipairs(recipe.outputs) do byCircuit[o.circuit] = o end
             local given = {}

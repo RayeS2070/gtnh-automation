@@ -169,8 +169,9 @@ function plan.evaluate(recipes, production, source, opts)
         local st = { trigger = trigger, outputs = {}, urgency = 0, low = false, done = true,
             weights = {} }
         local err
-        if recipe.catalysts == 0 then
-            -- No catalyst housing for it yet: the QFT would refuse to start it.
+        if recipe.catalysts == 0 or recipe.off then
+            -- No catalyst housing for it yet (the QFT would refuse to start it), or switched off
+            -- in the settings: never chosen, a running one finishes its cycle and yields.
             st.disabled, st.low, st.done = true, false, true
         elseif recipe.inputs then
             local inputMissing

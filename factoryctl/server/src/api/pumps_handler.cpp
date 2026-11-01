@@ -4,6 +4,7 @@
 #include <userver/components/component_context.hpp>
 #include <userver/formats/json/exception.hpp>
 #include <userver/formats/json/serialize.hpp>
+#include <userver/http/parser/http_request_parse_args.hpp>
 #include <userver/logging/log.hpp>
 #include <userver/server/http/http_request.hpp>
 #include <userver/server/http/http_status.hpp>
@@ -93,7 +94,8 @@ auto PumpTargetHandler::HandleRequestThrow(
     const userver::server::http::HttpRequest& request,
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
-  const auto& fluid = request.GetPathArg("fluid");
+  // As in the URL: decode (a fluid name with an odd character would come %-encoded).
+  const auto fluid = userver::http::parser::UrlDecode(request.GetPathArg("fluid"));
   if (fluid.empty()) return fail(request, HttpStatus::kBadRequest, "no fluid");
   const auto now = userver::utils::datetime::Now();
 

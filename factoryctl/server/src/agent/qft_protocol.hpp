@@ -32,8 +32,9 @@ struct Coords {
 //    "recipes": [{"id", "trigger", "low", "done", "disabled", "urgency",
 //                 "cycles", "outputs": [{"circuit", "amount", "target"}]}],
 //    "plasma": {"neptunium", "fermium"}, "log": [...]}
-// settings: {"mode": "auto|deficit|surplus", "recipes": [{"id", "outputs":
-//   [{"circuit", "target", "priority", "weight"}]}]} (version aside).
+// settings: {"mode": "auto|deficit|surplus", "recipes": [{"id", "enabled",
+//   "outputs": [{"circuit", "target", "priority", "weight"}]}]} (version
+//   aside); "enabled": false keeps a recipe from running (absent: true).
 // catalog recipe: {"id", "name", "trigger", "tier", "catalysts", "inputs",
 //   "outputs": [{"circuit", "kind", "label", "target", "priority", "weight"}]}.
 // `coords`, `offer`, `catalog` may be left out.

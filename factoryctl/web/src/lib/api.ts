@@ -248,7 +248,7 @@ export type QftOutputSettings = { circuit: number; target?: number; priority?: n
 export type QftSettings = {
   version: number
   mode: QftMode
-  recipes: { id: string; outputs: QftOutputSettings[] }[]
+  recipes: { id: string; enabled?: boolean; outputs: QftOutputSettings[] }[] // enabled: absent = true
 }
 
 export type QftCatalogRecipe = {

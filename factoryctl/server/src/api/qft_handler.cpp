@@ -4,6 +4,7 @@
 #include <userver/formats/json/exception.hpp>
 #include <userver/formats/json/serialize.hpp>
 #include <userver/formats/json/value_builder.hpp>
+#include <userver/http/parser/http_request_parse_args.hpp>
 #include <userver/logging/log.hpp>
 #include <userver/server/http/http_request.hpp>
 #include <userver/server/http/http_status.hpp>
@@ -31,6 +32,11 @@ auto fail(const userver::server::http::HttpRequest& request, HttpStatus status,
           std::string_view message) -> std::string {
   request.GetHttpResponse().SetStatus(status);
   return errorJson(message);
+}
+
+// Path arguments come as they are in the URL: a browser sends qft@-1,2,3 as qft%40-1%2C2%2C3.
+auto nameOf(const userver::server::http::HttpRequest& request) -> std::string {
+  return userver::http::parser::UrlDecode(request.GetPathArg("name"));
 }
 
 auto utc(domain::TimePoint t) -> std::string {
@@ -85,7 +91,7 @@ auto QftSettingsHandler::HandleRequestThrow(
     const userver::server::http::HttpRequest& request,
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
-  const auto& name = request.GetPathArg("name");
+  const auto name = nameOf(request);
   json::Value body;
   try {
     body = json::FromString(request.RequestBody());
@@ -110,7 +116,7 @@ auto QftSetupHandler::HandleRequestThrow(
     const userver::server::http::HttpRequest& request,
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
-  const auto& name = request.GetPathArg("name");
+  const auto name = nameOf(request);
   if (!db::deleteQftSetup(*db_, name, userver::utils::datetime::Now())) {
     return fail(request, HttpStatus::kNotFound, "no such setup");
   }

@@ -77,7 +77,10 @@ auto checkQftSettings(const json::Value& settings, const json::Value& catalog)
     const auto path = std::format("settings.recipes[{}]", i);
     const auto& r = recipes[i];
     if (!r.IsObject()) return fail(path, "not an object");
-    if (auto ok = onlyFields(r, path, {"id", "outputs"}); !ok) return ok;
+    if (auto ok = onlyFields(r, path, {"id", "enabled", "outputs"}); !ok) return ok;
+    if (const auto& e = r["enabled"]; !e.IsMissing() && !e.IsBool()) {
+      return fail(std::format("{}.enabled", path), "not a boolean");
+    }
     const auto id = text(r["id"], std::format("{}.id", path));
     if (!id) return std::unexpected(id.error());
     if (!seen.insert(*id).second) return fail(path, std::format("{} twice", *id));

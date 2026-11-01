@@ -14,7 +14,16 @@
   let setups = $state<QftSetup[]>([])
   let error = $state('')
   // The settings being edited, per setup: recipe id -> circuit -> fields as typed. Reloads keep it.
-  let editing = $state<Record<string, { mode: QftMode; fields: Record<string, Record<number, Record<string, string>>> }>>({})
+  let editing = $state<
+    Record<
+      string,
+      {
+        mode: QftMode
+        enabled: Record<string, boolean>
+        fields: Record<string, Record<number, Record<string, string>>>
+      }
+    >
+  >({})
 
   async function load() {
     try {
@@ -39,6 +48,8 @@
   const kOffline = 60_000 // ms without a poll: the agent or its computer is away
   const online = (s: QftSetup) => Date.now() - new Date(s.seenAt).getTime() < kOffline
 
+  const enabled = (s: QftSetup, recipe: string) =>
+    s.settings?.recipes.find((r) => r.id === recipe)?.enabled !== false
   const outputSettings = (s: QftSetup, recipe: string, circuit: number): QftOutputSettings | undefined =>
     s.settings?.recipes.find((r) => r.id === recipe)?.outputs.find((o) => o.circuit === circuit)
   const recipeState = (s: QftSetup, recipe: string) => s.status.recipes.find((r) => r.id === recipe)
@@ -50,7 +61,9 @@
 
   function startEdit(s: QftSetup) {
     const fields: Record<string, Record<number, Record<string, string>>> = {}
+    const on: Record<string, boolean> = {}
     for (const r of s.catalog) {
+      on[r.id] = enabled(s, r.id)
       fields[r.id] = {}
       for (const o of r.outputs) {
         const cur = outputSettings(s, r.id, o.circuit)
@@ -61,7 +74,7 @@
         }
       }
     }
-    editing[s.name] = { mode: s.settings?.mode ?? 'auto', fields }
+    editing[s.name] = { mode: s.settings?.mode ?? 'auto', enabled: on, fields }
   }
 
   // A typed value: empty is none (an output without a target is not tracked); k/M/G as elsewhere.
@@ -78,6 +91,7 @@
     const e = editing[s.name]
     const recipes = s.catalog.map((r) => ({
       id: r.id,
+      enabled: e.enabled[r.id],
       outputs: r.outputs.map((o) => {
         const out: QftOutputSettings = { circuit: o.circuit }
         for (const f of fieldsOf(r)) {
@@ -92,6 +106,21 @@
       await putQftSettings(s.name, { mode: e.mode, recipes })
       delete editing[s.name]
     })
+  }
+
+  // Switches a recipe on or off at once: the rest of the settings as they are.
+  function toggle(s: QftSetup, id: string) {
+    const cur = s.settings
+    if (!cur) return
+    const recipes = s.catalog.map((r) => {
+      const have = cur.recipes.find((x) => x.id === r.id)
+      return {
+        id: r.id,
+        enabled: r.id === id ? !enabled(s, r.id) : enabled(s, r.id),
+        outputs: have?.outputs ?? [],
+      }
+    })
+    act(() => putQftSettings(s.name, { mode: cur.mode, recipes }))
   }
 
   function phaseText(s: QftSetup) {
@@ -159,9 +188,16 @@
         <tbody>
           {#each s.catalog as r (r.id)}
             {@const st = recipeState(s, r.id)}
-            <tr class="recipe" class:current={s.status.state?.recipe === r.id}>
+            <tr class="recipe" class:current={s.status.state?.recipe === r.id} class:off={!enabled(s, r.id)}>
               <th colspan="4">
+                {#if editing[s.name]}
+                  <input type="checkbox" bind:checked={editing[s.name].enabled[r.id]} title="the recipe may run" />
+                {:else if s.settings}
+                  <button class="small" title="Switch the recipe off or on: off, it never runs; running, it finishes its cycle and yields"
+                    onclick={() => toggle(s, r.id)}>{enabled(s, r.id) ? 'Off' : 'On'}</button>
+                {/if}
                 {r.name}
+                {#if !enabled(s, r.id)}<span class="tag">off</span>{/if}
                 <span class="tag">{r.trigger}</span>
                 <span class="muted small">tier {r.tier}, {r.catalysts} catalysts</span>
                 {#if st?.disabled}<span class="tag">no catalysts</span>
@@ -245,6 +281,9 @@
   tr.recipe th {
     padding-top: 0.7rem;
     font-weight: 600;
+  }
+  tr.off th {
+    opacity: 0.55;
   }
   tr.current th {
     color: var(--accent, inherit);

@@ -12,7 +12,8 @@ GregTech: New Horizons modpack.
 With `server` in `config/components.lua` (the default: the address the other factoryctl agents
 use) the agent reports to the server every 10 seconds and takes its settings: the mode and,
 per output, the target and priority (maintaining products) or the weight (processing raw
-materials). They are edited on the **QFT** tab of the web client and kept on this computer
+materials), and which recipes may run at all (Off/On on the tab: an off recipe never runs, a
+running one finishes its cycle and yields). They are edited on the **QFT** tab of the web client and kept on this computer
 (`/etc/qftctl.settings`), so the QFT goes on with them when the server is away, also after a
 restart. What a recipe is made of (inputs, circuits, tier, catalysts) stays in
 `config/recipes.lua`. The first time, the server takes the agent's own values from

@@ -97,6 +97,12 @@ TEST(QftProtocol, Settings) {
       << "a typo is refused";
   EXPECT_FALSE(check(R"({"mode": "auto", "recipes": [{"id": "glue"}, {"id": "glue"}]})")
                    .has_value());
+  EXPECT_TRUE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "enabled": false}]})")
+                  .has_value());
+  EXPECT_NE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "enabled": "no"}]})")
+                .error()
+                .find("enabled"),
+            std::string::npos);
   // Without a catalog the ids are not checked.
   EXPECT_TRUE(checkQftSettings(json::FromString(R"({"mode": "auto", "recipes": [{"id": "x"}]})"),
                                json::Value{})

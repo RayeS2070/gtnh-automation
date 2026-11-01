@@ -681,6 +681,18 @@ do
         'apply: deficit targets as the server says, an output it leaves out is not tracked')
     check(r.plat.outputs[1].weight == nil and r.plat.outputs[2].weight == 5, 'apply: surplus weights')
     check(#warned == 2, 'apply: an unknown circuit and recipe are warned of')
+    link.apply(r, { version = 4, mode = 'auto', recipes = { { id = 'glue', enabled = false, outputs = {} } } },
+        function() end)
+    check(r.glue.off == true and not r.plat.off, 'apply: a recipe switched off')
+    local st = plan.evaluate(r, fluids({ Glue = 0 }), resource.snapshot({ { label = 'Ore', name = 'ore', damage = 0, size = 1e6 } },
+        { { label = 'Water', name = 'water', amount = 1e6 } }))
+    check(st.glue.disabled and not st.glue.low and plan.choose(st, 'glue') == 'plat',
+        'a switched off recipe never runs and a running one yields')
+    link.apply(r, { version = 5, mode = 'auto', recipes = { { id = 'glue', enabled = true, outputs = {} } } },
+        function() end)
+    check(r.glue.off == false, 'apply: and back on')
+    check(link.check({ mode = 'auto', recipes = { { id = 'glue', enabled = 'no' } } }) == nil,
+        'enabled must be a boolean')
 
     -- a poll: offer and catalog first; the server's settings are taken and saved
     local saved, requests, replies = nil, {}, {}
