@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { putTarget, type Priority, type TargetSettings } from './api'
+  import { fetchGroups, putTarget, type Priority, type TargetGroup, type TargetSettings } from './api'
   import { amount, parseAmount, shownLabel, unit } from './format'
 
   type Props = {
@@ -20,6 +20,10 @@
   let enabled = $state(initial?.enabled ?? true)
   let note = $state(initial?.note ?? '')
   let fill = $state(initial?.fill ?? false)
+  let group = $state<number | null>(initial?.group ?? null)
+  let groups = $state<TargetGroup[]>([])
+  // Optional: without the list the form still saves, with the group it had.
+  fetchGroups().then((g) => (groups = g), () => {})
   let error = $state('')
   let saving = $state(false)
 
@@ -39,6 +43,7 @@
         enabled,
         note,
         fill,
+        group,
       })
       onsaved()
     } catch (e) {
@@ -71,6 +76,14 @@
   <label class="inline">
     <input type="checkbox" bind:checked={fill} />
     order what is missing, in whole batches (instead of one batch)
+  </label>
+  <label>
+    Group
+    <select bind:value={group}>
+      <option value={null}>none</option>
+      {#each groups as g (g.id)}<option value={g.id}>{g.name}</option>{/each}
+    </select>
+    {#if groups.length === 0}<span class="hint">groups are made on the Targets tab</span>{/if}
   </label>
   <label class="inline"><input type="checkbox" bind:checked={enabled} /> enabled</label>
   <label>Note <input bind:value={note} /></label>

@@ -114,6 +114,16 @@ components_manager:
             method: PUT,DELETE
             task_processor: main-task-processor
 
+        handler-api-target-groups:
+            path: /api/v1/target-groups
+            method: GET,POST
+            task_processor: main-task-processor
+
+        handler-api-target-group:
+            path: /api/v1/target-groups/{group_id}
+            method: PUT,DELETE
+            task_processor: main-task-processor
+
         handler-api-orders:
             path: /api/v1/orders
             method: GET,POST

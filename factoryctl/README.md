@@ -76,7 +76,8 @@ is of another game version, so a few goods have no icon.
 | `GET /api/v1/stock?q=&kind=&sort=&dir=&limit=` | stock: every word of `q` in the label, any order; `kind` all/items/fluids; `sort` label/amount; `dir` asc/desc; everything without `limit` |
 | `GET /api/v1/cpus` | the CPUs of the agent's last poll: what each crafts, what is left, our open order of it; and `lowFreeCpus` |
 | `GET /api/v1/events?level=&source=&q=&order=&before=&limit=` | events, newest first: the agent's lines, every order status change, alarms, scans, targets (kept `FACTORYCTL_EVENTS.keep`, 30 days) |
-| `GET /api/v1/targets`, `PUT|DELETE /api/v1/targets/{goods_id}` | targets |
+| `GET /api/v1/targets`, `PUT|DELETE /api/v1/targets/{goods_id}` | targets; `group` in the settings: a group's id or null |
+| `GET|POST /api/v1/target-groups`, `PUT|DELETE /api/v1/target-groups/{group_id}` | groups of targets, for people only: list, add, rename, delete (its targets stay, ungrouped) |
 | `GET|POST /api/v1/orders`, `POST /api/v1/orders/{order_id}/cancel` | orders |
 | `GET /health`, `GET /ping` | |
 

@@ -23,16 +23,24 @@ namespace factoryctl::api {
 auto toJson(const db::StockRow& row) -> userver::formats::json::ValueBuilder;
 
 // The goods' fields and {"threshold", "batch", "priority", "enabled", "note",
-// "fill"}.
+// "fill", "group": a group's id or null}.
 auto toJson(const db::TargetRow& row) -> userver::formats::json::ValueBuilder;
 
 // The body of PUT /api/v1/targets/{goodsId}:
 //   {"threshold": 100, "batch": 64, "priority": "high"|"low",
-//    "enabled": true, "note": "...", "fill": false}
+//    "enabled": true, "note": "...", "fill": false, "group": 3}
 // threshold and batch are required; priority (high), enabled (true), note
-// ('') and fill (false) may be left out.
+// (''), fill (false) and group (null: none) may be left out.
 auto parseTargetSettings(const userver::formats::json::Value& body)
     -> std::expected<db::TargetSettings, std::string>;
+
+// {"id", "name", "targets": how many are in it}
+auto toJson(const db::TargetGroup& g) -> userver::formats::json::ValueBuilder;
+
+// The body of POST /api/v1/target-groups and PUT .../{id}: {"name": "..."},
+// trimmed, 1 to 100 characters.
+auto parseGroupName(const userver::formats::json::Value& body)
+    -> std::expected<std::string, std::string>;
 
 // The goods' fields under "goods", and {"id", "amount", "status", "source",
 // "requestedBy", "createdAt", "changedAt", "message", "cpu", "remaining",

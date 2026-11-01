@@ -43,6 +43,7 @@ auto toJson(const db::TargetRow& row) -> json::ValueBuilder {
   e["enabled"] = s.enabled;
   e["note"] = s.note;
   e["fill"] = s.fill;
+  e["group"] = s.group ? json::ValueBuilder{*s.group} : json::ValueBuilder{};
   return e;
 }
 
@@ -77,7 +78,35 @@ auto parseTargetSettings(const json::Value& body)
     if (!v.IsString()) return fail("note", "not a string");
     s.note = v.As<std::string>();
   }
+  if (const auto& v = body["group"]; !v.IsMissing() && !v.IsNull()) {
+    if (!v.IsInt64()) return fail("group", "not an id");
+    s.group = v.As<std::int64_t>();
+  }
   return s;
+}
+
+auto toJson(const db::TargetGroup& g) -> json::ValueBuilder {
+  json::ValueBuilder e;
+  e["id"] = g.id;
+  e["name"] = g.name;
+  e["targets"] = g.targets;
+  return e;
+}
+
+auto parseGroupName(const json::Value& body)
+    -> std::expected<std::string, std::string> {
+  constexpr std::size_t kMaxName = 100;
+  if (!body.IsObject()) return fail("group", "not an object");
+  const auto& v = body["name"];
+  if (v.IsMissing()) return fail("name", "missing");
+  if (!v.IsString()) return fail("name", "not a string");
+  const auto text = v.As<std::string>();
+  const auto first = text.find_first_not_of(" \t");
+  if (first == std::string::npos) return fail("name", "empty");
+  auto name = text.substr(first, text.find_last_not_of(" \t") - first + 1);
+  // Bytes, not characters: a bound, not a rule people see often.
+  if (name.size() > kMaxName) return fail("name", "longer than 100");
+  return name;
 }
 
 auto toJson(const db::OrderRow& row) -> json::ValueBuilder {

@@ -33,6 +33,15 @@ auto fail(const userver::server::http::HttpRequest& request, HttpStatus status,
   return errorJson(message);
 }
 
+auto parseBody(const userver::server::http::HttpRequest& request)
+    -> std::expected<json::Value, std::string> {
+  try {
+    return json::FromString(request.RequestBody());
+  } catch (const json::Exception& e) {
+    return std::unexpected(std::string("bad JSON: ") + e.what());
+  }
+}
+
 }  // namespace
 
 TargetsHandler::TargetsHandler(
@@ -71,14 +80,9 @@ auto TargetHandler::HandleRequestThrow(
     return R"({"ok":true})";
   }
 
-  json::Value body;
-  try {
-    body = json::FromString(request.RequestBody());
-  } catch (const json::Exception& e) {
-    return fail(request, HttpStatus::kBadRequest,
-                std::string("bad JSON: ") + e.what());
-  }
-  const auto settings = parseTargetSettings(body);
+  const auto body = parseBody(request);
+  if (!body) return fail(request, HttpStatus::kBadRequest, body.error());
+  const auto settings = parseTargetSettings(*body);
   if (!settings) {
     return fail(request, HttpStatus::kBadRequest, settings.error());
   }
@@ -89,6 +93,65 @@ auto TargetHandler::HandleRequestThrow(
   }
   LOG_INFO() << "target of goods " << *id << " set: threshold "
              << settings->threshold << ", batch " << settings->batch;
+  return R"({"ok":true})";
+}
+
+TargetGroupsHandler::TargetGroupsHandler(
+    const userver::components::ComponentConfig& config,
+    const userver::components::ComponentContext& context)
+    : HttpHandlerBase(config, context), db_(cluster(context)) {}
+
+auto TargetGroupsHandler::HandleRequestThrow(
+    const userver::server::http::HttpRequest& request,
+    userver::server::request::RequestContext&) const -> std::string {
+  request.GetHttpResponse().SetContentType("application/json");
+  if (request.GetMethod() == userver::server::http::HttpMethod::kGet) {
+    json::ValueBuilder items(userver::formats::common::Type::kArray);
+    for (const auto& g : db::listGroups(*db_)) items.PushBack(toJson(g));
+    json::ValueBuilder out;
+    out["items"] = std::move(items);
+    return json::ToString(out.ExtractValue());
+  }
+  const auto body = parseBody(request);
+  if (!body) return fail(request, HttpStatus::kBadRequest, body.error());
+  const auto name = parseGroupName(*body);
+  if (!name) return fail(request, HttpStatus::kBadRequest, name.error());
+  const auto id = db::addGroup(*db_, *name, userver::utils::datetime::Now());
+  if (!id) return fail(request, HttpStatus::kBadRequest, id.error());
+  LOG_INFO() << "target group " << *id << " added: " << *name;
+  json::ValueBuilder out;
+  out["id"] = *id;
+  return json::ToString(out.ExtractValue());
+}
+
+TargetGroupHandler::TargetGroupHandler(
+    const userver::components::ComponentConfig& config,
+    const userver::components::ComponentContext& context)
+    : HttpHandlerBase(config, context), db_(cluster(context)) {}
+
+auto TargetGroupHandler::HandleRequestThrow(
+    const userver::server::http::HttpRequest& request,
+    userver::server::request::RequestContext&) const -> std::string {
+  request.GetHttpResponse().SetContentType("application/json");
+  const auto id = parseId(request.GetPathArg("group_id"));
+  if (!id) return fail(request, HttpStatus::kBadRequest, "bad group id");
+  const auto now = userver::utils::datetime::Now();
+
+  if (request.GetMethod() == userver::server::http::HttpMethod::kDelete) {
+    if (!db::deleteGroup(*db_, *id, now)) {
+      return fail(request, HttpStatus::kNotFound, "no group");
+    }
+    LOG_INFO() << "target group " << *id << " deleted";
+    return R"({"ok":true})";
+  }
+  const auto body = parseBody(request);
+  if (!body) return fail(request, HttpStatus::kBadRequest, body.error());
+  const auto name = parseGroupName(*body);
+  if (!name) return fail(request, HttpStatus::kBadRequest, name.error());
+  const auto renamed = db::renameGroup(*db_, *id, *name, now);
+  if (!renamed) return fail(request, HttpStatus::kBadRequest, renamed.error());
+  if (!*renamed) return fail(request, HttpStatus::kNotFound, "no group");
+  LOG_INFO() << "target group " << *id << " renamed: " << *name;
   return R"({"ok":true})";
 }
 

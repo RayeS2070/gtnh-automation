@@ -40,6 +40,40 @@ TEST(ApiJson, TargetRow) {
   EXPECT_FALSE(v["enabled"].As<bool>());
   EXPECT_EQ(v["note"].As<std::string>(), "note");
   EXPECT_TRUE(v["fill"].As<bool>());
+  EXPECT_TRUE(v["group"].IsNull()) << "no group";
+  auto grouped = row;
+  grouped.settings.group = 7;
+  EXPECT_EQ(toJson(grouped).ExtractValue()["group"].As<int>(), 7);
+}
+
+TEST(ApiJson, TargetSettingsGroup) {
+  const auto in = settings(R"({"threshold": 1, "batch": 1, "group": 7})");
+  ASSERT_TRUE(in.has_value()) << in.error();
+  EXPECT_EQ(in->group, 7);
+  const auto none = settings(R"({"threshold": 1, "batch": 1, "group": null})");
+  ASSERT_TRUE(none.has_value()) << none.error();
+  EXPECT_EQ(none->group, std::nullopt);
+  const auto bad = settings(R"({"threshold": 1, "batch": 1, "group": "x"})");
+  ASSERT_FALSE(bad.has_value());
+  EXPECT_NE(bad.error().find("group"), std::string::npos);
+}
+
+TEST(ApiJson, Group) {
+  const auto v = toJson(TargetGroup{3, "Plasma", 2}).ExtractValue();
+  EXPECT_EQ(v["id"].As<int>(), 3);
+  EXPECT_EQ(v["name"].As<std::string>(), "Plasma");
+  EXPECT_EQ(v["targets"].As<int>(), 2);
+}
+
+TEST(ApiJson, GroupName) {
+  const auto name = [](std::string_view text) {
+    return parseGroupName(json::FromString(text));
+  };
+  EXPECT_EQ(name(R"({"name": "  Plasma "})").value_or(""), "Plasma") << "trimmed";
+  EXPECT_FALSE(name(R"({"name": "   "})").has_value());
+  EXPECT_FALSE(name(R"({"name": 1})").has_value());
+  EXPECT_FALSE(name(R"({})").has_value());
+  EXPECT_FALSE(name(R"({"name": ")" + std::string(101, 'x') + R"("})").has_value());
 }
 
 TEST(ApiJson, TargetSettingsFull) {

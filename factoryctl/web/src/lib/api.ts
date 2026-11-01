@@ -19,9 +19,16 @@ export type TargetSettings = {
   enabled: boolean
   note: string
   fill: boolean // order what is missing, in whole batches, instead of one batch
+  group: number | null // a TargetGroup's id; groups are for people, they change no order
 }
 
 export type Target = StockItem & TargetSettings
+
+export type TargetGroup = {
+  id: number
+  name: string
+  targets: number // how many are in it
+}
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -71,6 +78,23 @@ export async function putTarget(goodsId: number, settings: TargetSettings): Prom
 
 export async function deleteTarget(goodsId: number): Promise<void> {
   await call('DELETE', `/api/v1/targets/${goodsId}`)
+}
+
+export async function fetchGroups(): Promise<TargetGroup[]> {
+  return (await call<{ items: TargetGroup[] }>('GET', '/api/v1/target-groups')).items
+}
+
+export async function addGroup(name: string): Promise<number> {
+  return (await call<{ id: number }>('POST', '/api/v1/target-groups', { name })).id
+}
+
+export async function renameGroup(id: number, name: string): Promise<void> {
+  await call('PUT', `/api/v1/target-groups/${id}`, { name })
+}
+
+// Its targets stay, ungrouped.
+export async function deleteGroup(id: number): Promise<void> {
+  await call('DELETE', `/api/v1/target-groups/${id}`)
 }
 
 export type OrderStatus =

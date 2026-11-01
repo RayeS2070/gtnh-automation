@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (6);
+INSERT INTO factoryctl.schema_version VALUES (7);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -52,6 +52,13 @@ CREATE TABLE factoryctl.stock (
 -- fill = order what is missing, in whole batches, instead of one batch.
 CREATE TYPE factoryctl.priority AS ENUM ('high', 'low');
 
+-- Groups of targets, for people: they change nothing in what is ordered. A
+-- deleted group leaves its targets, ungrouped.
+CREATE TABLE factoryctl.target_groups (
+    id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name text NOT NULL UNIQUE CHECK (name <> '')
+);
+
 CREATE TABLE factoryctl.targets (
     goods_id   bigint PRIMARY KEY REFERENCES factoryctl.goods ON DELETE CASCADE,
     threshold  bigint NOT NULL CHECK (threshold >= 0),
@@ -60,6 +67,7 @@ CREATE TABLE factoryctl.targets (
     enabled    boolean NOT NULL DEFAULT true,
     note       text NOT NULL DEFAULT '',
     fill       boolean NOT NULL DEFAULT false,
+    group_id   bigint REFERENCES factoryctl.target_groups ON DELETE SET NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 

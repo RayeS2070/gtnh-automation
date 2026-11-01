@@ -101,4 +101,73 @@ UTEST_F(TargetsTest, Delete) {
   EXPECT_TRUE(listTargets(db()).empty());
 }
 
+// --- groups ----------------------------------------------------------------
+
+UTEST_F(TargetsTest, GroupsAddRenameDelete) {
+  EXPECT_TRUE(listGroups(db()).empty());
+  const auto plasma = addGroup(db(), "Plasma", t0);
+  ASSERT_TRUE(plasma.has_value()) << plasma.error();
+  const auto casings = addGroup(db(), "casings", t0);
+  ASSERT_TRUE(casings.has_value());
+  auto list = listGroups(db());
+  ASSERT_EQ(list.size(), 2);
+  EXPECT_EQ(list[0].name, "casings") << "by name, case aside";
+  EXPECT_EQ(list[1].id, *plasma);
+  EXPECT_EQ(list[1].targets, 0);
+
+  const auto renamed = renameGroup(db(), *plasma, "Plasmas", t0);
+  ASSERT_TRUE(renamed.has_value());
+  EXPECT_TRUE(*renamed);
+  EXPECT_EQ(listGroups(db())[1].name, "Plasmas");
+  EXPECT_FALSE(*renameGroup(db(), 999'999, "x", t0)) << "no such group";
+
+  EXPECT_TRUE(deleteGroup(db(), *plasma, t0));
+  EXPECT_FALSE(deleteGroup(db(), *plasma, t0));
+  EXPECT_EQ(listGroups(db()).size(), 1);
+}
+
+UTEST_F(TargetsTest, GroupNamesAreUnique) {
+  ASSERT_TRUE(addGroup(db(), "Plasma", t0).has_value());
+  const auto again = addGroup(db(), "Plasma", t0);
+  ASSERT_FALSE(again.has_value());
+  EXPECT_NE(again.error().find("already"), std::string::npos);
+  const auto other = addGroup(db(), "Other", t0);
+  const auto clash = renameGroup(db(), *other, "Plasma", t0);
+  ASSERT_FALSE(clash.has_value());
+  EXPECT_NE(clash.error().find("already"), std::string::npos);
+  EXPECT_FALSE(addGroup(db(), "", t0).has_value());
+}
+
+UTEST_F(TargetsTest, TargetInAGroup) {
+  const auto plasma = *addGroup(db(), "Plasma", t0);
+  ASSERT_TRUE(setTarget(db(), xenoxene,
+                        {.threshold = 1, .batch = 1, .group = plasma}, t0)
+                  .has_value());
+  ASSERT_TRUE(
+      setTarget(db(), stick, {.threshold = 1, .batch = 1}, t0).has_value());
+  const auto groupOf = [&](std::int64_t goods) {
+    for (const auto& t : listTargets(db())) {
+      if (t.goods.goodsId == goods) return t.settings.group;
+    }
+    ADD_FAILURE() << "no target for " << goods;
+    return std::optional<std::int64_t>{};
+  };
+  EXPECT_EQ(groupOf(stick), std::nullopt);
+  EXPECT_EQ(groupOf(xenoxene), plasma);
+  EXPECT_EQ(listGroups(db())[0].targets, 1);
+
+  // A deleted group leaves its targets, ungrouped: they keep working.
+  ASSERT_TRUE(deleteGroup(db(), plasma, t0));
+  EXPECT_EQ(listTargets(db()).size(), 2);
+  EXPECT_EQ(groupOf(xenoxene), std::nullopt);
+}
+
+UTEST_F(TargetsTest, UnknownGroupRefused) {
+  const auto r =
+      setTarget(db(), stick, {.threshold = 1, .batch = 1, .group = 999'999}, t0);
+  ASSERT_FALSE(r.has_value());
+  EXPECT_NE(r.error().find("no group"), std::string::npos);
+  EXPECT_TRUE(listTargets(db()).empty());
+}
+
 }  // namespace

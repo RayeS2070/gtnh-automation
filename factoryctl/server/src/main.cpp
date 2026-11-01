@@ -38,6 +38,8 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::StockHandler>()
           .Append<factoryctl::api::TargetsHandler>()
           .Append<factoryctl::api::TargetHandler>()
+          .Append<factoryctl::api::TargetGroupsHandler>()
+          .Append<factoryctl::api::TargetGroupHandler>()
           .Append<factoryctl::api::OrdersHandler>()
           .Append<factoryctl::api::OrderCancelHandler>()
           .Append<factoryctl::api::CpusHandler>()
