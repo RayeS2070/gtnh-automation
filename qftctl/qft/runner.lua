@@ -1,11 +1,13 @@
 ---Drives the QFT from one decision to another; a decision is a recipe plus the plasma it uses.
 ---Inputs are switched only while the machine stands still: plasma is consumed during the run,
----and losing it mid-run spoils the cycle (or shuts the QFT down, depending on the version).
+---and losing it mid-run spoils the cycle.
 ---
----Neptunium: its hatch is never on without a circuit in the recipe bus (on this server it burns
----plasma even without one). The circuit is set before the hatch is enabled and reset to -1 only
----after every hatch is off. Moving the focus while running only changes the circuit: that is
----safe for plasma, at worst one cycle runs with the old focus.
+---GTNH 2.9: one stocking input bus and one hatch serve every recipe. Before a recipe starts their
+---slots are set to its inputs (only the slots that differ: every call costs a tick), the Neptunium
+---circuit goes into the bus. On 2.9 Neptunium burns no plasma without a circuit (GT5-Unofficial
+---5.09.54.264); the circuit still goes in before the hatches are enabled and out only after they
+---are off. Moving the focus while running only changes the circuit: at worst one cycle runs with
+---the old focus.
 ---
 ---  running --decision changed--> stopping --machine inactive--> idle --decision set--> running
 ---
@@ -13,6 +15,7 @@
 ---and starts no new one. The runner starts in `stopping`, so whatever the previous run left
 ---enabled is switched off safely before anything else happens.
 local log = require('qft.log')
+local slots = require('qft.slots')
 
 local runner = {}
 
@@ -25,6 +28,7 @@ local kTicksPerSecond = 20
 ---@field recipe string
 ---@field fermium boolean
 ---@field neptunium integer? # Focused circuit; nil = Neptunium off.
+---@field slots qft.Slots # What the bus and the hatch hold for the recipe.
 
 ---@alias qft.Phase 'stopping' | 'idle' | 'running'
 
@@ -36,6 +40,8 @@ local kTicksPerSecond = 20
 ---@field since number # When the phase was entered.
 ---@field lastActive number # Last time the machine was seen active.
 ---@field warned boolean # Stall warning already printed for this phase.
+---@field configured { bus: table<integer, string>, hatch: table<integer, string> } # Slot keys
+---                  # as set; unknown at the start, so every slot is written once.
 
 ---Calls a component method. OC proxies take no self, so this is proxy.method(...), not ':'.
 ---A failing call is logged and reported, it does not kill the program.
@@ -82,20 +88,43 @@ function runner.describe(d)
         .. (d.neptunium and (' + neptunium@' .. d.neptunium) or '')
 end
 
----Every input the program may enable: recipe buses/hatches and plasma hatches.
+---Every input the program may enable: the bus, the hatch and the plasma hatches.
 ---@return { proxy: table, what: string }[]
 local function allInputs(components)
-    local list = {}
-    for id, parts in pairs(components.recipes) do
-        list[#list + 1] = { proxy = parts.bus, what = id .. '.bus' }
-        if parts.hatch then
-            list[#list + 1] = { proxy = parts.hatch, what = id .. '.hatch' }
-        end
-    end
+    local list = { { proxy = components.bus, what = 'bus' }, { proxy = components.hatch, what = 'hatch' } }
     for name, plasma in pairs(components.plasma) do
         list[#list + 1] = { proxy = plasma.hatch, what = 'plasma.' .. name }
     end
     return list
+end
+
+---Sets the slots of the bus or the hatch to `list` (slot i = list[i], the rest cleared); only
+---the slots that differ from what was set. A failed call leaves that slot unknown.
+---@param r qft.Runner
+---@param which 'bus' | 'hatch'
+---@param list table[]
+---@return boolean ok
+local function configure(r, which, list)
+    local proxy, set = r.components[which], r.configured[which]
+    for i = 1, slots.kSize do
+        local want = list[i]
+        local key = slots.key(want)
+        if set[i] ~= key then
+            local ok, res
+            if want then
+                ok, res = call(proxy, which, 'setConfiguration', i, want)
+            else
+                ok, res = call(proxy, which, 'setConfiguration', i)
+            end
+            if not ok or res == false then
+                set[i] = nil
+                log.err('%s slot %d: not set to %s', which, i, key ~= '' and key or 'nothing')
+                return false
+            end
+            set[i] = key
+        end
+    end
+    return true
 end
 
 ---@param r qft.Runner
@@ -117,7 +146,7 @@ end
 ---@param now number
 ---@return qft.Runner
 function runner.new(components, now)
-    local r = { components = components }
+    local r = { components = components, configured = { bus = {}, hatch = {} } }
     beginStop(r, now)
     return r
 end
@@ -146,16 +175,16 @@ end
 ---@param now number
 ---@return boolean ok # false: something failed, the runner went back to stopping.
 local function start(r, want, now)
-    local id = want.recipe
-    local parts = r.components.recipes[id]
-    -- The circuit first: the Neptunium hatch must never be on without one.
-    if not setCircuit(parts.bus, id .. '.bus', want.neptunium or -1) then
+    local c = r.components
+    -- Slots and circuit first, with everything still off.
+    if not (configure(r, 'bus', want.slots.items) and configure(r, 'hatch', want.slots.fluids)
+            and setCircuit(c.bus, 'bus', want.neptunium or -1)) then
         beginStop(r, now)
         return false
     end
-    local steps = { { parts.bus, id .. '.bus' } }
-    if parts.hatch then
-        steps[#steps + 1] = { parts.hatch, id .. '.hatch' }
+    local steps = { { c.bus, 'bus' } }
+    if #want.slots.fluids > 0 then
+        steps[#steps + 1] = { c.hatch, 'hatch' }
     end
     if want.fermium then
         steps[#steps + 1] = { r.components.plasma.fermium.hatch, 'plasma.fermium' }
@@ -171,7 +200,8 @@ local function start(r, want, now)
             return false
         end
     end
-    r.running = { recipe = want.recipe, fermium = want.fermium, neptunium = want.neptunium }
+    r.running = { recipe = want.recipe, fermium = want.fermium, neptunium = want.neptunium,
+        slots = want.slots }
     r.cycleSeconds = nil
     enter(r, 'running', now)
     log.inf('started %s', runner.describe(want))
@@ -191,7 +221,7 @@ function runner.step(r, want, now)
         else
             if want.neptunium ~= r.running.neptunium then
                 local id = r.running.recipe
-                if setCircuit(r.components.recipes[id].bus, id .. '.bus', want.neptunium) then
+                if setCircuit(r.components.bus, 'bus', want.neptunium) then
                     log.inf('%s: neptunium focus %d -> %d', id, r.running.neptunium, want.neptunium)
                     r.running.neptunium = want.neptunium
                 end
@@ -216,10 +246,9 @@ function runner.step(r, want, now)
         for _, input in ipairs(allInputs(r.components)) do
             call(input.proxy, input.what, 'setWorkAllowed', false)
         end
-        -- Only now, with every hatch off, the circuits may go.
-        for id, parts in pairs(r.components.recipes) do
-            setCircuit(parts.bus, id .. '.bus', -1)
-        end
+        -- Only now, with every hatch off, the circuit may go. The slots stay: the next start
+        -- changes only those that differ.
+        setCircuit(r.components.bus, 'bus', -1)
         r.running, r.cycleSeconds = nil, nil
         enter(r, 'idle', now)
     end

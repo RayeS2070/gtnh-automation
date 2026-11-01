@@ -3,7 +3,8 @@
 local bind = {}
 
 ---@class qft.Binding
----@field type string # OC component type, e.g. 'me_interface' or 'gt_machine'.
+---@field type string|string[] # OC component type(s), e.g. 'gt_machine', or
+---                            # { 'fluid_interface', 'me_controller' }: any of them will do.
 ---@field prompt string # What to tell the user while waiting for the component.
 
 ---@class qft.BindingSlot
@@ -15,7 +16,7 @@ local bind = {}
 local Binding = {}
 
 ---A component the user identifies by hand: setup mode asks them to (re)connect it.
----@param spec { type: string, prompt: string }
+---@param spec { type: string|string[], prompt: string }
 ---@return qft.Binding
 function bind.manual(spec)
     -- Unknown fields would be dropped here and the slot is replaced by a proxy on resolve,
@@ -23,9 +24,29 @@ function bind.manual(spec)
     for k in pairs(spec) do
         assert(k == 'type' or k == 'prompt', 'bind.manual: unknown field ' .. tostring(k))
     end
-    assert(type(spec.type) == 'string', 'bind.manual: type is required')
+    assert(type(spec.type) == 'string' or (type(spec.type) == 'table' and #spec.type > 0),
+        'bind.manual: type is required: a component type or a list of them')
     assert(type(spec.prompt) == 'string', 'bind.manual: prompt is required')
     return setmetatable({ type = spec.type, prompt = spec.prompt }, Binding)
+end
+
+---The component types a binding takes.
+---@param binding qft.Binding
+---@return string[]
+function bind.types(binding)
+    return type(binding.type) == 'table' and binding.type or { binding.type }
+end
+
+---@param binding qft.Binding
+---@param ctype string?
+---@return boolean
+function bind.accepts(binding, ctype)
+    for _, t in ipairs(bind.types(binding)) do
+        if t == ctype then
+            return true
+        end
+    end
+    return false
 end
 
 ---@param value any

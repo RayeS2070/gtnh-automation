@@ -1,6 +1,7 @@
 ---Loads both config parts and checks that they agree on recipe ids.
 local bind = require('qft.bind')
 local resource = require('qft.resource')
+local slots = require('qft.slots')
 
 local config = {}
 
@@ -11,25 +12,22 @@ local config = {}
 ---@param ids table<string, string>
 ---@param components table
 ---@param recipes table
----@return string[] # Problems found, empty when the parts agree.
+---@return string[] # Problems found, empty when every id has a recipe and every recipe an id.
 function config.validate(ids, components, recipes)
+    local _ = components -- recipes no longer have components of their own (GTNH 2.9)
     local known = {}
+    local problems = {}
     for _, id in pairs(ids) do
         known[id] = true
-    end
-
-    local problems = {}
-    local function check(tbl, where, other, otherWhere)
-        for id in pairs(tbl) do
-            if not known[id] then
-                problems[#problems + 1] = ('%s: recipe "%s" is not in config/ids.lua'):format(where, id)
-            elseif other[id] == nil then
-                problems[#problems + 1] = ('%s: recipe "%s" is missing in %s'):format(where, id, otherWhere)
-            end
+        if recipes[id] == nil then
+            problems[#problems + 1] = ('ids: recipe "%s" is missing in recipes'):format(id)
         end
     end
-    check(components.recipes or {}, 'components', recipes, 'recipes')
-    check(recipes, 'recipes', components.recipes or {}, 'components')
+    for id in pairs(recipes) do
+        if not known[id] then
+            problems[#problems + 1] = ('recipes: recipe "%s" is not in config/ids.lua'):format(id)
+        end
+    end
     table.sort(problems)
     return problems
 end
@@ -61,13 +59,15 @@ function config.checkValues(components, recipes)
             add('components.plasma.%s: fluid must be a label', name)
         end
     end
-    for id, parts in pairs(components.recipes or {}) do
-        if not bind.isBinding(parts.bus) then
-            add('components.recipes.%s: bus is required', id)
+    for _, part in ipairs({ 'bus', 'hatch' }) do
+        if not bind.isBinding(components[part]) then
+            add('components: %s must be a binding (one stocking input %s for every recipe)', part,
+                part)
         end
-        if parts.hatch ~= nil and not bind.isBinding(parts.hatch) then
-            add('components.recipes.%s: hatch must be a binding or absent', id)
-        end
+    end
+    if components.recipes ~= nil then
+        add('components: recipes are gone: one bus and one hatch serve every recipe now; their '
+            .. 'inputs go to config/recipes.lua')
     end
     for id, recipe in pairs(recipes) do
         if not isInt(recipe.tier, 1, kMaxTier) then
@@ -84,19 +84,32 @@ function config.checkValues(components, recipes)
         if trigger ~= 'deficit' and trigger ~= 'surplus' then
             add("recipes.%s: trigger must be 'deficit' or 'surplus'", id)
         end
+        -- Inputs set the slots of the bus and the hatch: every recipe has them.
         local inputs = recipe.inputs
-        if inputs ~= nil then
-            if type(inputs) ~= 'table' or #inputs == 0 then
-                add('recipes.%s: inputs must be a list of { item|fluid = <label>, amount = n }', id)
-            else
-                for i, input in ipairs(inputs) do
-                    if not (type(input.amount) == 'number' and input.amount > 0) then
-                        add('recipes.%s.inputs[%d]: amount must be a number > 0', id, i)
-                    end
+        if type(inputs) ~= 'table' or #inputs == 0 then
+            add('recipes.%s: inputs must be a list of { item|fluid = <label>[, amount = n] }: the '
+                .. 'bus and the hatch are set from them', id)
+        else
+            local items, fluids = 0, 0
+            for i, input in ipairs(inputs) do
+                if input.amount ~= nil and not (type(input.amount) == 'number' and input.amount > 0) then
+                    add('recipes.%s.inputs[%d]: amount must be a number > 0 or absent', id, i)
+                elseif input.amount == nil and trigger == 'surplus' then
+                    add('recipes.%s.inputs[%d]: a surplus recipe needs the amount of every input: '
+                        .. 'it decides when the recipe runs', id, i)
+                end
+                if input.item ~= nil then
+                    items = items + 1
+                elseif input.fluid ~= nil then
+                    fluids = fluids + 1
                 end
             end
-        elseif trigger == 'surplus' then
-            add('recipes.%s: a surplus recipe needs inputs: they decide when it runs', id)
+            if items > slots.kSize then
+                add('recipes.%s: %d item inputs, the bus has %d slots', id, items, slots.kSize)
+            end
+            if fluids > slots.kSize then
+                add('recipes.%s: %d fluid inputs, the hatch has %d slots', id, fluids, slots.kSize)
+            end
         end
         local targets = 0
         local seen = {}

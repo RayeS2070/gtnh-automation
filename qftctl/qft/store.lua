@@ -47,8 +47,8 @@ end
 ---@return boolean
 function store.isValid(entry, binding)
     return entry ~= nil
-        and entry.type == binding.type
-        and component.type(entry.address) == binding.type
+        and bind.accepts(binding, entry.type)
+        and component.type(entry.address) == entry.type
 end
 
 ---Builds the runtime config: a copy of config with every binding replaced by a proxy.

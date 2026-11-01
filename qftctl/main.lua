@@ -14,11 +14,13 @@ local log = require('qft.log')
 local plan = require('qft.plan')
 local resource = require('qft.resource')
 local runner = require('qft.runner')
+local slots = require('qft.slots')
 local setup = require('qft.setup')
 local store = require('qft.store')
 
 local const = {
     kPollPeriod = 10, -- seconds between ticks
+    kStopPeriod = 1, -- seconds between ticks while the QFT finishes its cycle: the next recipe waits
     Event = {
         kInterrupted = 'interrupted',
     },
@@ -81,18 +83,27 @@ local function plasmaEnough(ctx, name, id, running)
     return enough, why
 end
 
----Builds the full decision for the chosen recipe: which plasma, which Neptunium focus.
+---Builds the full decision for the chosen recipe: its slots, which plasma, which Neptunium focus.
 ---@param id string
 ---@param st qft.RecipeState
 ---@param current qft.Decision? # What runs now.
----@return qft.Decision
+---@return qft.Decision? # nil: the slots cannot be set (logged), the recipe cannot start.
 local function decide(ctx, id, st, current)
     local recipe = ctx.recipes[id]
+    local set, serr = slots.forRecipe(recipe, ctx.source)
+    if not set then
+        if current and current.recipe == id then
+            set = current.slots -- set already; the lookup is needed for a start only
+        else
+            logOnce(ctx, 'err', ('%s: %s'):format(id, serr))
+            return nil
+        end
+    end
     local delta = ctx.components.shieldingTier - recipe.tier
     if delta < 0 then
         logOnce(ctx, 'inf', ('%s: no plasma, shielding tier %d < recipe tier %d: no effect')
             :format(id, ctx.components.shieldingTier, recipe.tier))
-        return { recipe = id, fermium = false }
+        return { recipe = id, fermium = false, slots = set }
     end
     local same = current ~= nil and current.recipe == id
 
@@ -124,11 +135,11 @@ local function decide(ctx, id, st, current)
     logChange(ctx, 'neptunium', focus or false, '%s: neptunium %s, %s', id,
         focus and ('focus ' .. focus) or 'off', nwhy)
 
-    return { recipe = id, fermium = fermium, neptunium = focus }
+    return { recipe = id, fermium = fermium, neptunium = focus, slots = set }
 end
 
 ---Reads the kinds of resources the program needs from a network: fluids, items, or both.
----@param network table # me_interface proxy.
+---@param network table # fluid_interface or me_controller proxy.
 ---@param kinds { item: boolean, fluid: boolean }
 ---@return qft.Snapshot? snap
 ---@return string? err
@@ -163,6 +174,7 @@ local function trackedKinds(recipes)
                 kinds.production[out.resource.kind] = true
             end
         end
+        -- Every input: its slot needs the name, found in this network.
         for _, input in ipairs(recipe.inputs or {}) do
             kinds.source[input.resource.kind] = true
         end
@@ -216,6 +228,11 @@ local function tick(ctx, now)
     runner.step(r, want, now)
 end
 
+---Seconds until the next tick: short while the QFT finishes its cycle, the switch waits for it.
+local function nextTick(ctx)
+    return ctx.runner.phase == 'stopping' and const.kStopPeriod or const.kPollPeriod
+end
+
 ---@param components table # Resolved components.
 ---@param recipes table<qft.RecipeId, qft.Recipe>
 ---@param mode qft.Mode
@@ -238,7 +255,7 @@ local function run(components, recipes, mode)
         if not ok then
             log.err('tick failed: %s', tostring(err))
         end
-    until event.pull(const.kPollPeriod, const.Event.kInterrupted)
+    until event.pull(nextTick(ctx), const.Event.kInterrupted)
     runner.shutdown(ctx.runner)
     log.inf('stopped: QFT finishes its current cycle and stays off')
 end

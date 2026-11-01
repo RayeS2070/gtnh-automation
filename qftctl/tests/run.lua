@@ -2,11 +2,13 @@
 ---  lua tests/run.lua   (from the repository root)
 package.path = './?.lua;' .. package.path
 
+local bind = require('qft.bind')
 local config = require('qft.config')
 local log = require('qft.log')
 local plan = require('qft.plan')
 local resource = require('qft.resource')
 local runner = require('qft.runner')
+local slots = require('qft.slots')
 
 log.setLevel(log.Level.Err + 1) -- keep test output clean
 
@@ -16,6 +18,12 @@ local function check(cond, what)
         failures = failures + 1
         print('FAIL ' .. what)
     end
+end
+
+-- What config.checkValues needs of the components.
+local function components()
+    return { shieldingTier = 1, bus = bind.manual { type = 'me_inputbus', prompt = 'bus' },
+        hatch = bind.manual { type = 'me_inputhatch', prompt = 'hatch' } }
 end
 
 local function recipes()
@@ -131,9 +139,12 @@ end
 
 -- config: each trigger has its own fields
 do
-    local function problems(recipe)
+    local function problems(recipe, keepInputs)
         recipe.tier, recipe.catalysts = recipe.tier or 1, recipe.catalysts or 1
-        local list = config.checkValues({ shieldingTier = 1 }, { r = recipe })
+        if not keepInputs and recipe.inputs == nil and recipe.trigger ~= 'surplus' then
+            recipe.inputs = { { fluid = 'Water' } }
+        end
+        local list = config.checkValues(components(), { r = recipe })
         return table.concat(list, '\n')
     end
     local out = function(extra)
@@ -152,8 +163,22 @@ do
         :find('weight is for surplus'), 'weight on deficit refused')
     check(problems({ trigger = 'surplus', inputs = input, outputs = out({ target = 1 }) })
         :find('use weight'), 'target on surplus refused')
-    check(problems({ trigger = 'surplus', outputs = out({ weight = 1 }) }):find('needs inputs'),
+    check(problems({ trigger = 'surplus', outputs = out({ weight = 1 }) }):find('inputs must be'),
         'surplus without inputs refused')
+    check(problems({ trigger = 'deficit', outputs = out({ target = 1 }) }, true):find('inputs must be'),
+        'deficit without inputs refused: the bus is set from them')
+    check(problems({ trigger = 'deficit', inputs = { { fluid = 'Water' } },
+        outputs = out({ target = 1 }) }) == '', 'a deficit input needs no amount')
+    local many = {}
+    for i = 1, 17 do many[i] = { item = 'Dust ' .. i } end
+    check(problems({ trigger = 'deficit', inputs = many, outputs = out({ target = 1 }) })
+        :find('17 item inputs'), 'more items than bus slots refused')
+    check(table.concat(config.checkValues({ shieldingTier = 1 }, {}), ' '):find('bus must be'),
+        'the bus and the hatch are required components')
+    local old = components()
+    old.recipes = {}
+    check(table.concat(config.checkValues(old, {}), ' '):find('recipes are gone'),
+        'per-recipe components are refused with a hint')
     check(problems({ trigger = 'surplus', inputs = { item = 'Dust', amount = 32 },
         outputs = out() }):find('must be a list'), 'old single-input format refused')
     check(problems({ trigger = 'surplus', inputs = { { item = 'Dust' } }, outputs = out() })
@@ -257,37 +282,97 @@ do
         'a running disabled recipe is stopped')
 
     local function problemsOf(catalysts)
-        return config.checkValues({ shieldingTier = 1 }, { r = { tier = 1, catalysts = catalysts,
-            trigger = 'deficit', outputs = { { fluid = 'A', circuit = 1, target = 1 } } } })
+        return config.checkValues(components(), { r = { tier = 1, catalysts = catalysts,
+            trigger = 'deficit', inputs = { { fluid = 'W' } },
+            outputs = { { fluid = 'A', circuit = 1, target = 1 } } } })
     end
     check(#problemsOf(0) == 0, 'config: catalysts = 0 allowed')
     check(#problemsOf(-1) == 1, 'config: negative catalysts refused')
 end
 
+-- bind: a slot may take any of several component types
+do
+    local net = bind.manual { type = { 'fluid_interface', 'me_controller' }, prompt = 'net' }
+    check(bind.accepts(net, 'me_controller') and bind.accepts(net, 'fluid_interface')
+        and not bind.accepts(net, 'me_interface'), 'several types: any of them')
+    local one = bind.manual { type = 'gt_machine', prompt = 'qft' }
+    check(bind.accepts(one, 'gt_machine') and #bind.types(one) == 1, 'one type as before')
+    check(not pcall(bind.manual, { type = {}, prompt = 'x' }), 'an empty type list is refused')
+end
+
+-- resource.identify and slots: what a stocking bus or hatch slot takes
+do
+    local source = resource.snapshot({
+        { label = 'Carbon Dust', name = 'gregtech:gt.metaitem.01', damage = 2010, size = 5 },
+        { label = 'Pane', name = 'minecraft:glass_pane', damage = 0, size = 1 },
+        { label = 'Pane', name = 'gregtech:gt.metaitem.01', damage = 17890, size = 2 },
+    }, { { label = 'Oxygen', name = 'oxygen', amount = 1000 } })
+    local d = resource.identify(source, { kind = 'item', label = 'Carbon Dust' })
+    check(d and d.name == 'gregtech:gt.metaitem.01' and d.damage == 2010, 'item found by label')
+    d = resource.identify(source, { kind = 'fluid', label = 'Oxygen' })
+    check(d and d.name == 'oxygen' and d.damage == nil, 'fluid found by label')
+    local _, err = resource.identify(source, { kind = 'item', label = 'Pane' })
+    check(err and err:find('add name/damage'), 'an ambiguous label is an error')
+    _, err = resource.identify(source, { kind = 'item', label = 'Missing Dust' })
+    check(err and err:find('not in the network'), 'absent: cannot set the slot')
+    d = resource.identify(source, { kind = 'item', label = 'Missing Dust', name = 'x:y', damage = 3 })
+    check(d and d.name == 'x:y' and d.damage == 3, 'named fully in the config: no lookup')
+    d = resource.identify(source, { kind = 'fluid', label = 'Helium', name = 'helium' })
+    check(d and d.name == 'helium', 'a fluid with its name: no lookup')
+
+    local r = { inputs = { { fluid = 'Oxygen' }, { item = 'Carbon Dust', amount = 1 } }, outputs = {} }
+    assert(#config.normalize({ r = r }) == 0)
+    local set = slots.forRecipe(r, source)
+    check(set and #set.items == 1 and #set.fluids == 1 and set.fluids[1].name == 'oxygen',
+        'a recipe splits into bus items and hatch fluids')
+    r.inputs[3] = { item = 'Missing Dust' }
+    assert(#config.normalize({ r = r }) == 0)
+    local none, serr = slots.forRecipe(r, source)
+    check(none == nil and serr:find('Missing Dust'), 'an input that cannot be found: no slots')
+    check(slots.key({ name = 'a:b', damage = 2 }) == 'a:b:2' and slots.key(nil) == '', 'slot keys')
+end
+
+-- inputs without an amount are set in the bus but not counted
+do
+    local r = { only = { trigger = 'deficit', catalysts = 1,
+        inputs = { { fluid = 'Water' } },
+        outputs = { { fluid = 'A', circuit = 1, target = 100 } } } }
+    assert(#config.normalize(r) == 0)
+    local st = plan.evaluate(r, fluids({ A = 10 }), fluids({}))
+    check(st.only.cycles == nil and st.only.low, 'not counted: the recipe is not held back')
+end
+
 -- runner with fakes
 local function fakeMachine(active)
-    local m = { allowed = true, active = active or false, calls = 0 }
+    local m = { allowed = true, active = active or false, calls = 0, slots = {}, writes = 0 }
     m.setWorkAllowed = function(v) m.allowed = v; m.calls = m.calls + 1 end
     m.circuit = -1
     m.setCircuitConfiguration = function(v) m.circuit = v; return true end
     m.isMachineActive = function() return m.active end
+    -- A stocking bus or hatch: slots 1..16, a missing detail clears the slot.
+    m.setConfiguration = function(slot, detail)
+        if slot < 1 or slot > 16 then error('invalid slot') end
+        m.slots[slot], m.writes = detail, m.writes + 1
+        return true
+    end
     return m
 end
 
 local function fakeSetup()
     local c = {
         controller = fakeMachine(true),
+        bus = fakeMachine(),
+        hatch = fakeMachine(),
         plasma = { fermium = { hatch = fakeMachine() }, neptunium = { hatch = fakeMachine() } },
-        recipes = {
-            rubber = { bus = fakeMachine(), hatch = fakeMachine() },
-            other = { bus = fakeMachine() },
-        },
     }
     return c
 end
 
-local R = { recipe = 'rubber', fermium = false }
-local O = { recipe = 'other', fermium = false }
+local kRubberSlots = { items = { { name = 'gregtech:gt.metaitem.01', damage = 2010 } },
+    fluids = { { name = 'oxygen' }, { name = 'hydrogen' } } }
+local kOtherSlots = { items = { { name = 'bw:dust', damage = 47 } }, fluids = {} }
+local R = { recipe = 'rubber', fermium = false, slots = kRubberSlots }
+local O = { recipe = 'other', fermium = false, slots = kOtherSlots }
 
 do
     local c = fakeSetup()
@@ -296,29 +381,37 @@ do
 
     runner.step(r, R, 1)
     check(r.phase == 'stopping', 'waits while the machine finishes its cycle')
-    check(c.recipes.rubber.bus.allowed == true, 'inputs untouched while active')
+    check(c.bus.allowed == true and c.bus.writes == 0, 'inputs untouched while active')
 
     c.controller.active = false
     runner.step(r, R, 2)
-    check(c.plasma.fermium.hatch.allowed == false and c.recipes.other.bus.allowed == false,
-        'idle switches every input off')
+    check(c.plasma.fermium.hatch.allowed == false, 'idle switches every input off')
     check(r.phase == 'running' and r.running.recipe == 'rubber', 'idle -> running in the same tick')
-    check(c.recipes.rubber.bus.allowed and c.recipes.rubber.hatch.allowed
-        and c.controller.allowed, 'recipe inputs and controller enabled')
+    check(c.bus.slots[1] and c.bus.slots[1].damage == 2010 and c.bus.slots[2] == nil,
+        'bus slots set to the items')
+    check(c.hatch.slots[1].name == 'oxygen' and c.hatch.slots[2].name == 'hydrogen',
+        'hatch slots set to the fluids')
+    check(c.bus.writes == 16 and c.hatch.writes == 16, 'every slot written once at first')
+    check(c.bus.allowed and c.hatch.allowed and c.controller.allowed,
+        'bus, hatch and controller enabled')
 
     c.controller.active = true
-    local calls = c.recipes.rubber.bus.calls
+    local calls = c.bus.calls
     runner.step(r, R, 3)
-    check(c.recipes.rubber.bus.calls == calls, 'no switching while the decision holds')
+    check(c.bus.calls == calls, 'no switching while the decision holds')
 
     runner.step(r, O, 4)
     check(r.phase == 'stopping' and c.controller.allowed == false, 'new decision: stop first')
-    check(c.recipes.rubber.bus.allowed == true, 'old inputs stay on until the cycle ends')
+    check(c.bus.allowed == true and c.bus.slots[1].damage == 2010,
+        'old inputs stay until the cycle ends')
 
     c.controller.active = false
+    local busWrites, hatchWrites = c.bus.writes, c.hatch.writes
     runner.step(r, O, 5)
-    check(r.running.recipe == 'other' and c.recipes.rubber.bus.allowed == false
-        and c.recipes.other.bus.allowed == true, 'switched after the cycle ended')
+    check(r.running.recipe == 'other' and c.bus.slots[1].damage == 47, 'switched after the cycle ended')
+    check(c.bus.writes - busWrites == 1, 'only the slot that differs is written')
+    check(c.hatch.writes - hatchWrites == 2 and c.hatch.slots[1] == nil, 'old fluids cleared')
+    check(c.hatch.allowed == false, 'a recipe without fluids leaves the hatch off')
 
     runner.step(r, nil, 6)
     check(r.phase == 'idle' and c.controller.allowed == false, 'nothing wanted: QFT stops')
@@ -333,11 +426,19 @@ do
 
     c = fakeSetup()
     c.controller.active = false
-    c.recipes.rubber.hatch.setWorkAllowed = function() error('gone') end
+    c.hatch.setWorkAllowed = function() error('gone') end
     r = runner.new(c, 0)
     runner.step(r, R, 1)
     check(r.phase == 'stopping' and c.controller.allowed == false,
         'failed start falls back to stopping')
+
+    c = fakeSetup()
+    c.controller.active = false
+    c.bus.setConfiguration = function(slot) if slot == 3 then error('invalid slot') end return true end
+    r = runner.new(c, 0)
+    runner.step(r, R, 1)
+    check(r.phase == 'stopping' and c.bus.allowed == false and c.controller.allowed == false,
+        'a slot that cannot be set: no start')
 end
 
 -- plasma
@@ -362,13 +463,13 @@ do
     local c = fakeSetup()
     c.controller.active = false
     local r = runner.new(c, 0)
-    runner.step(r, { recipe = 'rubber', fermium = true }, 1)
+    runner.step(r, { recipe = 'rubber', fermium = true, slots = kRubberSlots }, 1)
     check(c.plasma.fermium.hatch.allowed == true and c.plasma.neptunium.hatch.allowed == false,
         'fermium decision enables only the fermium hatch')
 
     c.controller.active = true
     c.controller.getWorkMaxProgress = function() return 1200 end
-    runner.step(r, { recipe = 'rubber', fermium = true }, 2)
+    runner.step(r, { recipe = 'rubber', fermium = true, slots = kRubberSlots }, 2)
     check(r.cycleSeconds == 60, 'cycle length read from the controller in seconds')
 
     runner.step(r, R, 3)
@@ -418,14 +519,14 @@ do
     local c = fakeSetup()
     c.controller.active = false
     local r = runner.new(c, 0)
-    local N1 = { recipe = 'rubber', fermium = false, neptunium = 1 }
-    local N3 = { recipe = 'rubber', fermium = false, neptunium = 3 }
+    local N1 = { recipe = 'rubber', fermium = false, neptunium = 1, slots = kRubberSlots }
+    local N3 = { recipe = 'rubber', fermium = false, neptunium = 3, slots = kRubberSlots }
     -- the circuit must be set before the hatch: check the order inside the hatch call
     local circuitAtEnable
     local hatch = c.plasma.neptunium.hatch
     local set = hatch.setWorkAllowed
     hatch.setWorkAllowed = function(v)
-        if v then circuitAtEnable = c.recipes.rubber.bus.circuit end
+        if v then circuitAtEnable = c.bus.circuit end
         set(v)
     end
     runner.step(r, N1, 1)
@@ -433,26 +534,26 @@ do
 
     c.controller.active = true
     runner.step(r, N3, 2)
-    check(r.phase == 'running' and c.recipes.rubber.bus.circuit == 3,
+    check(r.phase == 'running' and c.bus.circuit == 3,
         'focus moves on the fly, no stop')
 
     runner.step(r, R, 3)
-    check(r.phase == 'stopping' and c.recipes.rubber.bus.circuit == 3 and hatch.allowed,
+    check(r.phase == 'stopping' and c.bus.circuit == 3 and hatch.allowed,
         'neptunium off waits for the cycle, circuit kept while the hatch is on')
     c.controller.active = false
     local circuitAtDisable
     hatch.setWorkAllowed = function(v)
-        if not v then circuitAtDisable = c.recipes.rubber.bus.circuit end
+        if not v then circuitAtDisable = c.bus.circuit end
         set(v)
     end
     runner.step(r, R, 4)
     check(circuitAtDisable == 3, 'hatch off before the circuit is reset')
-    check(c.recipes.rubber.bus.circuit == -1 and r.running.neptunium == nil,
+    check(c.bus.circuit == -1 and r.running.neptunium == nil,
         'restarted without neptunium and without circuit')
 
     c = fakeSetup()
     c.controller.active = false
-    c.recipes.rubber.bus.setCircuitConfiguration = function() return nil, 'no slot' end
+    c.bus.setCircuitConfiguration = function() return nil, 'no slot' end
     r = runner.new(c, 0)
     runner.step(r, N1, 1)
     check(r.phase == 'stopping' and c.plasma.neptunium.hatch.allowed == false,

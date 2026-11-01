@@ -142,4 +142,46 @@ function resource.amount(snap, res)
     return total
 end
 
+---What a stocking bus or hatch slot takes for a resource: {name, damage} for an item, {name} for a
+---fluid (OC's DriverMEInputHatch reads them, GTNH 2.9). Taken from the config when it names the
+---resource fully, else from the network: the label is the key everywhere else.
+---@param snap qft.Snapshot # The network the stocking bus and hatch draw from.
+---@param res qft.Resource
+---@return { name: string, damage: integer? }? detail
+---@return string? err
+function resource.identify(snap, res)
+    if res.name and (res.kind == 'fluid' or res.damage) then
+        return { name = res.name, damage = res.kind == 'item' and res.damage or nil }
+    end
+    local byLabel = snap[res.kind]
+    if not byLabel then
+        return nil, res.kind .. 's of this network were not read'
+    end
+    local found, ids = nil, {}
+    for _, stack in ipairs(byLabel[res.label] or {}) do
+        if (res.name == nil or stack.name == res.name)
+                and (res.damage == nil or stack.damage == res.damage) then
+            local id = identity(res.kind, stack)
+            if not ids[id] then
+                ids[id] = true
+                ids[#ids + 1] = id
+                found = stack
+            end
+        end
+    end
+    if not found then
+        return nil, ('%s is not in the network: its slot cannot be set; add name%s to the config')
+            :format(resource.describe(res), res.kind == 'item' and ' and damage' or '')
+    end
+    if #ids > 1 then
+        table.sort(ids)
+        return nil, ('%s matches %s; add name/damage'):format(resource.describe(res),
+            table.concat(ids, ', '))
+    end
+    if res.kind == 'item' then
+        return { name = found.name, damage = found.damage }
+    end
+    return { name = found.name }
+end
+
 return resource

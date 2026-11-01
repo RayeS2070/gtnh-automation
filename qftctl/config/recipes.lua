@@ -17,14 +17,20 @@ local RecipeId = require('config.ids')
 ---@field weight number? # Surplus only: how much this output is wanted, for Neptunium focusing.
 ---                      # Only the ratio between outputs matters; absent = 0, not wanted.
 
----An input is described like an output, plus how much of it one cycle takes.
+---An input is described like an output, plus how much of it one cycle takes. Every input of the
+---recipe is listed: the stocking bus (items) and hatch (fluids) are set from them before the
+---recipe starts, in this order. The slot needs the internal name: the program finds it in the
+---raw materials network by the label; `name` (and `damage`) here spare that lookup and work when
+---the network has none of it.
 ---@class qft.RecipeInput
 ---@field item string?
 ---@field fluid string?
 ---@field name string?
 ---@field damage integer?
 ---@field resource qft.Resource # Built when the config is loaded.
----@field amount number # Per parallel per cycle: pieces or mB, as in NEI.
+---@field amount number? # Per parallel per cycle: pieces or mB, as in NEI. Counted: the recipe
+---                      # waits for stock for a cycle. Absent: supplied without limit, not counted
+---                      # (surplus recipes need it on every input).
 
 ---Why a recipe runs:
 ---  'deficit' maintains products: runs when a tracked output is below its target.
@@ -36,8 +42,7 @@ local RecipeId = require('config.ids')
 ---@field trigger qft.Trigger
 ---@field tier integer # Recipe tier (1..4): the pulse manipulator tier that unlocks it.
 ---@field catalysts integer # Catalysts in the bulk catalyst housing = parallels; 0 = recipe disabled.
----@field inputs qft.RecipeInput[]? # Raw materials in the source network; required for surplus.
----                                 # Deficit: optional, nil means supplied without limit.
+---@field inputs qft.RecipeInput[] # Every input, from the source network: 16 items, 16 fluids at most.
 ---@field outputs qft.RecipeOutput[]
 
 ---@type table<qft.RecipeId, qft.Recipe>
@@ -47,6 +52,10 @@ return {
         trigger = 'deficit',
         tier = 1, -- wiki,
         catalysts = 4,
+        inputs = {
+            -- TODO(user): every input of the recipe, e.g. { fluid = 'Oxygen' } or
+            -- { item = 'Some Dust', amount = 32 } (amount: counted, see qft.RecipeInput).
+        },
         outputs = {
             { item = 'Hyper-Stable Self-Healing Adhesive', circuit = 1, target = 4096, priority = 3 },
             { fluid = 'Ethyl Cyanoacrylate (Super Glue)',  circuit = 2, priority = 1 },
@@ -60,7 +69,10 @@ return {
         trigger = 'deficit',
         tier = 1, -- wiki
         catalysts = 1,
-        -- No `inputs`: this recipe is supplied without limit, nothing to track.
+        -- Supplied without limit: inputs without an amount, set in the bus and hatch, not counted.
+        inputs = {
+            -- TODO(user): every input of the recipe, e.g. { fluid = 'Oxygen' }.
+        },
         outputs = {
             { fluid = 'Molten Silicone Rubber',          circuit = 1, target = 10e8, priority = 2 },
             { fluid = 'Molten Styrene-Butadiene Rubber', circuit = 2, target = 10e6, priority = 1 },

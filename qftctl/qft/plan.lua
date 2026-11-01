@@ -81,7 +81,7 @@ plan.defaults.surplusSwitchRatio = 2
 ---How many cycles the stock of every input covers: the scarcest input decides.
 ---@param recipe qft.Recipe
 ---@param source qft.Snapshot?
----@return number? cycles # nil on error.
+---@return number? cycles # nil on error, and when no input has an amount (nothing is counted).
 ---@return string? err
 ---@return string[] missing # Inputs absent from the network (counted as 0).
 local function inputCycles(recipe, source)
@@ -91,14 +91,20 @@ local function inputCycles(recipe, source)
     end
     local cycles = math.huge
     for _, input in ipairs(recipe.inputs) do
-        local amount, err, absent = resource.amount(source, input.resource)
-        if not amount then
-            return nil, err, missing
+        -- Without an amount it is in the bus or the hatch but not counted: supplied without limit.
+        if input.amount then
+            local amount, err, absent = resource.amount(source, input.resource)
+            if not amount then
+                return nil, err, missing
+            end
+            if absent then
+                missing[#missing + 1] = resource.describe(input.resource)
+            end
+            cycles = math.min(cycles, amount / (input.amount * recipe.catalysts))
         end
-        if absent then
-            missing[#missing + 1] = resource.describe(input.resource)
-        end
-        cycles = math.min(cycles, amount / (input.amount * recipe.catalysts))
+    end
+    if cycles == math.huge then
+        return nil, nil, missing -- nothing counted
     end
     return cycles, nil, missing
 end

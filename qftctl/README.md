@@ -3,25 +3,30 @@
 An OpenComputers program that controls a **Quantum Force Transformer** (QFT) in the
 GregTech: New Horizons modpack.
 
-> **Status:** setup, both modes (maintaining products and processing raw materials) and plasma
-> focusing are written and tested locally. See [Not verified in game yet](#not-verified-in-game-yet).
+> **Status:** moved to GTNH 2.9: one stocking input bus and one hatch serve every recipe, the
+> program sets their slots. Written and tested locally. See
+> [Not verified in game yet](#not-verified-in-game-yet).
 
 ## Why setup is needed
 
-The AE2 API gives a program no way to tell two ME networks apart: an ME interface of the raw
+The AE2 API gives a program no way to tell two ME networks apart: a fluid interface of the raw
 materials network and one of the products network look exactly the same. The program still has
 to know which is which, and which stocking hatch holds which plasma. So you tell it once, in
 **setup mode**, and it remembers the component addresses.
 
 ## Requirements
 
+- GTNH 2.9 (its stocking buses and hatches can be set from OpenComputers).
 - An OpenComputers computer running OpenOS, with the Lua 5.3 architecture (the default).
 - An Adapter next to every block the program talks to:
-  - one ME interface in the **raw materials** network and one in the **products** network;
+  - a fluid interface (or the ME controller) of the **raw materials** network and one of the
+    **products** network: on 2.9 only these answer for fluids;
   - the Quantum Force Transformer controller;
-  - the stocking input hatches with Neptunium Plasma and Fermium Plasma;
-  - for each recipe, its stocking input bus and, if the recipe has fluid inputs, its stocking
-    input hatch.
+  - **one** ME stocking input bus and **one** ME stocking input hatch on the QFT, basic or
+    advanced, for every recipe: the program sets their slots to the inputs of the recipe it
+    starts. Take any other stocking bus or hatch with recipe inputs off the QFT, or it feeds
+    every recipe;
+  - the ME stocking input hatches with Neptunium Plasma and Fermium Plasma, set by hand.
 
 ## Installation
 
@@ -43,6 +48,9 @@ Saved component addresses (`/etc/qftctl.bindings`) are never touched by the inst
 
 Without an Internet Card, copy `main.lua`, `config/` and `qft/` into one directory by hand.
 
+`tools/qft-dump.lua` writes what the program sees (stocking buses and hatches with their slots,
+the controller, a few stacks of each network) into `/home/qft-dump.txt`; it changes nothing.
+
 Run the program **from its directory** (`cd /home/qftctl`): modules are loaded relative to
 the current directory.
 
@@ -59,8 +67,8 @@ the current directory.
 
 ### How normal mode works
 
-Every 10 seconds the program reads the products and raw materials networks and decides which
-recipe should run. Each recipe has a `trigger`, and the program works in one of two modes:
+Every 10 seconds (every second while the QFT finishes a cycle before a switch) the program
+reads the products and raw materials networks and decides which recipe should run. Each recipe has a `trigger`, and the program works in one of two modes:
 
 **Maintaining products** (`trigger = 'deficit'`) comes first:
 
@@ -69,7 +77,8 @@ recipe should run. Each recipe has a `trigger`, and the program works in one of 
   this gap the QFT would switch on and off around the target on every poll.
 - If several recipes are low, the most urgent one wins. Urgency of an output is
   `1 - (amount / target) ^ priority`.
-- If the recipe has `inputs`, it needs raw materials for one cycle to start and to keep going.
+- If some of its `inputs` have an `amount`, it needs raw materials for one cycle to start and to
+  keep going.
 
 **Processing raw materials** (`trigger = 'surplus'`) takes the machine while no product is short:
 
@@ -86,7 +95,8 @@ If nothing is needed, the QFT stops. The log says when the mode changes.
 
 Switching is safe for plasma. The program stops the controller (`setWorkAllowed(false)`: the
 current cycle finishes, no new one starts) and waits until the machine is inactive. Only
-then does it switch the stocking buses/hatches and start again. On start the program first
+then does it switch the inputs off, set the slots of the stocking bus and hatch to the next
+recipe (only the slots that differ), put the Neptunium circuit into the bus and start again. On start the program first
 stops the machine and switches every input off. On Ctrl+C it stops the controller and leaves
 the inputs as they are.
 
@@ -98,7 +108,7 @@ the inputs as they are.
   the current cycle (read from the controller) plus 60 s.
 
 When the stock gets too low, the recipe finishes its cycle and restarts without Fermium. The
-QFT never runs dry mid-cycle, because that would shut it down until a manual restart.
+QFT never runs dry mid-cycle: plasma that runs out mid-cycle spoils the cycle's outputs.
 **Neptunium Plasma.** Neptunium moves probability between outputs, it adds none, so it
 pays only when the outputs are needed unequally. For every option (no focus, focus on each
 output) the program computes `Σ weight × chance`, with the chances ported from the QFT source.
@@ -108,8 +118,8 @@ Neptunium goes on when the best focus beats no focus by 10% and the stock is eno
 rule as Fermium). It stays on while the focus still beats no focus by 5%. The focus moves
 to another output when that output beats it by 10%.
 
-- On this server the Neptunium hatch burns plasma even without a circuit. So the circuit is
-  set on the recipe's stocking bus **before** the hatch is enabled, and reset to `-1` only
+- On GTNH 2.9 Neptunium burns no plasma without a circuit (on 2.8.4 it did). The circuit is
+  still set on the stocking bus **before** the hatches are enabled, and reset to `-1` only
   after every hatch is off.
 - Moving the focus only changes the circuit, without stopping the machine. Switching
   Neptunium on or off goes through a stop after the cycle, like Fermium.
@@ -121,17 +131,17 @@ Saved addresses live in `/etc/qftctl.bindings`. Deleting that file is the same a
 
 ## Setup step by step
 
-1. **Configuration check.** Before anything else the program checks that `config/components.lua`
-   and `config/recipes.lua` describe the same recipes (see [Configuration](#configuration)).
-   If they do not, it prints the mismatch and stops.
+1. **Configuration check.** Before anything else the program checks that `config/ids.lua`
+   and `config/recipes.lua` list the same recipes and that the values make sense (see
+   [Configuration](#configuration)). If not, it prints the problems and stops.
 2. **Walk over the components.** Setup goes over every component in `config/components.lua`
    in alphabetical order of its path (`network.production`, `network.source`,
-   `plasma.fermium.hatch`, ...). A component that is already bound and still present prints `ok` and
+   `bus`, `controller`, `hatch`, `network.production`, ...). A component that is already bound and still present prints `ok` and
    is skipped; with `--all` every saved address is forgotten and everything is bound again.
 3. **Binding a component** — the program prints what it needs, for example:
    ```
-   [network.source] ME interface of the RAW MATERIALS network
-     Connect the me_interface now, or connect it and press Enter. [s] skip.
+   [network.source] Fluid interface of the RAW MATERIALS network
+     Connect the fluid_interface or me_controller now, or connect it and press Enter. [s] skip.
    ```
    Then **connect that block** to the computer: place the adapter next to it, or break and
    place the adapter back if it is already there. Either:
@@ -149,9 +159,9 @@ Saved addresses live in `/etc/qftctl.bindings`. Deleting that file is the same a
 
 Safety checks during setup:
 
-- one block cannot be bound to two components — for example, the same ME interface as both
+- one block cannot be bound to two components — for example, the same fluid interface as both
   raw materials and products. Setup says which component already holds it and keeps waiting;
-- a component of the wrong type is ignored — an ME interface will not be bound where a stocking
+- a component of the wrong type is ignored — a fluid interface will not be bound where a stocking
   hatch is expected;
 - if several new components of the right type show up at once, setup does not guess and asks
   you to connect them one at a time.
@@ -162,7 +172,7 @@ The configuration is split into three files. You edit them by hand; the program 
 
 | File | What it holds |
 | --- | --- |
-| `config/ids.lua` | Recipe identifiers. They link the two files below. |
+| `config/ids.lua` | Recipe identifiers, the keys of `config/recipes.lua`. |
 | `config/components.lua` | Which components the setup needs and how to find them. |
 | `config/recipes.lua` | Recipe data: trigger, inputs, outputs, targets and weights. |
 
@@ -170,19 +180,24 @@ The configuration is split into three files. You edit them by hand; the program 
 
 ```lua
 network = {
-    source = bind.manual{ type = 'me_interface', prompt = 'ME interface of the RAW MATERIALS network' },
+    source = bind.manual{ type = { 'fluid_interface', 'me_controller' },
+        prompt = 'Fluid interface of the RAW MATERIALS network' },
 },
+bus = bind.manual{ type = 'me_inputbus', prompt = 'ME stocking input bus of the QFT (items)' },
+hatch = bind.manual{ type = 'me_inputhatch', prompt = 'ME stocking input hatch of the QFT (fluids)' },
 ```
 
 - `bind.manual{ type, prompt }` — a component bound in setup mode; `prompt` is what the
   player sees while setup waits for it.
-- `type` is the OpenComputers component type. GregTech machines and hatches are `gt_machine`,
-  ME interfaces are `me_interface`.
+- `type` is the OpenComputers component type, or a list of types any of which will do. The QFT
+  controller is `gt_machine`, ME stocking buses and hatches are `me_inputbus` and
+  `me_inputhatch`.
 - `bind.manual` accepts only `type` and `prompt`. Data about a component goes next to it, not
   into it: `plasma.neptunium = { hatch = bind.manual{...}, fluid = 'Neptunium Plasma' }`.
 - `shieldingTier` — the tier of the Shielding Core Casings (1..4).
-- `recipes[id].bus` (required) — the recipe's stocking input bus; it also holds the programmed
-  circuit for Neptunium focusing. `recipes[id].hatch` (optional) — its stocking input hatch.
+- `bus`, `hatch` — the one stocking input bus and hatch of every recipe; the bus also holds the
+  programmed circuit for Neptunium focusing. The old per-recipe `recipes = { ... }` table is
+  refused with a hint: the inputs moved to `config/recipes.lua`.
 
 ### Recipes
 
@@ -194,6 +209,10 @@ A recipe that maintains products:
     trigger = 'deficit',
     tier = 1,      -- recipe tier (pulse manipulator tier that unlocks it)
     catalysts = 8, -- catalysts in the bulk catalyst housing = parallels; 0 = never run it
+    inputs = {     -- every input: the stocking bus and hatch are set from them
+        { item = 'Some Dust' },  -- no amount: supplied without limit, not counted
+        { fluid = 'Oxygen' },
+    },
     outputs = {
         { fluid = 'Molten Silicone Rubber', circuit = 1, target = 10e9, priority = 1 }, -- 10e9 mB
         { fluid = 'Molten Rubber',          circuit = 4 },                -- no target: not tracked
@@ -238,23 +257,24 @@ with Neptunium.
 
 A field of the other trigger is an error: it usually means the trigger is wrong.
 
-`inputs` is a list of raw materials in the source network, described like outputs plus
-`amount`: how much one parallel takes per cycle, in pieces or mB as in NEI. A surplus recipe
-needs `inputs`. For a deficit recipe they are optional: without them it is treated as
-supplied without limit.
+`inputs` lists **every** input of the recipe: before it starts the program sets the stocking
+bus slots to its items and the hatch slots to its fluids, in this order (16 of each at most).
+An input is described like an output. A slot needs the internal name: the program finds it in
+the raw materials network by the label; `name` (and `damage` for an item) in the config spare
+that lookup and work while the network has none of it. `amount` is how much one parallel takes
+per cycle, in pieces or mB as in NEI: an input with an amount is counted (the recipe waits for
+stock for a cycle), one without is supplied without limit. A surplus recipe needs the amount
+of every input: it decides when the recipe runs.
 
 ### Adding a recipe
 
-A recipe goes into three places:
+A recipe goes into two places, no new blocks:
 
 1. `config/ids.lua` — add an id: `MyRecipe = 'my_recipe'`.
-2. `config/components.lua` — under `recipes`, add `[RecipeId.MyRecipe] = { bus = bind.manual{...} }`
-   (plus `hatch = bind.manual{...}` if the recipe has fluid inputs).
-3. `config/recipes.lua` — add `[RecipeId.MyRecipe] = { name, trigger, tier, catalysts, inputs, outputs }`.
+2. `config/recipes.lua` — add `[RecipeId.MyRecipe] = { name, trigger, tier, catalysts, inputs, outputs }`.
 
-Then run `main setup` to bind the new bus/hatch. If you forget one of the files, the program
-tells you which recipe is missing where; a mistyped `RecipeId.X` stops it with
-`unknown recipe id: X`.
+If you forget one of them, the program tells you which recipe is missing where; a mistyped
+`RecipeId.X` stops it with `unknown recipe id: X`.
 
 ## Troubleshooting
 
@@ -262,17 +282,18 @@ tells you which recipe is missing where; a mistyped `RecipeId.X` stops it with
   changed. Run `main setup`.
 - **A component is bound to the wrong block** — for example, one plasma hatch got the
   other's slot. Run `main setup --all` and connect the blocks one at a time.
-- **`config is inconsistent: ...`** — the config files disagree about recipes; the message says
-  which recipe is missing where.
+- **`config is inconsistent: ...`** — the config files disagree about recipes, or a value is
+  wrong; the message says which.
+- **`... is not in the network: its slot cannot be set`** — an input of the recipe is not in the
+  raw materials network, so its internal name is unknown. Add `name` (and `damage`) to the
+  input, or stock some of it.
 
 ## Not verified in game yet
 
 - Whether an adapter keeps the same component address after leaving and rejoining the world.
   If it does not, setup will have to be redone after every restart.
-- Whether `setWorkAllowed(false)` really stops a stocking bus (for the plasma stocking hatch it
-  does).
-- Whether `getWorkMaxProgress()` of the QFT controller returns the cycle length in ticks.
-  The plasma reserve while running depends on it.
+- Setting the stocking bus and hatch slots from the program for a whole recipe, and the QFT
+  taking it up right after (by the source a slot applies at once).
 - Whether a stocking bus/hatch starts supplying fast enough after `setWorkAllowed(true)` for
   the QFT to pick the recipe up. The program warns if the machine stays inactive for 2 minutes
   while a recipe should run.
