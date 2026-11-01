@@ -24,6 +24,7 @@ return {
         'qft/main.lua',
         'qft/qft/bind.lua',
         'qft/qft/config.lua',
+        'qft/qft/link.lua',
         'qft/qft/log.lua',
         'qft/qft/plan.lua',
         'qft/qft/resource.lua',

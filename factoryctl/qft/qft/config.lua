@@ -48,6 +48,12 @@ function config.checkValues(components, recipes)
         problems[#problems + 1] = fmt:format(...)
     end
 
+    if components.server ~= nil and type(components.server) ~= 'string' then
+        add('components: server must be a URL or nil (no server)')
+    end
+    if components.name ~= nil and (type(components.name) ~= 'string' or components.name == '') then
+        add('components: name must be a non-empty string or nil (qft@x,y,z)')
+    end
     if not isInt(components.shieldingTier, 1, kMaxTier) then
         add('components: shieldingTier must be an integer 1..%d', kMaxTier)
     end

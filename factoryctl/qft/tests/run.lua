@@ -1,6 +1,6 @@
 ---Local tests for the pure logic and the runner, with fake components. Not installed in game.
 ---  lua tests/run.lua   (from the repository root)
-package.path = './?.lua;' .. package.path
+package.path = './?.lua;../agent/?.lua;' .. package.path
 
 local bind = require('qft.bind')
 local config = require('qft.config')
@@ -180,6 +180,11 @@ do
     check(table.concat(config.checkValues({ shieldingTier = 1, plasma = {
         neptunium = { hatch = bind.manual { type = 'me_inputhatch', prompt = 'n' } } } }, {}), ' ')
         :find('plasma: hatch must be'), 'old per-plasma hatches refused')
+    local named = components()
+    named.server, named.name = 'http://127.0.0.1:8090', 'qft-main'
+    check(#config.checkValues(named, {}) == 0, 'server and name are fine')
+    named.name = ''
+    check(table.concat(config.checkValues(named, {}), ' '):find('name must be'), 'an empty name refused')
     local old = components()
     old.recipes = {}
     check(table.concat(config.checkValues(old, {}), ' '):find('recipes are gone'),
@@ -574,6 +579,108 @@ do
     runner.step(r, N1, 1)
     check(r.phase == 'stopping' and c.plasma.hatch.allowed == false,
         'refused circuit: never starts neptunium')
+end
+
+-- link: settings from the server, telemetry to it
+do
+    local link = require('qft.link')
+    local function encode(v)
+        if type(v) == 'table' then
+            local keys = {}
+            for k in pairs(v) do keys[#keys + 1] = k end
+            table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+            local parts = {}
+            for _, k in ipairs(keys) do
+                local key = type(k) == 'number' and ('[' .. k .. ']') or ('[%q]'):format(k)
+                parts[#parts + 1] = key .. '=' .. encode(v[k])
+            end
+            return '{' .. table.concat(parts, ',') .. '}'
+        elseif type(v) == 'string' then
+            return ('%q'):format(v)
+        end
+        return tostring(v)
+    end
+    local function decode(text) return load('return ' .. text, '=data', 't', {})() end
+    local function rs()
+        local r = {
+            glue = { name = 'Glue', trigger = 'deficit', tier = 1, catalysts = 1,
+                inputs = { { fluid = 'Water' } },
+                outputs = { { fluid = 'Glue', circuit = 1, target = 100, priority = 2 },
+                    { fluid = 'Waste', circuit = 2 } } },
+            plat = { name = 'Plat', trigger = 'surplus', tier = 1, catalysts = 1,
+                inputs = { { item = 'Ore', amount = 1 } },
+                outputs = { { fluid = 'Pt', circuit = 1, weight = 1 }, { fluid = 'Pd', circuit = 2 } } },
+        }
+        assert(#config.normalize(r) == 0)
+        return r
+    end
+
+    local d = link.defaults(rs(), 'auto')
+    check(d.version == 0 and d.mode == 'auto' and #d.recipes == 2 and d.recipes[1].id == 'glue',
+        'defaults: from the config, sorted')
+    check(d.recipes[1].outputs[1].target == 100 and d.recipes[1].outputs[2].target == nil,
+        'defaults: outputs as configured')
+    check(link.check({ mode = 'often' }) == nil, 'a bad mode is refused')
+    check(link.check({ mode = 'auto', recipes = { { id = 'glue', outputs = {
+        { circuit = 1, target = -1 } } } } }) == nil, 'a negative target is refused')
+
+    local r = rs()
+    local warned = {}
+    link.apply(r, { version = 3, mode = 'deficit', recipes = {
+        { id = 'glue', outputs = { { circuit = 2, target = 50 }, { circuit = 9, target = 1 } } },
+        { id = 'plat', outputs = { { circuit = 2, weight = 5 } } },
+        { id = 'gone', outputs = {} },
+    } }, function(fmt, ...) warned[#warned + 1] = fmt:format(...) end)
+    check(r.glue.outputs[1].target == nil and r.glue.outputs[2].target == 50,
+        'apply: deficit targets as the server says, an output it leaves out is not tracked')
+    check(r.plat.outputs[1].weight == nil and r.plat.outputs[2].weight == 5, 'apply: surplus weights')
+    check(#warned == 2, 'apply: an unknown circuit and recipe are warned of')
+
+    -- a poll: offer and catalog first; the server's settings are taken and saved
+    local saved, requests, replies = nil, {}, {}
+    local deps = {
+        post = function(path, body)
+            requests[#requests + 1] = { path = path, body = body }
+            local reply = replies[#requests]
+            if reply == false then return nil, 'refused' end
+            return reply or '{poll=10}'
+        end,
+        decode = decode,
+        store = { read = function() return saved end, write = function(t) saved = t; return true end,
+            encode = encode, decode = decode },
+        recipes = rs(), mode = 'auto', name = 'qft-main', coords = { x = 1, y = 2, z = 3 },
+        run = 'test-1',
+    }
+    local l = link.new(deps)
+    replies[1] = '{poll=10,settings={version=1,mode="deficit",recipes={{id="glue",outputs={'
+        .. '{circuit=1,target=500,priority=1}}}}}}'
+    local reply = l:poll({ phase = 'running', mode = 'auto', want = 'glue',
+        running = { recipe = 'glue', fermium = true }, cycleSeconds = 6, plasma = { fermium = 900 },
+        states = plan.evaluate(deps.recipes, fluids({ Glue = 10 }), fluids({ Water = 1 })) })
+    local body = requests[1].body
+    check(requests[1].path == '/agent/v1/qft/poll', 'its path')
+    check(body:find('"name":"qft-main"', 1, true) and body:find('"x":1', 1, true), 'the setup and coords')
+    check(body:find('"offer":{', 1, true) and body:find('"catalog":[', 1, true), 'offer and catalog first')
+    check(body:find('"phase":"running"', 1, true) and body:find('"recipe":"glue"', 1, true), 'the state')
+    check(body:find('"amount":10', 1, true) ~= nil, 'output amounts')
+    check(reply and reply.changed and l.settings.version == 1 and l.settings.mode == 'deficit',
+        'the server\'s settings taken')
+    check(deps.recipes.glue.outputs[1].target == 500, '... into the recipes')
+    check(saved and saved:find('deficit') ~= nil, '... and saved')
+
+    replies[2] = false
+    check(l:poll({ phase = 'idle', mode = 'deficit', plasma = {} }) == nil, 'a failed poll: nil')
+    l:poll({ phase = 'idle', mode = 'deficit', plasma = {} })
+    check(not requests[3].body:find('"catalog"', 1, true) and not requests[3].body:find('"offer"', 1, true),
+        'no catalog once one got through, no offer with the server\'s settings')
+
+    local deps2 = {}
+    for k, v in pairs(deps) do deps2[k] = v end
+    deps2.recipes = rs()
+    local l2 = link.new(deps2)
+    check(l2.settings.version == 1 and deps2.recipes.glue.outputs[1].target == 500,
+        'saved settings at the start: no server needed')
+    check(l2.offer.recipes[1].outputs[1].target == 100, 'the offer is still the config\'s')
 end
 
 print(failures == 0 and 'all tests passed' or (failures .. ' test(s) failed'))

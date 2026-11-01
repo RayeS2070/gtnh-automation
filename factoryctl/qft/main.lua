@@ -11,11 +11,16 @@ local here = (debug.getinfo(1, 'S').source:match('^[@=](/.*)/[^/]*$'))
     or require('shell').getWorkingDirectory()
 package.path = ('%s/?.lua;%s/../agent/?.lua;%s'):format(here, here, package.path)
 
+local component = require('component')
 local computer = require('computer')
 local event = require('event')
+local serialization = require('serialization')
 local shell = require('shell')
+local http = require('fc.http')
+local logbuf = require('fc.logbuf')
 local config = require('qft.config')
 local log = require('qft.log')
+local link = require('qft.link')
 local plan = require('qft.plan')
 local resource = require('qft.resource')
 local runner = require('qft.runner')
@@ -23,8 +28,11 @@ local slots = require('qft.slots')
 local setup = require('qft.setup')
 local store = require('qft.store')
 
+local kSettingsPath = '/etc/qftctl.settings' -- the server's settings, kept for restarts
+
 local const = {
     kPollPeriod = 10, -- seconds between ticks
+    kServerRetry = 30, -- seconds before polling the server again after a failed poll
     kStopPeriod = 1, -- seconds between ticks while the QFT finishes its cycle: the next recipe waits
     Event = {
         kInterrupted = 'interrupted',
@@ -219,6 +227,7 @@ local function tick(ctx, now)
         log.err('source network poll failed: %s', serr)
     else
         local states, problems, missing = plan.evaluate(ctx.recipes, snap, source)
+        ctx.states = states
         for _, p in ipairs(problems) do
             logOnce(ctx, 'err', p)
         end
@@ -234,6 +243,7 @@ local function tick(ctx, now)
         end
 
         local id = plan.choose(states, current and current.recipe, { mode = ctx.mode })
+        ctx.want = id
         local mode = id and states[id].trigger or 'idle'
         logChange(ctx, 'mode', mode, 'mode: %s', kModeNames[mode] or 'nothing to do')
         if id ~= ctx.lastWant then
@@ -250,34 +260,167 @@ local function tick(ctx, now)
     runner.step(r, want, now)
 end
 
----Seconds until the next tick: short while the QFT finishes its cycle, the switch waits for it.
-local function nextTick(ctx)
-    return ctx.runner.phase == 'stopping' and const.kStopPeriod or const.kPollPeriod
+---Plasma in the raw materials network, for the server.
+local function plasmaStock(ctx)
+    local out = {}
+    for _, name in ipairs({ 'neptunium', 'fermium' }) do
+        local amount = ctx.source and resource.amount(ctx.source,
+            { kind = 'fluid', label = ctx.components.plasma[name] })
+        out[name] = amount
+    end
+    return out
+end
+
+---Reports to the server when due; newer settings change the recipes in place.
+local function serverPoll(ctx, now)
+    if not ctx.link or now < ctx.nextPoll then
+        return
+    end
+    local r = ctx.runner
+    local reply, err = ctx.link:poll({
+        phase = r.phase, mode = ctx.mode, want = ctx.want,
+        running = r.phase == 'running' and r.running or nil, cycleSeconds = r.cycleSeconds,
+        states = ctx.states, plasma = plasmaStock(ctx),
+    })
+    if not reply then
+        -- Said once: it may be away for long, the QFT goes on without it.
+        if not ctx.serverDown then
+            log.wrn('server: %s; going on with the settings in hand', tostring(err))
+            ctx.serverDown = true
+        end
+        ctx.nextPoll = now + const.kServerRetry
+        return
+    end
+    if ctx.serverDown then
+        log.inf('server answers again')
+        ctx.serverDown = false
+    end
+    if reply.changed then
+        ctx.track = trackedKinds(ctx.recipes)
+        if not ctx.fixedMode then
+            ctx.mode = ctx.link.settings.mode
+        end
+    end
+    ctx.nextPoll = now + (math.tointeger(reply.poll) or const.kPollPeriod)
+end
+
+---The controller's coordinates, whatever shape the driver gives them in: {x, y, z} or a list.
+local function coordinates(controller)
+    local ok, a, b, c = pcall(controller.getCoordinates)
+    if not ok then
+        return nil
+    end
+    if type(a) == 'table' then
+        local x, y, z = a.x or a[1], a.y or a[2], a.z or a[3]
+        if type(x) == 'number' and type(y) == 'number' and type(z) == 'number' then
+            return { x = x, y = y, z = z }
+        end
+    elseif type(a) == 'number' and type(b) == 'number' and type(c) == 'number' then
+        return { x = a, y = b, z = c }
+    end
+    log.wrn('controller coordinates in an unknown shape: %s', tostring(a))
+    return nil
+end
+
+---The settings file of the link.
+local settingsStore = {
+    read = function()
+        local f = io.open(kSettingsPath, 'r')
+        if not f then return nil end
+        local text = f:read('*a')
+        f:close()
+        return text
+    end,
+    write = function(text)
+        local f, err = io.open(kSettingsPath, 'w')
+        if not f then return nil, err end
+        f:write(text)
+        f:close()
+        return true
+    end,
+    encode = serialization.serialize,
+    decode = serialization.unserialize,
+}
+
+---The link to the factoryctl server, when components.server names one.
+local function makeLink(components, recipes, mode)
+    if not components.server then
+        return nil
+    end
+    if not component.isAvailable('internet') then
+        log.wrn('no Internet Card: running without the server')
+        return nil
+    end
+    local logs = logbuf.new()
+    log.forward = function(level, text) logs:push(computer.uptime(), level, text) end
+    local coords = coordinates(components.controller)
+    local name = components.name
+        or (coords and ('qft@%d,%d,%d'):format(coords.x, coords.y, coords.z))
+        or ('qft@' .. components.controller.address:sub(1, 8))
+    log.inf('setup %s%s, server %s', name,
+        coords and (' at %d,%d,%d'):format(coords.x, coords.y, coords.z) or '', components.server)
+    return link.new({
+        post = function(path, body) return http.post(components.server .. path, body) end,
+        decode = serialization.unserialize,
+        store = settingsStore,
+        recipes = recipes,
+        mode = mode,
+        name = name,
+        coords = coords,
+        run = ('%s-%d'):format(computer.address():sub(1, 8), math.floor(os.time())),
+        logs = logs,
+        warn = log.wrn,
+        info = log.inf,
+    })
 end
 
 ---@param components table # Resolved components.
 ---@param recipes table<qft.RecipeId, qft.Recipe>
 ---@param mode qft.Mode
-local function run(components, recipes, mode)
+local function run(components, recipes, mode, fixedMode)
     log.clock = computer.uptime
+    -- Before the runner: saved settings of the server change the recipes and the mode.
+    local l = makeLink(components, recipes, mode)
+    if l and not fixedMode then
+        mode = l.settings.mode
+    end
     local ctx = {
         components = components,
         recipes = recipes,
         mode = mode,
+        fixedMode = fixedMode,
+        link = l,
+        nextPoll = computer.uptime(),
         track = trackedKinds(recipes),
         runner = runner.new(components, computer.uptime()),
         reported = {},
         last = {},
         lastWant = false, -- not nil: the first decision is always logged
     }
-    log.inf('running in mode %s, poll every %ds; Ctrl+C to stop', mode, const.kPollPeriod)
+    log.inf('running in mode %s%s, poll every %ds; Ctrl+C to stop', mode,
+        fixedMode and ' (--mode: the server does not change it)' or '', const.kPollPeriod)
+    local nextTickAt = computer.uptime()
     repeat
+        local now = computer.uptime()
         -- A bug in a tick must not kill the controller; the traceback says where it was.
-        local ok, err = xpcall(tick, debug.traceback, ctx, computer.uptime())
-        if not ok then
-            log.err('tick failed: %s', tostring(err))
+        if now >= nextTickAt then
+            local ok, err = xpcall(tick, debug.traceback, ctx, now)
+            if not ok then
+                log.err('tick failed: %s', tostring(err))
+            end
+            nextTickAt = computer.uptime() + (ctx.runner.phase == 'stopping' and const.kStopPeriod
+                or const.kPollPeriod)
         end
-    until event.pull(nextTick(ctx), const.Event.kInterrupted)
+        local ok, err = xpcall(serverPoll, debug.traceback, ctx, computer.uptime())
+        if not ok then
+            log.err('server poll failed: %s', tostring(err))
+            ctx.nextPoll = computer.uptime() + const.kServerRetry
+        end
+        local wait = math.max(0, nextTickAt - computer.uptime())
+        if ctx.link then
+            wait = math.min(wait, math.max(0, ctx.nextPoll - computer.uptime()))
+        end
+    until event.pull(wait, const.Event.kInterrupted)
     runner.shutdown(ctx.runner)
     log.inf('stopped: QFT finishes its current cycle and stays off')
 end
@@ -285,6 +428,7 @@ end
 local function main(...)
     local args, opts = shell.parse(...)
     local mode = opts.mode or 'auto'
+    local fixedMode = opts.mode ~= nil
     if not plan.modes[mode] then
         print('--mode must be auto, deficit or surplus')
         return 1
@@ -318,7 +462,7 @@ local function main(...)
     if opts.debug then
         log.setLevel(log.Level.Dbg)
     end
-    run(components, cfg.recipes, mode)
+    run(components, cfg.recipes, mode, fixedMode)
     return 0
 end
 
