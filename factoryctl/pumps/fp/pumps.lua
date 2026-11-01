@@ -69,6 +69,12 @@ function pumps:discover(now)
             if kind then
                 self.modules[address] = module.new(proxy, kind, now, self.warn)
                 self.info('pump module T%d %s', kind.tier, address:sub(1, 8))
+                -- Its parameters as the module has them: their keys are known from GT's source
+                -- only, never seen in game.
+                local okParams, text = pcall(function() return json.encode(proxy.getParameters()) end)
+                if okParams then
+                    self.info('pump module %s parameters: %s', address:sub(1, 8), text)
+                end
             elseif ok then
                 self.ignored[address] = true
             end -- a failed getName: asked again next time

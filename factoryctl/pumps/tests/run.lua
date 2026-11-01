@@ -165,6 +165,7 @@ function fake.pump(clock, address, name, opts)
         if m.active and clock.now >= m.endsAt then m.active = false end
         return m.active
     end
+    function m.getParameters() return { batch = m.params.batch or 1 } end
     function m.getWorkProgress() return 200 end
     function m.getWorkMaxProgress() return 600 end
     return m
@@ -393,6 +394,18 @@ suite('pumps', function()
     local p4 = pumps.new(w4.deps, clock4.now)
     p4:step(clock4.now, clock4.time)
     check(p4.modules.dddd == nil and not p4.ignored.dddd, 'not taken, not ignored for good')
+
+    -- a module found: its parameters go to the log, as the game gives them
+    local clock6 = fake.clock()
+    local w6 = fakeWorld(clock6, { ffff = fake.pump(clock6, 'ffff', 'projectmodulepumpt1') }, {})
+    local told6 = {}
+    w6.deps.info = function(fmt, ...) told6[#told6 + 1] = fmt:format(...) end
+    pumps.new(w6.deps, clock6.now):step(clock6.now, clock6.time)
+    local found6 = false
+    for _, line in ipairs(told6) do
+        found6 = found6 or line:find('parameters: {"batch":', 1, true) ~= nil
+    end
+    check(found6, 'a found module\'s parameters are logged')
 
     -- a module that keeps failing is warned of once, and again when it works
     local clock5 = fake.clock()
