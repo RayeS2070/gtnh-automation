@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (8);
+INSERT INTO factoryctl.schema_version VALUES (9);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -127,7 +127,7 @@ CREATE TABLE factoryctl.events (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     at           timestamptz NOT NULL,
     level        factoryctl.event_level NOT NULL,
-    source       text NOT NULL,  -- agent | server | order | scan | target | pumps
+    source       text NOT NULL,  -- agent | server | order | scan | target | pumps | qft
     text         text NOT NULL,
     order_id     bigint REFERENCES factoryctl.orders ON DELETE SET NULL,
     goods_id     bigint REFERENCES factoryctl.goods ON DELETE SET NULL,
@@ -209,3 +209,22 @@ CREATE TABLE factoryctl.pump_stock (
     amount bigint NOT NULL,
     at     timestamptz NOT NULL
 );
+
+-- QFT setups (factoryctl/qft): one Quantum Force Transformer, one computer, one
+-- agent. It decides; the server keeps its settings and the last report. The
+-- name is the key; the controller's coordinates (as first reported) tell two
+-- setups given one name apart. JSON as the agent sends it: for the web.
+CREATE TABLE factoryctl.qft_setups (
+    name             text PRIMARY KEY,
+    x                bigint,
+    y                bigint,
+    z                bigint,
+    run              text NOT NULL,
+    catalog          jsonb NOT NULL DEFAULT '[]',  -- its recipes
+    status           jsonb NOT NULL DEFAULT '{}',  -- state, recipes, plasma
+    seen_at          timestamptz NOT NULL,
+    settings_version bigint NOT NULL DEFAULT 0,    -- 0: no settings yet
+    settings         jsonb,                        -- mode, recipes
+    settings_at      timestamptz
+);
+

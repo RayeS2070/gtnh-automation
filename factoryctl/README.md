@@ -95,6 +95,8 @@ is of another game version, so a few goods have no icon.
 | `POST /agent/v1/poll`, `POST /agent/v1/scan` | the agent; answers are Lua tables, always HTTP 200 with `ok` |
 | `POST /agent/v1/pumps/poll` | the pumping agent: modules, cycles, stock up; newer settings down |
 | `GET /api/v1/pumps`, `PUT /api/v1/pumps/settings`, `PUT|DELETE /api/v1/pumps/targets/{fluid}` | pumping: modules, fluids (stock, target, in flight, pumped in 24 h); edits raise the settings' version |
+| `POST /agent/v1/qft/poll` | a QFT agent: its setup (name, controller coordinates), state, recipes, plasma up; newer settings down. A second QFT under a taken name is refused |
+| `GET /api/v1/qft`, `PUT /api/v1/qft/{name}/settings`, `DELETE /api/v1/qft/{name}` | QFT setups: the last report, the recipes, the settings (mode; targets, priorities, weights); forget a setup |
 | `GET /api/v1/stock?q=&kind=&sort=&dir=&limit=` | stock: every word of `q` in the label, any order; `kind` all/items/fluids; `sort` label/amount; `dir` asc/desc; everything without `limit` |
 | `GET /api/v1/cpus` | the CPUs of the agent's last poll: what each crafts, what is left, our open order of it; and `lowFreeCpus` |
 | `GET /api/v1/events?level=&source=&q=&order=&before=&limit=` | events, newest first: the agent's lines, every order status change, alarms, scans, targets (kept `FACTORYCTL_EVENTS.keep`, 30 days) |
