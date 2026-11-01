@@ -104,6 +104,10 @@ function fake.cpus(rows)
                         if r.fails then error('cpu gone') end
                         return r.finalOutput
                     end,
+                    isBusy = function()
+                        if r.isBusy == nil then return r.busy end
+                        return r.isBusy
+                    end,
                     cancel = function()
                         me.canceled[#me.canceled + 1] = r.name
                         r.finalOutput, r.busy = nil, false
@@ -184,10 +188,21 @@ suite('me', function()
     eq(#cpus, 32, 'every CPU')
     local by = {}
     for _, c in ipairs(cpus) do by[c.name] = c end
-    eq(by.CPU_022.busy, false, 'busy as getCpus says')
+    eq(by.CPU_022.busy, true, 'getCpus said free, isBusy() says busy: busy')
     eq(by.CPU_022.output and by.CPU_022.output.fluid, 'xenoxene', 'the output decides, busy or not')
     eq(by.CPU_031.output and by.CPU_031.output.name, 'dreamcraft:item.TCetiESeaweedExtract', 'item output')
     check(by.CPU_024.output == nil, 'a free CPU has no output')
+    -- GTNH 2.9: a free CPU's monitor keeps the last craft when the batch made more than asked
+    -- (a negative size; AE2 CraftingCPUCluster never clears it). Not crafting: no output.
+    local stale = me.cpus(fake.cpus({ { name = 'CPU_015', busy = false, isBusy = false,
+        finalOutput = { name = 'gregtech:gt.metaitem.01', damage = 1, label = 'Alumina Milling Ball',
+            size = -7 } } }))
+    check(stale[1].output == nil, 'a free CPU with the last craft on its monitor has no output')
+    eq(stale[1].busy, false, '... and is free')
+    local raced = me.cpus(fake.cpus({ { name = 'CPU_022', busy = false, isBusy = true,
+        finalOutput = { name = 'minecraft:stick', damage = 0, label = 'Stick', size = 5 } } }))
+    eq(raced[1].output and raced[1].output.size, 5, 'busy=false but isBusy(): a craft just started')
+    eq(raced[1].busy, true, '... reported busy')
     local flaky = me.cpus(fake.cpus({ { name = 'CPU_X', busy = true, fails = true } }))
     eq(#flaky, 1, 'a CPU whose finalOutput fails is still reported')
     check(flaky[1].output == nil, '... without an output')

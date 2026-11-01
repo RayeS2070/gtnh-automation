@@ -125,6 +125,9 @@ end
 
 ---Every CPU with its finalOutput(). Asked of every CPU, not only of busy ones: in game
 ---getCpus() once said busy=false while finalOutput() already showed a craft just started.
+---Such a CPU is asked isBusy() too: on GTNH 2.9 a free CPU's monitor keeps its last craft when
+---the batch made more than asked (a negative size: AE2's CraftingCPUCluster clears its output
+---only at exactly 0). Only a busy CPU's output is reported.
 ---@param proxy table
 ---@return fc.Cpu[]
 function me.cpus(proxy)
@@ -132,7 +135,11 @@ function me.cpus(proxy)
     for _, meta in ipairs(proxy.getCpus()) do
         local c = { name = meta.name, busy = meta.busy == true }
         local ok, final = pcall(meta.cpu.finalOutput)
-        if ok and final then
+        if ok and final and not c.busy then
+            local okBusy, busy = pcall(meta.cpu.isBusy)
+            c.busy = okBusy and busy == true
+        end
+        if ok and final and c.busy then
             c.output = me.item(final)
         end
         out[#out + 1] = c
