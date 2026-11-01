@@ -370,12 +370,14 @@ suite('pumps', function()
         'settings of the server are not offered back')
 
     -- a server without settings asks for the agent's, whatever their version
-    w2.replies[#w2.requests + 1] = '{poll=10,offer=true}'
-    clock.now = clock.now + 20
-    p2:step(clock.now, clock.time)
-    clock.now = clock.now + 20
-    p2:step(clock.now, clock.time)
-    check(w2.requests[#w2.requests].body:find('"offer":{', 1, true) ~= nil,
+    local asked = #w2.requests + 1
+    w2.replies[asked] = '{poll=10,offer=true}'
+    -- Step on until the poll after the one that asks: polls wait for pulses.
+    for _ = 1, 200 do
+        if #w2.requests > asked then break end
+        clock.now = clock.now + math.max(p2:step(clock.now, clock.time), 0.1)
+    end
+    check(w2.requests[asked + 1] and w2.requests[asked + 1].body:find('"offer":{', 1, true) ~= nil,
         'asked for: offered, version 1 and all')
 
     -- nothing to pump: idle, looked at again later, no busy loop
