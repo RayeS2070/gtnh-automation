@@ -54,7 +54,8 @@ the fluid levels without the server:
 
 **QFT agent** (`qft/`, ex-qftctl, Lua on its own computer next to one Quantum Force Transformer).
 It decides by itself too: recipes by the stock of products and raw materials, plasma focusing,
-the safe stop before every switch. See [qft/README.md](qft/README.md).
+the safe stop before every switch. The server keeps each setup's settings (mode, targets,
+weights; edited on the QFT tab) and its last report. See [qft/README.md](qft/README.md).
 
 **Server** (`server/`, C++ with userver). One poll is one transaction:
 
@@ -82,7 +83,8 @@ priority, fill, pause); one-off orders and cancel; the order list with status, C
 progress; the CPUs and what they craft (a tile and the order form say when goods are on a CPU
 already); the Pumping tab (modules with their slots and progress; fluids with the pumping
 network's stock, target, fill, what is in flight and what was pumped in 24 h; targets, batch and
-threshold edited there); the Logs tab and each order's history (events: what our code tells on purpose, not the
+threshold edited there); the QFT tab (each setup: what it runs, its recipes and outputs, the
+mode and the targets or weights edited there); the Logs tab and each order's history (events: what our code tells on purpose, not the
 server's whole log). Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
 Item icons come from the GTNH Calculator's export (`../assets/data`, served at `/data/`): the
 page reads `data.bin` the way the calculator does and draws icons from `atlas.webp`. The export

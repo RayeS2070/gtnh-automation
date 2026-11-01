@@ -3,6 +3,7 @@
   import Logs from './lib/Logs.svelte'
   import Orders from './lib/Orders.svelte'
   import Pumps from './lib/Pumps.svelte'
+  import Qft from './lib/Qft.svelte'
   import Stock from './lib/Stock.svelte'
   import Targets from './lib/Targets.svelte'
 
@@ -13,6 +14,7 @@
     orders: 'Orders',
     cpus: 'CPUs',
     pumps: 'Pumping',
+    qft: 'QFT',
     logs: 'Logs',
   } as const
   type Page = keyof typeof pages
@@ -46,6 +48,8 @@
     <Cpus />
   {:else if page === 'pumps'}
     <Pumps />
+  {:else if page === 'qft'}
+    <Qft />
   {:else if page === 'logs'}
     <Logs />
   {:else}

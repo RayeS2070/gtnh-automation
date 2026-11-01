@@ -7,6 +7,22 @@ GregTech: New Horizons modpack.
 > program sets their slots. Written and tested locally. See
 > [Not verified in game yet](#not-verified-in-game-yet).
 
+## The factoryctl server
+
+With `server` in `config/components.lua` (the default: the address the other factoryctl agents
+use) the agent reports to the server every 10 seconds and takes its settings: the mode and,
+per output, the target and priority (maintaining products) or the weight (processing raw
+materials). They are edited on the **QFT** tab of the web client and kept on this computer
+(`/etc/qftctl.settings`), so the QFT goes on with them when the server is away, also after a
+restart. What a recipe is made of (inputs, circuits, tier, catalysts) stays in
+`config/recipes.lua`. The first time, the server takes the agent's own values from
+`config/recipes.lua`. `--mode` on the command line wins over the server's mode.
+
+Each QFT has its own computer and its own name on the server: `name` in
+`config/components.lua`, or `qft@x,y,z` of the controller when it is not set. A second QFT
+reporting under a name another QFT (at other coordinates) holds is refused until it gets its own
+name, or the other one is forgotten on the web page. `server = nil` runs without the server.
+
 ## Why setup is needed
 
 The AE2 API gives a program no way to tell two ME networks apart: a fluid interface of the raw

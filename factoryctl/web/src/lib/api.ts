@@ -240,3 +240,68 @@ export async function putPumpTarget(fluid: string, target: PumpTarget): Promise<
 export async function deletePumpTarget(fluid: string): Promise<void> {
   await call('DELETE', `/api/v1/pumps/targets/${encodeURIComponent(fluid)}`)
 }
+
+// QFT setups (factoryctl/qft): one Quantum Force Transformer and its agent each.
+export type QftMode = 'auto' | 'deficit' | 'surplus'
+
+export type QftOutputSettings = { circuit: number; target?: number; priority?: number; weight?: number }
+export type QftSettings = {
+  version: number
+  mode: QftMode
+  recipes: { id: string; outputs: QftOutputSettings[] }[]
+}
+
+export type QftCatalogRecipe = {
+  id: string
+  name: string
+  trigger: 'deficit' | 'surplus'
+  tier: number
+  catalysts: number
+  inputs: { kind: string; label: string; amount?: number }[]
+  outputs: { circuit: number; kind: 'item' | 'fluid'; label: string }[]
+}
+
+export type QftRecipeState = {
+  id: string
+  trigger: string
+  low: boolean
+  done: boolean
+  disabled: boolean
+  urgency: number
+  cycles?: number
+  outputs: { circuit: number; amount: number; target: number }[]
+}
+
+export type QftSetup = {
+  name: string
+  coords: { x: number; y: number; z: number } | null
+  seenAt: string
+  catalog: QftCatalogRecipe[]
+  status: {
+    state: {
+      phase?: string
+      mode?: QftMode
+      want?: string
+      recipe?: string
+      fermium?: boolean
+      neptunium?: number
+      cycleSeconds?: number
+    } | null
+    recipes: QftRecipeState[]
+    plasma: { neptunium?: number; fermium?: number } | null
+  }
+  settings: QftSettings | null
+}
+
+export async function fetchQft(): Promise<QftSetup[]> {
+  return (await call<{ items: QftSetup[] }>('GET', '/api/v1/qft')).items
+}
+
+export async function putQftSettings(name: string, settings: Omit<QftSettings, 'version'>): Promise<void> {
+  await call('PUT', `/api/v1/qft/${encodeURIComponent(name)}/settings`, settings)
+}
+
+export async function forgetQft(name: string): Promise<void> {
+  await call('DELETE', `/api/v1/qft/${encodeURIComponent(name)}`)
+}
+

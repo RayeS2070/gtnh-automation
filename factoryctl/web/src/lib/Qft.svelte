@@ -1,0 +1,298 @@
+<script lang="ts">
+  import {
+    fetchQft,
+    forgetQft,
+    putQftSettings,
+    type QftCatalogRecipe,
+    type QftMode,
+    type QftOutputSettings,
+    type QftSetup,
+  } from './api'
+  import { amount, compact, parseAmount, plainLabel } from './format'
+  import { every, kRefreshMs } from './refresh'
+
+  let setups = $state<QftSetup[]>([])
+  let error = $state('')
+  // The settings being edited, per setup: recipe id -> circuit -> fields as typed. Reloads keep it.
+  let editing = $state<Record<string, { mode: QftMode; fields: Record<string, Record<number, Record<string, string>>> }>>({})
+
+  async function load() {
+    try {
+      setups = await fetchQft()
+      error = ''
+    } catch (e) {
+      error = String(e)
+    }
+  }
+  load()
+  $effect(() => every(kRefreshMs, load))
+
+  async function act(fn: () => Promise<void>) {
+    try {
+      await fn()
+      await load()
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+    }
+  }
+
+  const kOffline = 60_000 // ms without a poll: the agent or its computer is away
+  const online = (s: QftSetup) => Date.now() - new Date(s.seenAt).getTime() < kOffline
+
+  const outputSettings = (s: QftSetup, recipe: string, circuit: number): QftOutputSettings | undefined =>
+    s.settings?.recipes.find((r) => r.id === recipe)?.outputs.find((o) => o.circuit === circuit)
+  const recipeState = (s: QftSetup, recipe: string) => s.status.recipes.find((r) => r.id === recipe)
+  const outputState = (s: QftSetup, recipe: string, circuit: number) =>
+    recipeState(s, recipe)?.outputs.find((o) => o.circuit === circuit)
+
+  // The fields a trigger edits: deficit keeps stock (target, priority), surplus weighs outputs.
+  const fieldsOf = (r: QftCatalogRecipe) => (r.trigger === 'surplus' ? ['weight'] : ['target', 'priority'])
+
+  function startEdit(s: QftSetup) {
+    const fields: Record<string, Record<number, Record<string, string>>> = {}
+    for (const r of s.catalog) {
+      fields[r.id] = {}
+      for (const o of r.outputs) {
+        const cur = outputSettings(s, r.id, o.circuit)
+        fields[r.id][o.circuit] = {}
+        for (const f of fieldsOf(r)) {
+          const v = cur?.[f as keyof QftOutputSettings]
+          fields[r.id][o.circuit][f] = v === undefined ? '' : String(v)
+        }
+      }
+    }
+    editing[s.name] = { mode: s.settings?.mode ?? 'auto', fields }
+  }
+
+  // A typed value: empty is none (an output without a target is not tracked); k/M/G as elsewhere.
+  function value(text: string): number | undefined | null {
+    const t = text.trim()
+    if (t === '') return undefined
+    const n = parseAmount(t)
+    if (n !== null) return n
+    const f = Number(t)
+    return Number.isFinite(f) && f >= 0 ? f : null
+  }
+
+  function save(s: QftSetup) {
+    const e = editing[s.name]
+    const recipes = s.catalog.map((r) => ({
+      id: r.id,
+      outputs: r.outputs.map((o) => {
+        const out: QftOutputSettings = { circuit: o.circuit }
+        for (const f of fieldsOf(r)) {
+          const v = value(e.fields[r.id][o.circuit][f])
+          if (v === null) throw new Error(`${r.name}, ${o.label}: ${f} is not a number`)
+          if (v !== undefined) (out as Record<string, number>)[f] = v
+        }
+        return out
+      }),
+    }))
+    act(async () => {
+      await putQftSettings(s.name, { mode: e.mode, recipes })
+      delete editing[s.name]
+    })
+  }
+
+  function phaseText(s: QftSetup) {
+    const st = s.status.state
+    if (!st?.phase) return 'no report yet'
+    if (!st.recipe) return st.phase
+    let text = `${st.phase}: ${s.catalog.find((r) => r.id === st.recipe)?.name ?? st.recipe}`
+    if (st.fermium) text += ' + Fermium'
+    if (st.neptunium) text += ` + Neptunium on output ${st.neptunium}`
+    return text
+  }
+
+  const percent = (a: number, t: number) => `${Math.round((1000 * a) / t) / 10}%`
+</script>
+
+<section>
+  {#if error}<p class="error">{error}</p>{/if}
+  {#if setups.length === 0 && !error}
+    <p class="muted">No QFT yet: a QFT agent with `server` in its config/components.lua shows here after its first poll.</p>
+  {/if}
+  {#each setups as s (s.name)}
+    <article class:offline={!online(s)}>
+      <header>
+        <h2>{s.name}</h2>
+        {#if s.coords}<span class="muted">at {s.coords.x}, {s.coords.y}, {s.coords.z}</span>{/if}
+        <span class="muted">· {online(s) ? 'polled' : 'OFFLINE since'} {new Date(s.seenAt).toLocaleTimeString()}</span>
+        <span class="spacer"></span>
+        <button
+          class="link"
+          title="Forget this setup and its settings"
+          onclick={() => {
+            if (confirm(`Forget ${s.name}? Its settings go too; a running agent comes back as a new setup.`))
+              act(() => forgetQft(s.name))
+          }}>✕</button>
+      </header>
+      <p class="state">
+        <strong>{phaseText(s)}</strong>
+        {#if s.status.state?.cycleSeconds}<span class="muted">· cycle {s.status.state.cycleSeconds} s</span>{/if}
+        {#if s.settings}<span class="muted">· mode {s.settings.mode}, settings v{s.settings.version}</span>{/if}
+        {#if s.status.plasma}
+          <span class="muted">· plasma: Neptunium {s.status.plasma.neptunium != null ? compact(s.status.plasma.neptunium) : '?'},
+            Fermium {s.status.plasma.fermium != null ? compact(s.status.plasma.fermium) : '?'} L</span>
+        {/if}
+      </p>
+
+      {#if editing[s.name]}
+        <form class="inline" onsubmit={(e) => { e.preventDefault(); try { save(s) } catch (err) { error = String(err) } }}>
+          <label>
+            Mode
+            <select bind:value={editing[s.name].mode}>
+              <option value="auto">auto: products first, then raw materials</option>
+              <option value="deficit">deficit: only keep products stocked</option>
+              <option value="surplus">surplus: only process raw materials</option>
+            </select>
+          </label>
+          <button type="submit">Save</button>
+          <button type="button" onclick={() => delete editing[s.name]}>Cancel</button>
+          <span class="muted">empty target: the output is not tracked</span>
+        </form>
+      {:else if s.settings}
+        <button onclick={() => startEdit(s)}>Edit settings</button>
+      {/if}
+
+      <table>
+        <tbody>
+          {#each s.catalog as r (r.id)}
+            {@const st = recipeState(s, r.id)}
+            <tr class="recipe" class:current={s.status.state?.recipe === r.id}>
+              <th colspan="4">
+                {r.name}
+                <span class="tag">{r.trigger}</span>
+                <span class="muted small">tier {r.tier}, {r.catalysts} catalysts</span>
+                {#if st?.disabled}<span class="tag">no catalysts</span>
+                {:else if st?.low}<span class="tag warn">wants to run</span>{/if}
+                {#if st?.cycles != null}<span class="muted small">· inputs for {st.cycles.toFixed(1)} cycles</span>{/if}
+              </th>
+            </tr>
+            {#each r.outputs as o (o.circuit)}
+              {@const cur = outputSettings(s, r.id, o.circuit)}
+              {@const os = outputState(s, r.id, o.circuit)}
+              <tr>
+                <td class="label"><span class="muted">{o.circuit}.</span> {plainLabel(o.label)}</td>
+                <td class="num">
+                  {#if os}
+                    {amount(os.amount)}{o.kind === 'fluid' ? ' mB' : ''}
+                    <span class="muted">/ {compact(os.target)}, {percent(os.amount, os.target)}</span>
+                  {/if}
+                </td>
+                {#if editing[s.name]}
+                  <td colspan="2">
+                    {#each fieldsOf(r) as f (f)}
+                      <label class="field">{f} <input bind:value={editing[s.name].fields[r.id][o.circuit][f]} size="8" /></label>
+                    {/each}
+                  </td>
+                {:else}
+                  <td class="num muted">
+                    {#if r.trigger === 'surplus'}
+                      {cur?.weight != null ? `weight ${cur.weight}` : 'not wanted'}
+                    {:else}
+                      {cur?.target != null ? `keep ${compact(cur.target)}` : 'not tracked'}
+                    {/if}
+                  </td>
+                  <td class="num muted">{r.trigger !== 'surplus' && cur?.priority != null ? `priority ${cur.priority}` : ''}</td>
+                {/if}
+              </tr>
+            {/each}
+          {/each}
+        </tbody>
+      </table>
+    </article>
+  {/each}
+</section>
+
+<style>
+  article {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 1rem;
+  }
+  article.offline {
+    opacity: 0.6;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+  h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .state {
+    margin: 0.4rem 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+  }
+  td,
+  th {
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+  tr.recipe th {
+    padding-top: 0.7rem;
+    font-weight: 600;
+  }
+  tr.current th {
+    color: var(--accent, inherit);
+  }
+  .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .label {
+    white-space: nowrap;
+  }
+  .field {
+    margin-right: 0.6rem;
+    white-space: nowrap;
+  }
+  form.inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.8rem;
+    align-items: center;
+  }
+  .tag {
+    font-size: 0.7rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    color: var(--muted);
+    font-weight: normal;
+  }
+  .tag.warn {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+  .small {
+    font-size: 0.8rem;
+    font-weight: normal;
+  }
+  button.link {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .error {
+    color: var(--error);
+  }
+</style>
