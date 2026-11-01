@@ -7,7 +7,6 @@
 ---Changes nothing. Run from the qftctl directory:
 ---  tools/qft-dump.lua [file]      (default /home/qft-dump.txt)
 local component = require('component')
-local serialization = require('serialization')
 local shell = require('shell')
 
 local args = shell.parse(...)
@@ -53,11 +52,14 @@ for _, kind in ipairs(kTypes) do
 
         if kind == 'me_inputbus' or kind == 'me_inputhatch' then
             local size = ask(proxy, 'getSlotSize')
+            -- Slots count from 1 (slot 0: "invalid slot", in game). Only configured ones are kept:
+            -- a dozen buses of 16 empty slots would bury them.
             local slots = {}
-            -- Whether slots count from 0 or 1 is not known: both ends are asked.
-            local last = type(size) == 'number' and size or 16
-            for slot = 0, last do
-                slots[#slots + 1] = { slot = slot, configuration = ask(proxy, 'getConfiguration', slot) }
+            for slot = 1, type(size) == 'number' and size or 16 do
+                local c = ask(proxy, 'getConfiguration', slot)
+                if (type(c) == 'table' and next(c) ~= nil) or type(c) == 'string' then
+                    slots[#slots + 1] = { slot = slot, configuration = c }
+                end
             end
             dump.stocking[#dump.stocking + 1] = {
                 type = kind,
@@ -102,23 +104,45 @@ if not f then
     io.stderr:write(('cannot write %s: %s\n'):format(path, tostring(err)))
     return 1
 end
+---Every field, nothing cut: OpenOS's serialization.serialize(v, true) stops a table after ten
+---lines.
+local function write(v, indent)
+    if type(v) == 'string' then
+        f:write(('%q'):format(v))
+    elseif type(v) ~= 'table' then
+        f:write(tostring(v))
+    else
+        local keys = {}
+        for k in pairs(v) do keys[#keys + 1] = k end
+        table.sort(keys, function(a, b)
+            if type(a) == type(b) then return a < b end
+            return type(a) == 'number'
+        end)
+        f:write('{\n')
+        for _, k in ipairs(keys) do
+            f:write(indent, '  ')
+            if type(k) ~= 'number' then
+                f:write(tostring(k), ' = ')
+            end
+            write(v[k], indent .. '  ')
+            f:write(',\n')
+        end
+        f:write(indent, '}')
+    end
+end
+
 for _, section in ipairs({ 'components', 'stocking', 'qft', 'networks' }) do
     f:write('-- ' .. section .. '\n')
-    f:write(serialization.serialize(dump[section], true), '\n\n')
+    write(dump[section], '')
+    f:write('\n\n')
 end
 f:close()
 
 print(('%d components, %d stocking buses/hatches, %d QFT controllers, %d networks -> %s'):format(
     #dump.components, #dump.stocking, #dump.qft, #dump.networks, path))
 for _, s in ipairs(dump.stocking) do
-    local configured = 0
-    for _, slot in ipairs(s.slots) do
-        if type(slot.configuration) == 'table' and next(slot.configuration) then
-            configured = configured + 1
-        end
-    end
-    print(('  %s %s: %s slots, %d configured'):format(s.type, s.address:sub(1, 8),
-        tostring(s.slotSize), configured))
+    print(('  %s %s%s: %s slots, %d configured'):format(s.type, s.address:sub(1, 8),
+        s.advanced == true and ' (advanced)' or '', tostring(s.slotSize), #s.slots))
 end
 if #dump.stocking > 0 then
     local any = false
