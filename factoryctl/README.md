@@ -294,6 +294,12 @@ operation and stands.
 Local tests: `cd mining && lua tests/run.lua`; against a running server, with a fake module and
 simulated time: `lua tests/live.lua` (the development server). The mining catalog
 (`server/data/mining_catalog.json`) comes from `mining/tools/mining-catalog.py`: smc's asteroids
-(GT5U), the item ids of their outputs (MEDINA's asteroid dump, `../gtnh-miner`) and the
-modpack's labels, checked against each other.
+(GT5U), the item ids of their outputs (`mining/data/asteroid_dump.json`, from MEDINA's
+asteroiddump mod) and the modpack's labels, checked against each other.
+
+Much of what the agent knows of the modules comes from
+[MEDINA](https://github.com/jdlovins/GTNH-Miner) (GTNH-Miner by Josh Lovins and contributors), an
+OpenComputers mining system for the same modules: the parameter names on 2.9, the drone path, the
+pitfalls of loading, the asteroid dump. No code of it is used; the asteroid dump is copied as it
+is (the repository is public domain).
 

@@ -6,8 +6,9 @@ game; run it again when the modpack moves on (after smc's tools/extract_asteroid
 
 Sources, joined and checked against each other (any disagreement stops it):
   * smc/data/asteroids.json: the asteroids as addRecipesToDrones gets them (GT5U source);
-  * gtnh-miner/asteroid-dump/asteroid_dump.json (MEDINA's asteroiddump mod, read from a running
-    game): the item id of every drop, in the same order, and what processing makes of it;
+  * mining/data/asteroid_dump.json (made by the asteroiddump mod of MEDINA,
+    https://github.com/jdlovins/GTNH-Miner, public domain; read from a running game): the item id
+    of every drop, in the same order, and what processing makes of it;
   * assets/data/data.bin (the GTNH calculator's export, GTNH 2.9.0): that every id exists, and
     the labels (without the "End " the game puts before endstone ores: ids are the key).
 Drones, drill tips and rods are GT5U's (ItemMiningDrones.DroneMaterials, toolHeadDrill =
@@ -22,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 SMC = ROOT / 'smc' / 'data' / 'asteroids.json'
-DUMP = ROOT / 'gtnh-miner' / 'asteroid-dump' / 'asteroid_dump.json'
+DUMP = ROOT / 'factoryctl' / 'mining' / 'data' / 'asteroid_dump.json'
 DATA = ROOT / 'assets' / 'data' / 'data.bin'
 OUT = ROOT / 'factoryctl' / 'server' / 'data' / 'mining_catalog.json'
 
