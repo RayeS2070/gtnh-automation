@@ -1,6 +1,7 @@
 -- Files installed by tools/gtnh-install.lua: the in-game agents; the server is not for OC.
 -- Installed into /home/factoryctl. The crafting agent runs from agent/, the pumping agent from
--- pumps/, the QFT agent from qft/ (both take the shared fc/ modules from ../agent).
+-- pumps/, the QFT agent from qft/, the mining agent from mining/ (they take the shared fc/
+-- modules from ../agent).
 return {
     code = {
         'agent/main.lua',
@@ -34,13 +35,18 @@ return {
         'qft/qft/slots.lua',
         'qft/qft/store.lua',
         'qft/tools/qft-dump.lua', -- what the QFT agent sees in game; changes nothing
-        'mining/tools/mining-dump.lua', -- what a mining agent would see; changes nothing
+        'mining/main.lua',
+        'mining/mm/miner.lua',
+        'mining/mm/module.lua',
+        'mining/tools/mining-dump.lua', -- what the mining agent sees in game; changes nothing
     },
     config = {
         'agent/config.lua',
         'pumps/config.lua',
+        'mining/config.lua',
         'qft/config/components.lua',
         'qft/config/recipes.lua',
     },
-    run = 'cd agent && main   (pumping: cd pumps && main; QFT: cd qft && main setup)',
+    run = 'cd agent && main   (pumping: cd pumps && main; QFT: cd qft && main setup;'
+        .. ' mining: cd mining && main)',
 }
