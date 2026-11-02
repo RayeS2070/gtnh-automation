@@ -41,6 +41,43 @@ suite('discovery: nearest stocking parts, the drone path from the config', funct
     eq(mod.parts.interface, w.interface, 'interface by prefix')
 end)
 
+suite('drone path found without config: one module, one transposer', function()
+    local w = fakeWorld()
+    w.deps.config.drones = nil
+    local m = miner.new(w.deps, 0)
+    m:discover(0)
+    local p = m.modules['169,33,-36'].parts
+    eq(p.transposer, w.transposer, 'the transposer')
+    eq(p.busSide, 4, 'bus side from what it holds')
+    eq(p.poolSide, 0, 'pool side from what it holds')
+    eq(p.interface, w.interface, 'the only interface')
+end)
+
+suite('drone path: spaces in the key, sides left out', function()
+    local w = fakeWorld()
+    w.deps.config.drones = { ['169, 33, -36'] = { transposer = 'tp-' } }
+    local m = miner.new(w.deps, 0)
+    m:discover(0)
+    local p = m.modules['169,33,-36'].parts
+    eq(p.transposer, w.transposer, 'the transposer')
+    eq(p.busSide, 4, 'bus side')
+    eq(p.poolSide, 0, 'pool side')
+end)
+
+suite('config mistakes are told', function()
+    local w = fakeWorld()
+    w.deps.config.drones = { ['173, 28, -37'] = { transposer = 'tp-' } }
+    w.deps.config.pool = '170, 31, -36'
+    local m = miner.new(w.deps, 0)
+    m:discover(0)
+    local text = w.warnings or ''
+    check(text:find('drones["173,28,-37"]: no mining module there; the modules are at 169,33,-36',
+        1, true), 'a wrong key names the modules: ' .. text)
+    check(text:find('pool = "170, 31, -36"', 1, true), 'coordinates as pool')
+    -- The transposer is not taken by the wrong key: the module finds it.
+    eq(m.modules['169,33,-36'].parts.transposer, w.transposer, 'found anyway')
+end)
+
 suite('report: modules, pool, buffer, routing slots', function()
     local w = fakeWorld()
     local m = miner.new(w.deps, 0)

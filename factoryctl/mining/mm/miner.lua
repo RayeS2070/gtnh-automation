@@ -55,6 +55,8 @@ function miner.new(deps, now)
         bufferLimit = nil,
         routes = {},
         held = false,
+        warned = {},     -- config mistakes told once
+        pathText = {},   -- the drone path last told, per module
     }, miner)
     return m
 end
@@ -99,6 +101,99 @@ function miner:nearest(kind, x, y, z, taken)
     return best
 end
 
+---The sides of a transposer from what they hold: a GT machine is the drone bus, an interface the
+---pool. nil for a side it does not have, or has twice (a controller and a bus: say it in config).
+function miner:sidesOf(transposer)
+    local bus, pool, buses = nil, nil, 0
+    for side = 0, 5 do
+        local ok, name = call(transposer, 'getInventoryName', side)
+        if ok and type(name) == 'string' then
+            if name == 'gt.blockmachines' then
+                bus, buses = side, buses + 1
+            elseif name:lower():find('interface', 1, true) then
+                pool = pool or side
+            end
+        end
+    end
+    return buses == 1 and bus or nil, pool
+end
+
+---The interfaces of the drone pool this computer has.
+function miner:interfaces()
+    local out = {}
+    for _, kind in ipairs({ 'fluid_interface', 'me_interface' }) do
+        for address in self.deps.list(kind) do out[#out + 1] = self.deps.proxy(address) end
+    end
+    return out
+end
+
+---The drone path of each module: from config.lua (drones, by the controller's coordinates; spaces
+---allowed), else found: with one module left and one transposer that has a drone bus and an
+---interface, they go together. The sides, when config.lua leaves them out, from what they hold;
+---the interface, when it does, the only one there is.
+function miner:paths(ids)
+    local given, out = {}, {}
+    for key, path in pairs(self.deps.config.drones or {}) do
+        given[(tostring(key):gsub('%s', ''))] = path
+    end
+    local known = {}
+    for _, id in ipairs(ids) do known[id] = true end
+    for key in pairs(given) do
+        if not known[key] and not self.warned[key] then
+            self.warned[key] = true
+            self.warn('config.lua drones[%q]: no mining module there; the modules are at %s'
+                .. ' (the controllers\' coordinates)', key, table.concat(ids, ' '))
+        end
+    end
+    local used, missing = {}, {}
+    for _, id in ipairs(ids) do
+        local g = given[id]
+        if g then
+            local t = self:find('transposer', g.transposer)
+            if t then used[t.address] = true end
+            out[id] = { transposer = t, bus = g.bus, pool = g.pool, interface = g.interface,
+                from = 'config.lua' }
+        else
+            missing[#missing + 1] = id
+        end
+    end
+    if #missing == 1 then
+        local candidates = {}
+        for address in self.deps.list('transposer') do
+            if not used[address] then
+                local t = self.deps.proxy(address)
+                local bus, pool = self:sidesOf(t)
+                if bus and pool then candidates[#candidates + 1] = t end
+            end
+        end
+        if #candidates == 1 then
+            out[missing[1]] = { transposer = candidates[1], from = 'found' }
+        end
+    end
+    local interfaces = self:interfaces()
+    for _, path in pairs(out) do
+        if path.transposer and not (path.bus and path.pool) then
+            local bus, pool = self:sidesOf(path.transposer)
+            path.bus, path.pool = path.bus or bus, path.pool or pool
+        end
+        if path.interface then
+            path.interface = self:find('fluid_interface', path.interface)
+                or self:find('me_interface', path.interface)
+        elseif #interfaces == 1 then
+            path.interface = interfaces[1]
+        end
+    end
+    return out
+end
+
+local function why(path)
+    if not path then return 'no drone path: give it one in config.lua (drones)' end
+    if not path.transposer then return 'no drone path: no such transposer' end
+    if not (path.bus and path.pool) then return 'no drone path: say the transposer\'s sides' end
+    if not path.interface then return 'no drone path: which interface? (drones[...].interface)' end
+    return nil
+end
+
 function miner:discover(now)
     local found, taken = {}, {}
     for address in self.deps.list('gt_machine') do
@@ -118,9 +213,15 @@ function miner:discover(now)
     local ids = {}
     for id in pairs(found) do ids[#ids + 1] = id end
     table.sort(ids)
+    local paths = self:paths(ids)
+    local pool = self.deps.config.pool
+    if type(pool) == 'string' and pool:find('[^%x%-]') and not self.warned.pool then
+        self.warned.pool = true
+        self.warn('config.lua pool = %q: an address prefix of an interface, not coordinates', pool)
+    end
     for _, id in ipairs(ids) do
         local f = found[id]
-        local path = self.deps.config.drones and self.deps.config.drones[id]
+        local path = paths[id]
         local parts = {
             controller = f.proxy,
             bus = self:nearest('me_inputbus', f.x, f.y, f.z, taken),
@@ -128,10 +229,9 @@ function miner:discover(now)
         }
         if parts.bus then taken[parts.bus.address] = true end
         if parts.hatch then taken[parts.hatch.address] = true end
-        if path then
-            parts.transposer = self:find('transposer', path.transposer)
-            parts.interface = self:find('fluid_interface', path.interface)
-                or self:find('me_interface', path.interface)
+        local missing = why(path)
+        if not missing then
+            parts.transposer, parts.interface = path.transposer, path.interface
             parts.busSide, parts.poolSide = path.bus, path.pool
         end
         local m = self.modules[id]
@@ -139,13 +239,19 @@ function miner:discover(now)
             m.parts = parts -- an adapter placed anew has a new address
         else
             self.modules[id] = module.new(id, f.tier, parts, now, self.warn)
-            self.info('mining module T%d at %s%s', f.tier, id, path and '' or ' (no drone path)')
+        end
+        local text = missing or ('drone path %s: transposer %s, bus side %d, pool side %d'):format(
+            path.from, path.transposer.address:sub(1, 8), path.bus, path.pool)
+        if self.pathText[id] ~= text then
+            self.pathText[id] = text
+            self.info('mining module T%d at %s: %s', f.tier, id, text)
         end
     end
     for id in pairs(self.modules) do
         if not found[id] then
             self.warn('mining module at %s is gone', id)
             self.modules[id] = nil
+            self.pathText[id] = nil
         end
     end
     self.discoverAt = now + kDiscover
@@ -155,6 +261,7 @@ end
 function miner:pool()
     local cfg = self.deps.config
     local proxy = self:find('fluid_interface', cfg.pool) or self:find('me_interface', cfg.pool)
+        or (not cfg.pool and self:interfaces()[1]) or nil
     if not proxy then return {} end
     local ok, stacks = call(proxy, 'getItemsInNetwork', { name = module.kDrone })
     local out = {}

@@ -283,8 +283,9 @@ cd /home/factoryctl && mining/tools/mining-dump.lua   # addresses, sides, coordi
 cd mining && edit config.lua && main
 ```
 
-`config.lua`: the setup's name, per module (by its controller's coordinates) the transposer, its
-two sides and the pool interface, the storage buses and the buffer network. Several computers
+`config.lua`: the setup's name; per module (by its controller's coordinates, as the agent prints
+them) the transposer and the pool interface — found by themselves with one module and one
+transposer, the sides always by what they hold; the storage buses and the buffer network. Several computers
 may share one server: each is a setup, the plan of one counts what the others mine.
 
 Without the server the modules go on with their last setting; once a kept ore fills the buffer

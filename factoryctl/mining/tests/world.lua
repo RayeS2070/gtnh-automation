@@ -82,6 +82,12 @@ local function fakeWorld()
         if side == 0 then return poolSlot()[slot] end
         return nil
     end
+    function t.getInventoryName(side)
+        if side == 4 then return 'gt.blockmachines' end
+        if side == 0 then return 'tile.fluid_interface' end
+        if side == 1 then return 'tile.oc.adapter' end
+        return nil, 'no inventory'
+    end
     function t.transferItem(from, to, count, slot, toSlot)
         local src = from == 4 and w.droneBus or poolSlot()
         local stack = src[slot or 1]
