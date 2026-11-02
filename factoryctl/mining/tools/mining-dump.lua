@@ -6,6 +6,9 @@
 ---    information, work state, coordinates;
 ---  * each ME stocking input bus and hatch: its settings and every configured slot;
 ---  * each transposer: what every side holds (a drone bus, an interface buffer);
+---  * each storage bus (me_storagebus, fluid_storagebus, or any component that has
+---    getStorageSlotSize, aemultipart included): per side of its cable, the slot count, the ore
+---    filter and every configured slot;
 ---  * the ME networks: drones (getItemInNetwork per tier: a hash lookup), the steel drill tip and
 ---    rod (getItemsInNetwork with a label filter: it still converts the whole network once per
 ---    call, fine for one dump), plasmas. No unfiltered item scan: one took the game server down.
@@ -83,7 +86,7 @@ local function stacks(list)
 end
 
 local dump = { components = {}, machines = {}, modules = {}, stocking = {}, transposers = {},
-    networks = {} }
+    storagebuses = {}, networks = {} }
 
 -- The computer's own parts: their methods tell nothing about the setup.
 local kOwn = { computer = true, eeprom = true, filesystem = true, gpu = true, screen = true,
@@ -165,6 +168,30 @@ for address in component.list('transposer', true) do
     dump.transposers[#dump.transposers + 1] = { address = address, sides = sides }
 end
 
+-- Storage buses: the methods take the side of the cable the bus is on; a side without one errs.
+for address, kind in component.list() do
+    local proxy = component.proxy(address)
+    if proxy.getStorageSlotSize then
+        local sides = {}
+        for side = 0, 5 do
+            local size = ask(proxy, 'getStorageSlotSize', side)
+            if type(size) == 'number' then
+                local slots = {}
+                for slot = 1, size do
+                    local c = ask(proxy, 'getStorageConfiguration', side, slot)
+                    if (type(c) == 'table' and next(c) ~= nil) or type(c) == 'string' then
+                        slots[#slots + 1] = { slot = slot, configuration = stacks({ c })[1] or c }
+                    end
+                end
+                sides[#sides + 1] = { side = side, slotSize = size,
+                    oreFilter = ask(proxy, 'getStorageOreFilter', side), slots = slots }
+            end
+        end
+        dump.storagebuses[#dump.storagebuses + 1] = { type = kind, address = address,
+            name = ask(proxy, 'getName'), sides = sides }
+    end
+end
+
 for _, kind in ipairs({ 'fluid_interface', 'me_controller', 'me_interface' }) do
     for address in component.list(kind, true) do
         local proxy = component.proxy(address)
@@ -231,7 +258,8 @@ local function write(v, indent)
     end
 end
 
-local kSections = { 'components', 'machines', 'modules', 'stocking', 'transposers', 'networks' }
+local kSections = { 'components', 'machines', 'modules', 'stocking', 'transposers', 'storagebuses',
+    'networks' }
 for _, section in ipairs(kSections) do
     f:write('-- ' .. section .. '\n')
     write(dump[section], '')
@@ -244,9 +272,15 @@ for _, m in ipairs(dump.modules) do
     if isMiner(m.name) then miners = miners + 1 end
     print(('  %s %s'):format(m.address:sub(1, 8), tostring(m.name)))
 end
-print(('%d components, %d gt_machine, %d mining modules, %d stocking, %d transposers, %d networks -> %s')
-    :format(#dump.components, #dump.machines, miners, #dump.stocking, #dump.transposers,
-        #dump.networks, path))
+print(('%d components, %d gt_machine, %d mining modules, %d stocking, %d transposers, '
+    .. '%d storage buses, %d networks -> %s'):format(#dump.components, #dump.machines, miners, #dump.stocking, #dump.transposers,
+        #dump.storagebuses, #dump.networks, path))
+for _, b in ipairs(dump.storagebuses) do
+    for _, side in ipairs(b.sides) do
+        print(('  %s %s side %d: %d slots, %d configured, ore filter %s'):format(b.type,
+            b.address:sub(1, 8), side.side, side.slotSize, #side.slots, tostring(side.oreFilter)))
+    end
+end
 if miners == 0 then
     print('No mining module found: put an Adapter on a module controller and run it again.')
 end
