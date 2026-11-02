@@ -1,5 +1,6 @@
 ---Dumps what a mining agent for the Space Elevator needs to know, into one file of Lua tables:
----  * every component: type and address (what this computer reaches);
+---  * every component: type and address (what this computer reaches), and the methods of those
+---    that are not the computer's own parts;
 ---  * every gt_machine: getName(); for the mining modules (projectmoduleminert1..3) and the Space
 ---    Elevator itself, all their methods and what the harmless getters give: parameters, sensor
 ---    information, work state, coordinates;
@@ -84,8 +85,14 @@ end
 local dump = { components = {}, machines = {}, modules = {}, stocking = {}, transposers = {},
     networks = {} }
 
+-- The computer's own parts: their methods tell nothing about the setup.
+local kOwn = { computer = true, eeprom = true, filesystem = true, gpu = true, screen = true,
+    keyboard = true, internet = true }
+
 for address, kind in component.list() do
-    dump.components[#dump.components + 1] = { type = kind, address = address }
+    -- The methods of the rest show what a component is (aemultipart: any AE part).
+    dump.components[#dump.components + 1] = { type = kind, address = address,
+        methods = not kOwn[kind] and kind ~= 'gt_machine' and methods(address) or nil }
 end
 table.sort(dump.components, function(a, b)
     if a.type ~= b.type then return a.type < b.type end
