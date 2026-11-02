@@ -5,7 +5,7 @@
 return {
     -- The factoryctl server. OpenComputers refuses private and local addresses by default
     -- (internet.filteringRules in its config on the game server): allow the server's address.
-    server = 'http://127.0.0.1:8090',
+    server = 'http://127.0.0.1:8080',
     -- The pumping network's fluid_interface or me_controller, as a prefix of its address; nil = the
     -- only one. Its stock is what the targets are about.
     me = nil,

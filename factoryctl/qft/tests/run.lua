@@ -181,7 +181,7 @@ do
         neptunium = { hatch = bind.manual { type = 'me_inputhatch', prompt = 'n' } } } }, {}), ' ')
         :find('plasma: hatch must be'), 'old per-plasma hatches refused')
     local named = components()
-    named.server, named.name = 'http://127.0.0.1:8090', 'qft-main'
+    named.server, named.name = 'http://127.0.0.1:8080', 'qft-main'
     check(#config.checkValues(named, {}) == 0, 'server and name are fine')
     named.name = ''
     check(table.concat(config.checkValues(named, {}), ' '):find('name must be'), 'an empty name refused')

@@ -10,7 +10,7 @@ return {
     -- The factoryctl server: settings (targets, weights, mode) come from it and are kept on this
     -- computer; it shows what the QFT does. nil: no server, config/recipes.lua as it is.
     -- OpenComputers refuses private and local addresses by default (internet.filteringRules).
-    server = 'http://127.0.0.1:8090',
+    server = 'http://127.0.0.1:8080',
     -- This setup's name on the server; nil: qft@x,y,z of the controller. Give each QFT its own.
     name = nil,
     controller = bind.manual { type = 'gt_machine', prompt = 'Quantum Force Transformer controller' },

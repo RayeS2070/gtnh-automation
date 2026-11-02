@@ -1,10 +1,10 @@
 ---The real pumping agent against a running server, outside the game: HTTP through curl, three
 ---T1 pump modules and the pumping network faked, time simulated (fast). Checks that both ends
 ---speak the same protocol. Not installed in game.
----  cd pumps && lua tests/live.lua [http://localhost:8080] [simulated seconds]
+---  cd pumps && lua tests/live.lua [http://localhost:8081] [simulated seconds]
 package.path = './?.lua;../agent/?.lua;' .. package.path
 local pumps = require('fp.pumps')
-local server, seconds = arg[1] or 'http://localhost:8080', tonumber(arg[2]) or 75
+local server, seconds = arg[1] or 'http://localhost:8081', tonumber(arg[2]) or 75
 
 local function post(path, body)
     local tmp = os.tmpname()

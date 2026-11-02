@@ -119,11 +119,11 @@ docker compose up -d     # development database on localhost:15432
 cmake --preset linux_clang_debug && cmake --build --preset linux_clang_debug
 build/linux/linux_clang_debug/server/factoryctl_server \
     --config server/configs/static_config.yaml --config_vars server/configs/config_vars.yaml
-curl localhost:8080/health
+curl localhost:8081/health
 ```
 
 The web client: `cd web && npm install && npm run build` before starting the server, then open
-http://localhost:8080 (see `web/README.md` for development). Icons need the `assets` submodule
+http://localhost:8081 (see `web/README.md` for development). Icons need the `assets` submodule
 with its `data` submodule checked out (`data-dir` in `config_vars.yaml`).
 
 Tests:
@@ -161,6 +161,17 @@ On the host the server listens on `127.0.0.1:8080` only: the agent runs on the s
 (`server = 'http://127.0.0.1:8080'` in `agent/config.lua`), people open the web client through
 `ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is the `factoryctl_pgdata`
 volume.
+
+Ports, the same wherever the server is deployed (`127.0.0.1` only):
+
+| port  | what |
+|-------|------|
+| 8080  | the deployed server: agents (`server` in their configs), the HTTPS proxy, an SSH tunnel |
+| 8443  | the HTTPS proxy with passwords (`deploy/nginx/factoryctl.conf`) |
+| 8081  | the development server (`server/configs/config_vars.yaml`), `npm run dev` passes to it |
+| 5173  | `npm run dev` |
+| 15432 | the development PostgreSQL (`compose.yaml`), with `factoryctl_test` for the tests |
+| 18081, 18091 | `deploy/check.sh`: the server natively and in a container, while it runs |
 
 Values can be tuned on the host without a deploy, in `~/factoryctl/config/`. `deploy.sh` puts
 both files there once, from `deploy/host_*`, and never overwrites them; set only what differs.
@@ -232,4 +243,4 @@ cd /home/factoryctl/pumps && edit config.lua && main
 ```
 
 Its local tests: `cd pumps && lua tests/run.lua`; against a running server, with fake modules and
-simulated time: `lua tests/live.lua http://localhost:8080`.
+simulated time: `lua tests/live.lua` (the development server, http://localhost:8081).

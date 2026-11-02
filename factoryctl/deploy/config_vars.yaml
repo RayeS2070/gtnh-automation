@@ -2,6 +2,8 @@
 # (merge_vars.awk). Hand-tuned values on the host go to host_config_vars.yaml, not here.
 # The database is the `db` service of deploy/compose.yaml; FACTORYCTL_DB still overrides it.
 db-connection: postgresql://factoryctl:factoryctl@db:5432/factoryctl
+# In the container; compose.yaml publishes it on 127.0.0.1:8080 (the development server is 8081).
+server-port: 8080
 web-dir: /app/web
 # The calculator's export, mounted by compose.yaml.
 data-dir: /app/data

@@ -1,10 +1,10 @@
 ---The real agent against a running server, outside the game: HTTP through curl, the ME network
 ---faked from the dumps. Checks that both ends speak the same protocol. Not installed in game.
----  cd agent && lua tests/live.lua [http://localhost:8080] [polls]
+---  cd agent && lua tests/live.lua [http://localhost:8081] [polls]
 package.path = './?.lua;' .. package.path
 local agent = require('fc.agent')
 local logbuf = require('fc.logbuf')
-local server, polls = arg[1] or 'http://localhost:8080', tonumber(arg[2]) or 3
+local server, polls = arg[1] or 'http://localhost:8081', tonumber(arg[2]) or 3
 
 local function post(path, body)
     local tmp = os.tmpname()

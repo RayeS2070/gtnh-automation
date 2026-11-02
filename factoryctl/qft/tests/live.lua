@@ -1,12 +1,12 @@
 ---The QFT agent's link against a running server, outside the game: HTTP through curl, a small
 ---recipe set, a made-up report. Checks that both ends speak the same protocol. Not installed.
----  cd qft && lua tests/live.lua [http://localhost:8080] [name] [x]
+---  cd qft && lua tests/live.lua [http://localhost:8081] [name] [x]
 package.path = './?.lua;../agent/?.lua;' .. package.path
 local config = require('qft.config')
 local link = require('qft.link')
 local plan = require('qft.plan')
 local resource = require('qft.resource')
-local server, name, x = arg[1] or 'http://localhost:8080', arg[2] or 'qft-live', tonumber(arg[3]) or 1
+local server, name, x = arg[1] or 'http://localhost:8081', arg[2] or 'qft-live', tonumber(arg[3]) or 1
 
 local function post(path, body)
     local tmp = os.tmpname()
