@@ -310,3 +310,81 @@ export async function forgetQft(name: string): Promise<void> {
   await call('DELETE', `/api/v1/qft/${encodeURIComponent(name)}`)
 }
 
+
+// --- Mining (Space Elevator mining modules: the server plans, the agents carry it out) ---------
+
+export type MiningOre = { name: string; damage: number; label: string }
+
+export type MiningTarget = StockItem & {
+  threshold: number
+  priority: number // > 0: urgency = 1 - fill^priority
+  enabled: boolean
+  ores: MiningOre[] // the module outputs it is made of
+}
+
+export type MiningSetting = { droneTier: number; distance: number; plasmaTier: number; parallel: number }
+
+export type MiningModuleStatus = {
+  x: number
+  y: number
+  z: number
+  tier: number
+  state: string // idle | stopping | loading | starting | running | held | unloading | failed
+  active: boolean
+  drone?: number // the drone tier in its bus
+  assignment?: string // what it is set up for: the id of a setting
+  error?: string
+}
+
+export type MiningPlanEntry = {
+  module: string // "x,y,z"
+  tier: number
+  setting?: MiningSetting // none: idle
+  value?: number
+  rates: (MiningOre & { rate: number })[] // wanted outputs, per second
+}
+
+export type MiningSetup = {
+  name: string
+  run: string
+  seenAt: string
+  status: {
+    modules?: MiningModuleStatus[]
+    pool?: { tier: number; count: number }[]
+    buffer?: { name: string; damage: number; size: number }[]
+    slots?: number
+  }
+  plan: MiningPlanEntry[]
+}
+
+export type Mining = {
+  setups: MiningSetup[]
+  targets: MiningTarget[]
+  plasma: { tier: number; label: string } | null
+  bufferLimit: number
+}
+
+export type MiningSource = MiningOre & { hops: number; asteroids: string[] }
+
+export async function fetchMining(): Promise<Mining> {
+  return await call('GET', '/api/v1/mining')
+}
+
+export async function putMiningTarget(
+  goodsId: number,
+  t: { threshold: number; priority: number; enabled: boolean; ores: { name: string; damage: number }[] },
+): Promise<void> {
+  await call('PUT', `/api/v1/mining/targets/${goodsId}`, t)
+}
+
+export async function deleteMiningTarget(goodsId: number): Promise<void> {
+  await call('DELETE', `/api/v1/mining/targets/${goodsId}`)
+}
+
+export async function fetchMiningSources(goodsId: number): Promise<MiningSource[]> {
+  return await call('GET', `/api/v1/mining/sources/${goodsId}`)
+}
+
+export async function forgetMiningSetup(name: string): Promise<void> {
+  await call('DELETE', `/api/v1/mining/setups/${encodeURIComponent(name)}`)
+}
