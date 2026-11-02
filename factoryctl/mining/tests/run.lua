@@ -153,7 +153,10 @@ suite('idle: the drone goes back, the slots are cleared', function()
     eq(w.bus[1], nil, 'no tip')
     eq(w.hatch[1], nil, 'no plasma')
     eq(w.controller.allowed, false, 'not allowed to work')
-    eq(w.storage.slots[1], nil, 'the routing is cleared')
+    -- Nothing kept: an empty bus would take everything, so a placeholder only.
+    eq(w.storage.slots[1] and w.storage.slots[1].name, 'minecraft:bedrock', 'keep bus takes nothing')
+    eq(w.storage.slots[2], nil, 'the rest cleared')
+    eq(w.void.slots[1] and w.void.slots[1].name, 'minecraft:bedrock', 'void bus takes everything')
 end)
 
 suite('no drone in the pool: failed, retried', function()

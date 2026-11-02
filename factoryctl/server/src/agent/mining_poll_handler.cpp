@@ -136,6 +136,14 @@ auto MiningPollHandler::HandleRequestThrow(
                      report->modules.size() == 1 ? "" : "s"));
   }
   const auto before = plannedOf(setup->plan);
+  // A module's error as last reported: told again only when it changes.
+  std::map<std::string, std::string> errorsBefore;
+  // A new setup has no report yet (status missing): nothing to compare.
+  const auto& reported = setup->status["modules"];
+  for (const auto& m : reported.IsArray() ? reported : json::FromString("[]")) {
+    errorsBefore[std::format("{},{},{}", m["x"].As<std::int64_t>(0), m["y"].As<std::int64_t>(0),
+                             m["z"].As<std::int64_t>(0))] = m["error"].As<std::string>("");
+  }
 
   // What the targets want, from the stock and this setup's buffer.
   const auto rows = db::listMiningTargets(tx);
@@ -171,7 +179,9 @@ auto MiningPollHandler::HandleRequestThrow(
                        .tier = m.tier,
                        .current = was != before.end() ? was->second.setting
                                                       : std::nullopt});
-    if (!m.error.empty()) told(std::format("{}: {}", id, m.error), "warning");
+    if (!m.error.empty() && errorsBefore[id] != m.error) {
+      told(std::format("{}: {}", id, m.error), "warning");
+    }
   }
   const auto plan = domain::planMining(catalog, {.modules = modules,
                                                  .others = others,

@@ -315,18 +315,24 @@ function miner:resolveRoutes()
     return slots
 end
 
+-- Written when no ore is kept: an empty storage bus takes everything (the keeping one would send
+-- every ore to processing), one with only this takes nothing - and the inverted one everything.
+local kNothing = { name = 'minecraft:bedrock', damage = 0 }
+
 ---Writes the whitelist into the buses: the keeping one routes these ores to processing, the void
 ---one (an Inverter Card) everything else to the trash.
 function miner:route()
+    local list = #self.keep > 0 and self.keep or { kNothing }
     local parts = {}
-    for _, o in ipairs(self.keep) do parts[#parts + 1] = module.key(o) end
+    for _, o in ipairs(list) do parts[#parts + 1] = module.key(o) end
     local k = table.concat(parts, ' ')
     if k == self.keepKey then return end
+    local written = 0
     for role, r in pairs(self.routes) do
         if r.proxy and r.size then
-            local last = math.max(r.written or r.size, #self.keep)
+            local last = math.max(r.written or r.size, #list)
             for slot = 1, math.min(last, r.size) do
-                local ore = self.keep[slot]
+                local ore = list[slot]
                 local ok, err
                 if ore then
                     ok, err = call(r.proxy, 'setStorageConfiguration', r.side, slot,
@@ -339,11 +345,14 @@ function miner:route()
                     return
                 end
             end
-            r.written = math.min(#self.keep, r.size)
+            r.written = math.min(#list, r.size)
+            written = written + 1
         end
     end
     self.keepKey = k
-    self.info('routing: %d ore%s kept', #self.keep, #self.keep == 1 and '' or 's')
+    if written > 0 then
+        self.info('routing: %d ore%s kept', #self.keep, #self.keep == 1 and '' or 's')
+    end
 end
 
 function miner:report()
