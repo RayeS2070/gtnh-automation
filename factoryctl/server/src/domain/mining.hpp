@@ -71,18 +71,24 @@ auto miningRates(const MiningCatalog& catalog, int moduleTier, int droneTier,
 struct MiningTarget {
   ItemKey product;   // what is kept stocked: a dust, a fluid (keyOf)
   double threshold = 0;
-  double priority = 1;  // > 0; as the pumps: 1 - fill^priority
+  double priority = 1;  // > 0: a weight, 2 is twice as important
   bool enabled = true;
   std::vector<ItemKey> ores;  // the module outputs it is made of
 };
 
-// What each ore is worth now: the targets it feeds that are short of stock.
-// Ores whose buffer before processing is at `bufferLimit` are worth nothing
-// until it drains (the factory is not keeping up).
+// What a target short of stock wants now: its weight, priority × (1 - fill),
+// and the ores that feed it. Ores whose buffer before processing is at
+// `bufferLimit` are left out until it drains (the factory is not keeping up).
+struct MiningNeed {
+  ItemKey product;
+  double weight = 0;
+  std::vector<ItemKey> ores;
+};
+
 auto miningDemand(std::span<const MiningTarget> targets,
                   const std::map<ItemKey, double>& stock,
                   const std::map<ItemKey, double>& buffer, double bufferLimit)
-    -> std::map<ItemKey, double>;
+    -> std::vector<MiningNeed>;
 
 // The ores the storage bus keeps (the rest is voided): every ore of an enabled
 // target short of stock, the most wanted first, at most `slots`. Blocked by
@@ -109,7 +115,7 @@ struct MiningPlanInput {
   std::span<const std::pair<int, MiningSetting>> others;
   std::map<int, int> drones;  // by tier: in the pool and in these modules
   int plasmaTier = 0;
-  std::map<ItemKey, double> demand;
+  std::vector<MiningNeed> needs;
   // A module keeps its setting unless the best one is worth this much more:
   // a change costs a drone swap and a stop.
   double stickiness = 1.25;
@@ -122,9 +128,12 @@ struct MiningAssignment {
   std::map<ItemKey, double> rates;  // per second, all parallels, wanted ones
 };
 
-// One assignment per module, the higher tiers planned first; each module
-// discounts what it covers for the next (half of its share of every ore it
-// yields), after the other setups' modules did.
+// One assignment per module, the higher tiers planned first. A setting is
+// worth Σ need weight × the share of the need it covers: its rate of the
+// need's ores over the best rate this module could have for them. So a rare
+// ore counts as much as a plentiful one (items of different ores do not
+// compare); the weights decide. Each module discounts what it covers for the
+// next (half of its share of every need), after the other setups' modules did.
 auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
     -> std::vector<MiningAssignment>;
 

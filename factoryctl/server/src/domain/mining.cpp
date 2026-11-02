@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 #include <utility>
 
 #include "core/mechanics.hpp"
@@ -32,36 +33,33 @@ auto breakpoints(const MiningCatalog& catalog, int droneTier)
   return out;
 }
 
-auto worth(const std::map<ItemKey, double>& rates,
-           const std::map<ItemKey, double>& demand) -> double {
-  double v = 0;
-  for (const auto& [item, rate] : rates) {
-    if (const auto it = demand.find(item); it != demand.end()) {
-      v += it->second * rate;
-    }
-  }
-  return v;
-}
-
 struct Choice {
   MiningSetting setting;
-  double value = 0;
   std::map<ItemKey, double> rates;  // all parallels
+  double value = 0;
 };
 
-auto evaluate(const MiningCatalog& catalog, int moduleTier,
-              const MiningSetting& s, const std::map<ItemKey, double>& demand)
+auto rateOf(const std::map<ItemKey, double>& rates, const MiningNeed& need)
+    -> double {
+  double r = 0;
+  for (const ItemKey& ore : need.ores) {
+    if (const auto it = rates.find(ore); it != rates.end()) r += it->second;
+  }
+  return r;
+}
+
+auto evaluate(const MiningCatalog& catalog, int moduleTier, const MiningSetting& s)
     -> Choice {
   auto rates = miningRates(catalog, moduleTier, s.droneTier, s.distance,
                            s.plasmaTier);
   for (auto& [item, rate] : rates) rate *= s.parallel;
-  return {.setting = s, .value = worth(rates, demand), .rates = std::move(rates)};
+  return {.setting = s, .rates = std::move(rates)};
 }
 
-auto best(const MiningCatalog& catalog, int moduleTier,
-          const std::map<int, int>& drones, int plasmaTier,
-          const std::map<ItemKey, double>& demand) -> std::optional<Choice> {
-  std::optional<Choice> out;
+// Every setting a module of the tier can take with the drones there are.
+auto settings(const MiningCatalog& catalog, int moduleTier,
+              const std::map<int, int>& drones, int plasmaTier) -> std::vector<Choice> {
+  std::vector<Choice> out;
   for (const auto& [tier, count] : drones) {
     if (count <= 0) continue;
     for (const int d : breakpoints(catalog, tier)) {
@@ -69,23 +67,48 @@ auto best(const MiningCatalog& catalog, int moduleTier,
                         {.droneTier = tier,
                          .distance = d,
                          .plasmaTier = plasmaTier,
-                         .parallel = miningParallels(moduleTier)},
-                        demand);
-      if (c.value > 0 && (!out || c.value > out->value)) out = std::move(c);
+                         .parallel = miningParallels(moduleTier)});
+      if (!c.rates.empty()) out.push_back(std::move(c));
     }
   }
   return out;
 }
 
-// What a module covers is wanted less by the next one: each ore loses half of
-// its share of the module's value.
-auto discount(std::map<ItemKey, double>& demand, const Choice& c) -> void {
-  if (c.value <= 0) return;
-  for (auto& [item, weight] : demand) {
-    const auto it = c.rates.find(item);
-    if (it == c.rates.end()) continue;
-    const double share = weight * it->second / c.value;
-    weight *= 1.0 - 0.5 * std::min(share, 1.0);
+// The best rate of each need's ores among the settings: what "all of it" is.
+auto bests(std::span<const Choice> all, std::span<const MiningNeed> needs)
+    -> std::vector<double> {
+  std::vector<double> out(needs.size(), 0.0);
+  for (const Choice& c : all) {
+    for (std::size_t i = 0; i < needs.size(); ++i) {
+      out[i] = std::max(out[i], rateOf(c.rates, needs[i]));
+    }
+  }
+  return out;
+}
+
+// Σ weight × share of each need; the shares go to `shares` when given.
+auto worth(const Choice& c, std::span<const MiningNeed> needs,
+           std::span<const double> best, std::vector<double>* shares = nullptr)
+    -> double {
+  double v = 0;
+  if (shares) shares->assign(needs.size(), 0.0);
+  for (std::size_t i = 0; i < needs.size(); ++i) {
+    if (best[i] <= 0) continue;
+    const double share = std::min(rateOf(c.rates, needs[i]) / best[i], 1.0);
+    v += needs[i].weight * share;
+    if (shares) (*shares)[i] = share;
+  }
+  return v;
+}
+
+// What a module covers is wanted less by the next one: each need loses half
+// of its part of the module's value.
+auto discount(std::vector<MiningNeed>& needs, std::span<const double> shares,
+              double value) -> void {
+  if (value <= 0) return;
+  for (std::size_t i = 0; i < needs.size(); ++i) {
+    const double part = needs[i].weight * shares[i] / value;
+    needs[i].weight *= 1.0 - 0.5 * std::min(part, 1.0);
   }
 }
 
@@ -132,22 +155,23 @@ auto miningRates(const MiningCatalog& catalog, int moduleTier, int droneTier,
 auto miningDemand(std::span<const MiningTarget> targets,
                   const std::map<ItemKey, double>& stock,
                   const std::map<ItemKey, double>& buffer, double bufferLimit)
-    -> std::map<ItemKey, double> {
-  std::map<ItemKey, double> out;
+    -> std::vector<MiningNeed> {
+  std::vector<MiningNeed> out;
   for (const MiningTarget& t : targets) {
     if (!t.enabled || t.threshold <= 0 || t.priority <= 0) continue;
     const auto it = stock.find(t.product);
     const double have = it == stock.end() ? 0 : it->second;
     const double fill = std::clamp(have / t.threshold, 0.0, 1.0);
-    const double urgency = 1.0 - std::pow(fill, t.priority);
-    if (urgency <= 0) continue;
+    if (fill >= 1) continue;
+    MiningNeed need{.product = t.product, .weight = t.priority * (1.0 - fill)};
     for (const ItemKey& ore : t.ores) {
       const auto b = buffer.find(ore);
       if (b != buffer.end() && bufferLimit > 0 && b->second >= bufferLimit) {
         continue;
       }
-      out[ore] += urgency;
+      need.ores.push_back(ore);
     }
+    if (!need.ores.empty()) out.push_back(std::move(need));
   }
   return out;
 }
@@ -155,9 +179,14 @@ auto miningDemand(std::span<const MiningTarget> targets,
 auto miningWhitelist(std::span<const MiningTarget> targets,
                      const std::map<ItemKey, double>& stock, int slots)
     -> std::vector<ItemKey> {
-  const auto demand = miningDemand(targets, stock, {}, 0);
+  std::map<ItemKey, double> weight;  // an ore: its most wanting need
+  for (const auto& need : miningDemand(targets, stock, {}, 0)) {
+    for (const auto& ore : need.ores) {
+      weight[ore] = std::max(weight[ore], need.weight);
+    }
+  }
   std::vector<std::pair<double, ItemKey>> ranked;
-  for (const auto& [ore, w] : demand) ranked.emplace_back(w, ore);
+  for (const auto& [ore, w] : weight) ranked.emplace_back(w, ore);
   std::ranges::sort(ranked, [](const auto& a, const auto& b) {
     if (a.first != b.first) return a.first > b.first;
     return a.second < b.second;
@@ -183,10 +212,22 @@ auto bestPlasma(const MiningCatalog& catalog,
 
 auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
     -> std::vector<MiningAssignment> {
-  auto demand = input.demand;
+  auto needs = input.needs;
   auto drones = input.drones;
+  std::set<ItemKey> wanted;
+  for (const auto& n : input.needs) wanted.insert(n.ores.begin(), n.ores.end());
+
+  // The other setups' modules first: what they cover is covered. Their best is
+  // taken over every drone tier (their pools are theirs).
+  std::map<int, int> anyDrone;
+  for (int t = 0; t < core::kDroneTierCount; ++t) anyDrone[t] = 1;
   for (const auto& [tier, s] : input.others) {
-    discount(demand, evaluate(catalog, tier, s, demand));
+    const auto all = settings(catalog, tier, anyDrone, s.plasmaTier);
+    const auto best = bests(all, needs);
+    std::vector<double> shares;
+    const auto c = evaluate(catalog, tier, s);
+    const double value = worth(c, needs, best, &shares);
+    discount(needs, shares, value);
   }
 
   // The bigger modules first: they get the drones that are worth the most.
@@ -199,24 +240,34 @@ auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
   std::vector<MiningAssignment> out;
   for (const MiningModule* m : order) {
     MiningAssignment a{.module = m->id};
-    if (input.plasmaTier > 0) {
-      auto choice = best(catalog, m->tier, drones, input.plasmaTier, demand);
+    if (input.plasmaTier > 0 && !needs.empty()) {
+      auto all = settings(catalog, m->tier, drones, input.plasmaTier);
+      const auto best = bests(all, needs);
+      const Choice* choice = nullptr;
+      for (auto& c : all) {
+        c.value = worth(c, needs, best);
+        if (c.value > 0 && (!choice || c.value > choice->value)) choice = &c;
+      }
+      Choice kept;
       if (m->current && m->current->plasmaTier == input.plasmaTier &&
           drones[m->current->droneTier] > 0) {
-        auto kept = evaluate(catalog, m->tier, *m->current, demand);
+        kept = evaluate(catalog, m->tier, *m->current);
+        kept.value = worth(kept, needs, best);
         if (kept.value > 0 &&
             (!choice || kept.value * input.stickiness >= choice->value)) {
-          choice = std::move(kept);
+          choice = &kept;
         }
       }
       if (choice) {
         drones[choice->setting.droneTier] -= 1;
-        discount(demand, *choice);
+        std::vector<double> shares;
+        worth(*choice, needs, best, &shares);
         a.setting = choice->setting;
         a.value = choice->value;
         for (const auto& [item, rate] : choice->rates) {
-          if (input.demand.contains(item)) a.rates[item] = rate;
+          if (wanted.contains(item)) a.rates[item] = rate;
         }
+        discount(needs, shares, choice->value);
       }
     }
     out.push_back(std::move(a));

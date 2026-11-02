@@ -317,7 +317,7 @@ export type MiningOre = { name: string; damage: number; label: string }
 
 export type MiningTarget = StockItem & {
   threshold: number
-  priority: number // > 0: urgency = 1 - fill^priority
+  priority: number // > 0, a weight: the target's is priority × (1 - fill)
   enabled: boolean
   ores: MiningOre[] // the module outputs it is made of
 }

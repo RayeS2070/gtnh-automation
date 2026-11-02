@@ -187,7 +187,7 @@ auto MiningPollHandler::HandleRequestThrow(
                                                  .others = others,
                                                  .drones = drones,
                                                  .plasmaTier = plasma,
-                                                 .demand = demand});
+                                                 .needs = demand});
 
   MiningReply reply{.poll = config_.GetCopy(config::kPoll).poll,
                     .keep = domain::miningWhitelist(

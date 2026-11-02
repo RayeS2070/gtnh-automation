@@ -260,8 +260,10 @@ ore makes many dusts, a dust comes from many ores).
 **The plan** (`server/src/domain/mining.*`, on smc's mechanics: `../smc/core`). A module draws its
 asteroid at random among the candidates its drone and distance allow, every operation, so a
 setting (module tier, drone tier, distance, plasma, parallels) is a mix of outputs. Its worth is
-Σ ore demand × the ore's expected rate per second; the demand of an ore is the urgency
-(`1 - fill^priority`) of the targets it feeds. Modules are planned greedily, the bigger first:
+Σ over the targets of weight × share: the weight is priority × (1 - fill), the share the
+setting's rate of the target's ores over the best rate the module could have for them — items of
+different ores do not compare, so a rare ore counts as much as a plentiful one and the weights
+decide. Modules are planned greedily, the bigger first:
 each takes the best setting it has a drone for, then discounts what it covers for the next; one
 keeps its setting unless the best is 25 % better (a change costs a drone swap). The plasma is
 the best one in stock (`plasma-minimum`); an ore with `buffer-limit` items in the buffer before

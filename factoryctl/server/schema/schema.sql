@@ -243,7 +243,7 @@ CREATE TABLE factoryctl.mining_setups (
 
 -- What mining keeps stocked: a product (a dust, a fluid: goods of the stock)
 -- and the module outputs it is made of ({name, damage}: they need not be
--- goods yet). priority as the pumps': urgency = 1 - fill^priority.
+-- goods yet). priority: a weight, the target's is priority × (1 - fill).
 CREATE TABLE factoryctl.mining_targets (
     goods_id   bigint PRIMARY KEY REFERENCES factoryctl.goods ON DELETE CASCADE,
     threshold  bigint NOT NULL CHECK (threshold > 0),

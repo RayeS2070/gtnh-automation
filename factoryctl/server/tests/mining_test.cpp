@@ -83,25 +83,27 @@ TEST(MiningDemand, ShortOfStockOnly) {
                             target(kDustZ, 100, {ore(3)})};
   const auto d = miningDemand(targets, {{kDustX, 50}, {kDustZ, 100}}, {}, 0);
   ASSERT_EQ(d.size(), 1);
-  EXPECT_DOUBLE_EQ(d.at(ore(1)), 0.5);
+  EXPECT_EQ(d[0].product, kDustX);
+  EXPECT_DOUBLE_EQ(d[0].weight, 0.5);
 }
 
 TEST(MiningDemand, FullBufferBlocks) {
   const std::vector targets{target(kDustX, 100, {ore(1), ore(2)})};
   const auto d = miningDemand(targets, {}, {{ore(1), 5000}}, 5000);
-  EXPECT_FALSE(d.contains(ore(1)));
-  EXPECT_DOUBLE_EQ(d.at(ore(2)), 1);
+  ASSERT_EQ(d.size(), 1);
+  EXPECT_EQ(d[0].ores, (std::vector{ore(2)}));
+  EXPECT_DOUBLE_EQ(d[0].weight, 1);
 }
 
 TEST(MiningDemand, DisabledAndPriority) {
   auto off = target(kDustX, 100, {ore(1)});
   off.enabled = false;
   auto urgent = target(kDustZ, 100, {ore(3)});
-  urgent.priority = 2;
+  urgent.priority = 3;
   const std::vector targets{off, urgent};
   const auto d = miningDemand(targets, {{kDustZ, 50}}, {}, 0);
   ASSERT_EQ(d.size(), 1);
-  EXPECT_DOUBLE_EQ(d.at(ore(3)), 0.75);  // 1 - 0.5^2
+  EXPECT_DOUBLE_EQ(d[0].weight, 1.5);  // a weight: 3 × (1 - 0.5)
 }
 
 TEST(MiningWhitelist, MostWantedFirstAndCut) {
@@ -122,6 +124,13 @@ TEST(BestPlasma, HighestInStock) {
   EXPECT_EQ(bestPlasma(c, {}, 1e4), 0);
 }
 
+// One need per ore, of that weight.
+auto needs(std::map<ItemKey, double> weights) -> std::vector<MiningNeed> {
+  std::vector<MiningNeed> out;
+  for (const auto& [o, w] : weights) out.push_back({.product = o, .weight = w, .ores = {o}});
+  return out;
+}
+
 auto plan(const MiningCatalog& c, std::vector<MiningModule> modules,
           std::map<ItemKey, double> demand, std::map<int, int> drones = {{0, 9}},
           std::vector<std::pair<int, MiningSetting>> others = {}) {
@@ -129,7 +138,7 @@ auto plan(const MiningCatalog& c, std::vector<MiningModule> modules,
                         .others = others,
                         .drones = std::move(drones),
                         .plasmaTier = 1,
-                        .demand = std::move(demand)});
+                        .needs = needs(std::move(demand))});
 }
 
 TEST(PlanMining, WantedAloneGoesWhereItIsAlone) {
@@ -159,7 +168,7 @@ TEST(PlanMining, NoDroneNoPlasmaNoDemandIdle) {
   EXPECT_FALSE(planMining(c, {.modules = one,
                               .drones = {{0, 1}},
                               .plasmaTier = 0,
-                              .demand = {{ore(1), 1}}})[0]
+                              .needs = needs({{ore(1), 1}})})[0]
                    .setting);
 }
 
@@ -172,10 +181,10 @@ TEST(PlanMining, OneDroneOneModule) {
 
 TEST(PlanMining, SecondModuleGoesForTheOtherNeed) {
   const auto c = twoAsteroids();
-  // X at 1 is worth 1 · 0.3, Z at 11 0.5 · 0.4: the first module takes X;
-  // the discount halves X (0.15) and turns the second one to Z (0.2).
+  // X at 1 (all of X a module can have) is worth 1, Z at 11 0.6: the first
+  // module takes X; the discount halves X and turns the second one to Z.
   const auto p = plan(c, {{.id = "m1"}, {.id = "m2"}},
-                      {{ore(1), 1}, {ore(3), 0.5}});
+                      {{ore(1), 1}, {ore(3), 0.6}});
   ASSERT_TRUE(p[0].setting && p[1].setting);
   EXPECT_EQ(p[0].setting->distance, 1);
   EXPECT_EQ(p[1].setting->distance, 11);
@@ -185,9 +194,20 @@ TEST(PlanMining, OthersCountFirst) {
   const auto c = twoAsteroids();
   const MiningSetting x{.droneTier = 0, .distance = 1, .plasmaTier = 1,
                         .parallel = 2};
-  const auto p = plan(c, {{.id = "m2"}}, {{ore(1), 1}, {ore(3), 0.5}}, {{0, 9}},
+  const auto p = plan(c, {{.id = "m2"}}, {{ore(1), 1}, {ore(3), 0.6}}, {{0, 9}},
                       {{1, x}});
   EXPECT_EQ(p[0].setting->distance, 11);
+}
+
+// Z drops a hundred times as many items as X: items of different ores do not
+// compare, the weights do. X (weight 1) wins over Z (0.9).
+TEST(PlanMining, VolumeDoesNotDrownARareOre) {
+  auto c = twoAsteroids();
+  c.smc.asteroids[1].outputs[0].amount = 100;
+  c.recipes = core::expand(c.smc.asteroids);
+  const auto p = plan(c, {{.id = "m1"}}, {{ore(1), 1}, {ore(3), 0.9}});
+  ASSERT_TRUE(p[0].setting);
+  EXPECT_EQ(p[0].setting->distance, 1);
 }
 
 TEST(PlanMining, KeepsItsSettingUnlessMuchBetter) {
@@ -238,7 +258,7 @@ TEST(MiningCatalog, PlanIsQuick) {
   const auto p = planMining(c, {.modules = modules,
                                 .drones = drones,
                                 .plasmaTier = 5,
-                                .demand = demand});
+                                .needs = needs(demand)});
   const auto took = std::chrono::steady_clock::now() - start;
   int busy = 0;
   for (const auto& a : p) busy += a.setting ? 1 : 0;
