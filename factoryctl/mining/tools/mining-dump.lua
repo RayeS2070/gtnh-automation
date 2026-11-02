@@ -213,7 +213,8 @@ for _, kind in ipairs({ 'fluid_interface', 'me_controller', 'me_interface' }) do
         if type(fluids) == 'table' then
             local plasmas = {}
             for _, f in ipairs(fluids) do
-                if type(f) == 'table' and type(f.name) == 'string' and f.name:find('plasma', 1, true) then
+                if type(f) == 'table' and type(f.name) == 'string'
+                    and f.name:find('plasma', 1, true) then
                     plasmas[#plasmas + 1] = f
                 end
             end
@@ -273,8 +274,8 @@ for _, m in ipairs(dump.modules) do
     print(('  %s %s'):format(m.address:sub(1, 8), tostring(m.name)))
 end
 print(('%d components, %d gt_machine, %d mining modules, %d stocking, %d transposers, '
-    .. '%d storage buses, %d networks -> %s'):format(#dump.components, #dump.machines, miners, #dump.stocking, #dump.transposers,
-        #dump.storagebuses, #dump.networks, path))
+    .. '%d storage buses, %d networks -> %s'):format(#dump.components, #dump.machines, miners,
+        #dump.stocking, #dump.transposers, #dump.storagebuses, #dump.networks, path))
 for _, b in ipairs(dump.storagebuses) do
     for _, side in ipairs(b.sides) do
         print(('  %s %s side %d: %d slots, %d configured, ore filter %s'):format(b.type,
