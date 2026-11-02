@@ -43,12 +43,12 @@ end)
 
 suite('stocking parts only inside the module', function()
     local w = fakeWorld()
-    -- Close, but out of the wall: a diagonal and a row too high.
+    -- Close, but out of the wall: a diagonal and two rows up (the controller is the second row).
     local function at(address, x, y, z)
         return { address = address, getCoordinates = function() return x, y, z end }
     end
-    w.components.me_inputbus = { at('bus-diag', 170, 33, -35), at('bus-high', 169, 36, -35) }
-    w.components.me_inputhatch = { at('hatch-x', 168, 31, -36) } -- the wall along x, at the bottom
+    w.components.me_inputbus = { at('bus-diag', 170, 33, -35), at('bus-high', 169, 35, -35) }
+    w.components.me_inputhatch = { at('hatch-x', 168, 30, -36) } -- the wall along x, at the bottom
     local byAddress = {}
     for _, list in pairs(w.components) do for _, p in ipairs(list) do byAddress[p.address] = p end end
     w.deps.proxy = function(a) return byAddress[a] end

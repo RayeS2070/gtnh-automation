@@ -272,7 +272,8 @@ keeping storage bus gets the wanted ores only.
 
 **Hardware, per module**: an Adapter on the controller (an MFU works), its ME stocking input bus
 (drill tip and rod) and stocking input hatch (plasma) — found by their coordinates inside the
-module: a wall two wide and five high around the controller, either way it faces —, a plain input bus with a transposer between it and an interface of
+module: a wall two wide and five high, the controller in its second row from the top, either way
+it faces —, a plain input bus with a transposer between it and an interface of
 the drone pool: the module takes no drone from an ME bus and its controller slot allows no
 automation. Drill tips, rods and plasma come from the main network, where they are ordinary
 crafting targets. **Shared**: the drone pool network, the storage buses of the output network

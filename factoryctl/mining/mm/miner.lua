@@ -85,14 +85,14 @@ local function coords(proxy)
 end
 
 ---Whether a block at dx, dy, dz from a controller is in its module. A module is a wall two
----blocks wide and five high around its controller (the third row), one deep:
+---blocks wide and five high, one deep, its controller in the second row from the top:
 ---    R B      R optical connector, B stocking bus, H stocking hatch,
----      H      x the controller, D the drone bus, O the output bus
----    x
+---    x H      x the controller, D the drone bus, O the output bus
+---
 ---    D        Which way it faces OC cannot tell: the width is along x or along z, either side.
 ---    O
 local function inModule(dx, dy, dz)
-    return math.abs(dy) <= 2
+    return dy >= -3 and dy <= 1
         and ((dx == 0 and math.abs(dz) <= 1) or (dz == 0 and math.abs(dx) <= 1))
 end
 
