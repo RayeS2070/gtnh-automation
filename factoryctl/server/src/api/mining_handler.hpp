@@ -48,16 +48,15 @@ class MiningTargetHandler final
   userver::storages::postgres::ClusterPtr db_;
 };
 
-// GET /api/v1/mining/sources/{goods_id}: the module outputs that are the goods
-// or that processing turns into it, the likeliest first (fewer hops):
-// [{"name", "damage", "label", "hops", "asteroids": [names]}].
-// DELETE /api/v1/mining/setups/{name}: forget a setup (404 when unknown).
-class MiningSourcesHandler final
+// POST /api/v1/mining/targets {"product": {"name", "damage", "variant",
+//   "label"}, "threshold", "priority", "enabled", "ores"}: a target on any item,
+//   in the stock or not (a product below the scan threshold): 200 {"goodsId"}.
+class MiningTargetsHandler final
     : public userver::server::handlers::HttpHandlerBase {
  public:
-  static constexpr std::string_view kName = "handler-api-mining-sources";
+  static constexpr std::string_view kName = "handler-api-mining-targets";
 
-  MiningSourcesHandler(const userver::components::ComponentConfig& config,
+  MiningTargetsHandler(const userver::components::ComponentConfig& config,
                        const userver::components::ComponentContext& context);
 
   auto HandleRequestThrow(const userver::server::http::HttpRequest& request,
@@ -68,6 +67,23 @@ class MiningSourcesHandler final
   userver::storages::postgres::ClusterPtr db_;
 };
 
+// GET /api/v1/mining/ores: every module output (an ore, a dust), by label:
+// [{"name", "damage", "label", "asteroids": [names],
+//   "products": [{"name", "damage"}]}] - what processing makes of it
+// (macerating, washing, centrifuging...; chemistry is not followed).
+class MiningOresHandler final
+    : public userver::server::handlers::HttpHandlerBase {
+ public:
+  static constexpr std::string_view kName = "handler-api-mining-ores";
+
+  using HttpHandlerBase::HttpHandlerBase;
+
+  auto HandleRequestThrow(const userver::server::http::HttpRequest& request,
+                          userver::server::request::RequestContext& context)
+      const -> std::string override;
+};
+
+// DELETE /api/v1/mining/setups/{name}: forget a setup (404 when unknown).
 class MiningSetupHandler final
     : public userver::server::handlers::HttpHandlerBase {
  public:

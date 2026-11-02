@@ -18,6 +18,7 @@
 #include "agent/scan_handler.hpp"
 #include "config/dynamic.hpp"
 #include "db/events.hpp"
+#include "db/mining.hpp"
 #include "db/orders.hpp"
 #include "db/scan.hpp"
 #include "db/schema.hpp"
@@ -198,9 +199,17 @@ auto PollHandler::HandleRequestThrow(
   if (scan) LOG_INFO() << "poll: scan " << scan->id << " started";
 
   PollReply reply{.poll = settings.poll, .scan = scan};
-  // Every enabled target is measured in the next poll.
+  // Every enabled target is measured in the next poll, the mining ones too:
+  // their products may be below the scan threshold (the scan never sees them).
   for (const auto& t : db::listTargets(*db_)) {
     if (t.settings.enabled) reply.probe.push_back({t.goods.key, t.goods.label});
+  }
+  for (const auto& t : db::listMiningTargets(*db_)) {
+    const bool listed = std::ranges::any_of(
+        reply.probe, [&](const auto& p) { return p.item == t.goods.key; });
+    if (t.target.enabled && !listed) {
+      reply.probe.push_back({t.goods.key, t.goods.label});
+    }
   }
   for (const auto& o : orders) {
     if (std::ranges::contains(out.send, o.id)) reply.send.push_back(o);

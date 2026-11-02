@@ -159,12 +159,23 @@ auto listMiningTargets(pg::Cluster& db) -> std::vector<MiningTargetRow> {
   return targets(db);
 }
 
-auto setMiningTarget(pg::Cluster& db, std::int64_t goodsId,
-                     const MiningTargetSettings& s, domain::TimePoint now,
-                     std::string_view by) -> std::expected<void, std::string> {
-  if (s.threshold <= 0) return std::unexpected("threshold must be > 0");
-  if (!(s.priority > 0)) return std::unexpected("priority must be > 0");
-  auto tx = db.Begin(kMaster, {});
+auto ensureGoods(pg::Transaction& tx, const domain::ItemKey& key,
+                 const std::string& label) -> std::int64_t {
+  // As the scan writes goods: every kind is 'item', a fluid by its variant.
+  return tx
+      .Execute(
+          "INSERT INTO factoryctl.goods (kind, name, damage, variant, label) "
+          "VALUES ('item', $1, $2, $3, $4) ON CONFLICT (kind, name, damage, variant) "
+          "DO UPDATE SET label = factoryctl.goods.label RETURNING id",
+          key.name, key.damage, key.variant, label)
+      .AsSingleRow<std::int64_t>();
+}
+
+namespace {
+
+auto upsertTarget(pg::Transaction& tx, std::int64_t goodsId,
+                  const MiningTargetSettings& s, domain::TimePoint now,
+                  std::string_view by) -> std::expected<void, std::string> {
   try {
     const auto res = tx.Execute(
         "INSERT INTO factoryctl.mining_targets (goods_id, threshold, priority,"
@@ -183,8 +194,41 @@ auto setMiningTarget(pg::Cluster& db, std::int64_t goodsId,
                    .text = "mining target: " + describe(s) + byWho(by),
                    .goodsId = goodsId};
   addEvents(tx, {&told, 1});
+  return {};
+}
+
+auto checkTarget(const MiningTargetSettings& s) -> std::expected<void, std::string> {
+  if (s.threshold <= 0) return std::unexpected("threshold must be > 0");
+  if (!(s.priority > 0)) return std::unexpected("priority must be > 0");
+  if (s.ores.empty()) return std::unexpected("no ore: what is it mined from?");
+  return {};
+}
+
+}  // namespace
+
+auto setMiningTarget(pg::Cluster& db, std::int64_t goodsId,
+                     const MiningTargetSettings& s, domain::TimePoint now,
+                     std::string_view by) -> std::expected<void, std::string> {
+  if (auto ok = checkTarget(s); !ok) return ok;
+  auto tx = db.Begin(kMaster, {});
+  if (auto ok = upsertTarget(tx, goodsId, s, now, by); !ok) return ok;
   tx.Commit();
   return {};
+}
+
+auto addMiningTarget(pg::Cluster& db, const domain::ItemKey& product,
+                     const std::string& label, const MiningTargetSettings& s,
+                     domain::TimePoint now, std::string_view by)
+    -> std::expected<std::int64_t, std::string> {
+  if (auto ok = checkTarget(s); !ok) return std::unexpected(ok.error());
+  if (product.name.empty()) return std::unexpected("no product");
+  auto tx = db.Begin(kMaster, {});
+  const auto id = ensureGoods(tx, product, label.empty() ? product.name : label);
+  if (auto ok = upsertTarget(tx, id, s, now, by); !ok) {
+    return std::unexpected(ok.error());
+  }
+  tx.Commit();
+  return id;
 }
 
 auto deleteMiningTarget(pg::Cluster& db, std::int64_t goodsId,

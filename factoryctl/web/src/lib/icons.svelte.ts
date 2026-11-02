@@ -17,6 +17,7 @@ type Index = {
   items: Map<string, number> // mod:internal:damage
   fluids: Map<string, number> // the fluid's internal name, as a drop's variant
   labels: Map<string, number> // a label only one item has; -1 for a shared one
+  all: Goods[] // every item (but the NBT variants) and fluid of the export, for searching
 }
 
 let index = $state<Index | null>(null)
@@ -53,6 +54,7 @@ function parse(data: ArrayBuffer): Index {
 
   const items = new Map<string, number>()
   const labels = new Map<string, number>()
+  const all: Goods[] = []
   const withNbt: number[] = []
   for (const item of slice(elements[1])) {
     const name = plainLabel(string(item, kName) ?? '')
@@ -61,7 +63,9 @@ function parse(data: ArrayBuffer): Index {
       withNbt.push(item)
       continue
     }
-    items.set(`${string(item, kMod)}:${string(item, kInternal)}:${elements[item + kDamage]}`, elements[item + kIcon])
+    const mod = `${string(item, kMod)}:${string(item, kInternal)}`
+    items.set(`${mod}:${elements[item + kDamage]}`, elements[item + kIcon])
+    all.push({ name: mod, damage: elements[item + kDamage], variant: '', label: name })
   }
   // OC does not give NBT: an item that has variants only by NBT gets the first one's icon.
   for (const item of withNbt) {
@@ -72,9 +76,13 @@ function parse(data: ArrayBuffer): Index {
   const fluids = new Map<string, number>()
   for (const fluid of slice(elements[2])) {
     const name = string(fluid, kInternal) ?? ''
-    if (!fluids.has(name)) fluids.set(name, elements[fluid + kIcon])
+    if (!fluids.has(name)) {
+      fluids.set(name, elements[fluid + kIcon])
+      // As the stock keys a fluid (a drop's key, domain::keyOf on the server).
+      all.push({ name: 'ae2fc:fluid_drop', damage: 0, variant: name, label: string(fluid, kName) ?? name })
+    }
   }
-  return { items, fluids, labels }
+  return { items, fluids, labels, all }
 }
 
 async function load() {
@@ -84,7 +92,21 @@ async function load() {
     index = parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
   } catch (e) {
     console.warn('no item icons:', e)
-    index = { items: new Map(), fluids: new Map(), labels: new Map() }
+    index = { items: new Map(), fluids: new Map(), labels: new Map(), all: [] }
   }
 }
 load()
+
+// Items and fluids of the export whose label has every word, shortest labels first: any goods of
+// the game, in the stock or not. Empty while the data loads.
+export function searchGoods(text: string, limit: number): Goods[] {
+  const words = text.toLowerCase().split(/\s+/).filter((w) => w !== '')
+  if (!index || words.length === 0) return []
+  const found: Goods[] = []
+  for (const g of index.all) {
+    const label = g.label.toLowerCase()
+    if (words.every((w) => label.includes(w))) found.push(g)
+  }
+  found.sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label))
+  return found.slice(0, limit)
+}

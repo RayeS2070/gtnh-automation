@@ -57,8 +57,9 @@ struct ProbedAmount {
 };
 
 // Stock measured by the agent in a poll: the amount, when (for settling),
-// and it counts as seen by the last finished scan. Unknown goods are left
-// out (a probe is of a target, and targets are of scanned goods).
+// and it counts as seen by the last finished scan. Goods without stock (a
+// mining target's product below the scan threshold) get it. Unknown goods are
+// left out; before the first finished scan, so are goods without stock.
 auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,
                  domain::TimePoint now) -> void;
 

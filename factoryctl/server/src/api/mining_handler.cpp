@@ -184,51 +184,86 @@ auto MiningTargetHandler::HandleRequestThrow(
   return R"({"ok":true})";
 }
 
-MiningSourcesHandler::MiningSourcesHandler(
+MiningTargetsHandler::MiningTargetsHandler(
     const userver::components::ComponentConfig& config,
     const userver::components::ComponentContext& context)
     : HttpHandlerBase(config, context), db_(cluster(context)) {}
 
-auto MiningSourcesHandler::HandleRequestThrow(
+auto MiningTargetsHandler::HandleRequestThrow(
     const userver::server::http::HttpRequest& request,
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
-  const auto id = parseId(request.GetPathArg("goods_id"));
-  if (!id) return fail(request, HttpStatus::kBadRequest, "bad goods id");
-  const auto goods = db::goodsById(*db_, *id);
-  if (!goods) return fail(request, HttpStatus::kNotFound, "no such goods");
-  const auto& c = mining::catalog();
-  // ore -> fewest hops to the goods, the asteroids that drop it
-  std::map<domain::ItemKey, std::pair<int, std::set<std::string>>> found;
-  for (std::size_t a = 0; a < c.outputs.size(); ++a) {
-    for (const auto& o : c.outputs[a]) {
-      int hops = -1;
-      if (o.item.key == goods->key) hops = 0;
-      for (const auto& p : o.products) {
-        if (p.key == goods->key) hops = hops < 0 ? 1 : hops;
-      }
-      if (hops < 0) continue;
-      auto& f = found.try_emplace(o.item.key, hops, std::set<std::string>{})
-                    .first->second;
-      f.first = std::min(f.first, hops);
-      f.second.insert(c.smc.asteroids[a].name);
-    }
+  json::Value body;
+  try {
+    body = json::FromString(request.RequestBody());
+  } catch (const json::Exception& e) {
+    return fail(request, HttpStatus::kBadRequest, std::string("bad JSON: ") + e.what());
   }
-  std::vector<std::pair<domain::ItemKey, std::pair<int, std::set<std::string>>>>
-      ranked(found.begin(), found.end());
-  std::ranges::stable_sort(ranked, [](const auto& x, const auto& y) {
-    return x.second.first < y.second.first;
-  });
-  json::ValueBuilder out(json::Type::kArray);
-  for (const auto& [key, f] : ranked) {
-    auto e = itemJson(key);
-    e["hops"] = f.first;
-    json::ValueBuilder asteroids(json::Type::kArray);
-    for (const auto& n : f.second) asteroids.PushBack(n);
-    e["asteroids"] = std::move(asteroids);
-    out.PushBack(std::move(e));
+  if (!body.IsObject()) return fail(request, HttpStatus::kBadRequest, "not an object");
+  const auto& p = body["product"];
+  if (!p.IsObject() || !p["name"].IsString() || !p["damage"].IsInt()) {
+    return fail(request, HttpStatus::kBadRequest,
+                "product: {name, damage, variant, label}");
   }
+  const domain::ItemKey product{.name = p["name"].As<std::string>(),
+                                .damage = p["damage"].As<std::int32_t>(),
+                                .variant = p["variant"].As<std::string>("")};
+  const auto label = p["label"].As<std::string>("");
+  json::ValueBuilder rest(body);
+  rest.Remove("product");
+  const auto s = parseTarget(rest.ExtractValue());
+  if (!s) return fail(request, HttpStatus::kBadRequest, s.error());
+  const auto id = db::addMiningTarget(*db_, product, label, *s,
+                                      userver::utils::datetime::Now(), userOf(request));
+  if (!id) return fail(request, HttpStatus::kBadRequest, id.error());
+  LOG_INFO() << "mining target " << label << " (goods " << *id << "): keep " << s->threshold;
+  json::ValueBuilder out;
+  out["goodsId"] = *id;
   return json::ToString(out.ExtractValue());
+}
+
+auto MiningOresHandler::HandleRequestThrow(
+    const userver::server::http::HttpRequest& request,
+    userver::server::request::RequestContext&) const -> std::string {
+  request.GetHttpResponse().SetContentType("application/json");
+  // The same for every request: made once.
+  static const std::string answer = [] {
+    const auto& c = mining::catalog();
+    struct Ore {
+      std::set<std::string> asteroids;
+      std::set<domain::ItemKey> products;
+    };
+    std::map<domain::ItemKey, Ore> ores;
+    for (std::size_t a = 0; a < c.outputs.size(); ++a) {
+      for (const auto& o : c.outputs[a]) {
+        auto& ore = ores[o.item.key];
+        ore.asteroids.insert(c.smc.asteroids[a].name);
+        for (const auto& p : o.products) ore.products.insert(p.key);
+      }
+    }
+    std::vector<std::pair<std::string, const domain::ItemKey*>> byLabel;
+    for (const auto& [key, ore] : ores) byLabel.emplace_back(mining::labelOf(key), &key);
+    std::ranges::sort(byLabel);
+    json::ValueBuilder out(json::Type::kArray);
+    for (const auto& [label, key] : byLabel) {
+      const auto& ore = ores.at(*key);
+      auto e = itemJson(*key);
+      json::ValueBuilder asteroids(json::Type::kArray);
+      for (const auto& n : ore.asteroids) asteroids.PushBack(n);
+      e["asteroids"] = std::move(asteroids);
+      json::ValueBuilder products(json::Type::kArray);
+      for (const auto& p : ore.products) {
+        json::ValueBuilder pe;
+        pe["name"] = p.name;
+        pe["damage"] = p.damage;
+        products.PushBack(std::move(pe));
+      }
+      e["products"] = std::move(products);
+      out.PushBack(std::move(e));
+    }
+    return json::ToString(out.ExtractValue());
+  }();
+  return answer;
 }
 
 MiningSetupHandler::MiningSetupHandler(

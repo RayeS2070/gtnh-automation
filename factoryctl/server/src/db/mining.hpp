@@ -61,6 +61,17 @@ auto setMiningTarget(pg::Cluster& db, std::int64_t goodsId,
 auto deleteMiningTarget(pg::Cluster& db, std::int64_t goodsId,
                         domain::TimePoint now, std::string_view by = {}) -> bool;
 
+// The id of the goods, made when none has the key (a product below the scan
+// threshold the stock never saw: the probe measures it from then on).
+auto ensureGoods(pg::Transaction& tx, const domain::ItemKey& key,
+                 const std::string& label) -> std::int64_t;
+
+// A target by the product's key; makes its goods when needed. The goods' id.
+auto addMiningTarget(pg::Cluster& db, const domain::ItemKey& product,
+                     const std::string& label, const MiningTargetSettings& s,
+                     domain::TimePoint now, std::string_view by = {})
+    -> std::expected<std::int64_t, std::string>;
+
 // The goods with that id, its stock with it.
 auto goodsById(pg::Cluster& db, std::int64_t id) -> std::optional<StockRow>;
 

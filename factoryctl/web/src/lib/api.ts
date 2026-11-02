@@ -364,7 +364,8 @@ export type Mining = {
   bufferLimit: number
 }
 
-export type MiningSource = MiningOre & { hops: number; asteroids: string[] }
+// A module output: the asteroids that drop it, what processing makes of it (not chemistry).
+export type MiningOreInfo = MiningOre & { asteroids: string[]; products: { name: string; damage: number }[] }
 
 export async function fetchMining(): Promise<Mining> {
   return await call('GET', '/api/v1/mining')
@@ -381,8 +382,19 @@ export async function deleteMiningTarget(goodsId: number): Promise<void> {
   await call('DELETE', `/api/v1/mining/targets/${goodsId}`)
 }
 
-export async function fetchMiningSources(goodsId: number): Promise<MiningSource[]> {
-  return await call('GET', `/api/v1/mining/sources/${goodsId}`)
+export async function fetchMiningOres(): Promise<MiningOreInfo[]> {
+  return await call('GET', '/api/v1/mining/ores')
+}
+
+// A target on any goods, in the stock or not.
+export async function postMiningTarget(t: {
+  product: { name: string; damage: number; variant: string; label: string }
+  threshold: number
+  priority: number
+  enabled: boolean
+  ores: { name: string; damage: number }[]
+}): Promise<number> {
+  return (await call<{ goodsId: number }>('POST', '/api/v1/mining/targets', t)).goodsId
 }
 
 export async function forgetMiningSetup(name: string): Promise<void> {

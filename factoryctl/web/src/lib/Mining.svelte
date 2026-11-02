@@ -2,19 +2,19 @@
   import {
     deleteMiningTarget,
     fetchMining,
-    fetchMiningSources,
-    fetchStock,
+    fetchMiningOres,
     forgetMiningSetup,
+    postMiningTarget,
     putMiningTarget,
     type Mining,
     type MiningModuleStatus,
+    type MiningOreInfo,
     type MiningPlanEntry,
-    type MiningSource,
     type MiningTarget,
-    type StockItem,
   } from './api'
   import { amount, compact, parseAmount, plainLabel, shownLabel } from './format'
   import Icon from './Icon.svelte'
+  import { searchGoods } from './icons.svelte'
   import { every, kRefreshMs } from './refresh'
 
   const kDrones = ['LV', 'MV', 'HV', 'EV', 'IV', 'LuV', 'ZPM', 'UV', 'UHV', 'UEV', 'UIV', 'UMV', 'UXV', 'MAX']
@@ -44,55 +44,79 @@
     }
   }
 
-  // --- a target: picked from the stock, its ores suggested by the catalog -------------------
+  // --- a target: any goods of the game (a dust below the scan threshold is not in the stock),
+  // made of module outputs: the catalog suggests what processing turns into it, the rest is picked
+  // by hand (chemistry is not followed).
+  type Product = { name: string; damage: number; variant: string; label: string }
   type Form = {
-    goods: StockItem
+    product: Product
+    goodsId: number | null // null: a new target
+    amount: number | null
     threshold: string
     priority: string
     enabled: boolean
-    sources: MiningSource[] | null
     ores: Record<string, boolean> // "name:damage" -> taken
   }
   let form = $state<Form | null>(null)
   let search = $state('')
-  let found = $state<StockItem[]>([])
+  let oreSearch = $state('')
+  let ores = $state<MiningOreInfo[] | null>(null)
 
-  async function find() {
-    const text = search.trim()
-    if (!text) {
-      found = []
-      return
-    }
+  const found = $derived(searchGoods(search, 12))
+  const oreKey = (o: { name: string; damage: number }) => `${o.name}:${o.damage}`
+  const byKey = $derived(new Map((ores ?? []).map((o) => [oreKey(o), o])))
+
+  async function loadOres() {
+    if (ores) return
     try {
-      found = (await fetchStock({ text, kind: 'all', sort: 'label', dir: 'asc' })).slice(0, 12)
+      ores = await fetchMiningOres()
     } catch (e) {
       error = String(e)
     }
   }
 
-  const oreKey = (o: { name: string; damage: number }) => `${o.name}:${o.damage}`
-
-  async function open(goods: StockItem, current?: MiningTarget) {
+  function open(product: Product, current?: MiningTarget) {
     form = {
-      goods,
+      product,
+      goodsId: current?.goodsId ?? null,
+      amount: current?.amount ?? null,
       threshold: current ? String(current.threshold) : '',
       priority: String(current?.priority ?? 1),
       enabled: current?.enabled ?? true,
-      sources: null,
       ores: Object.fromEntries((current?.ores ?? []).map((o) => [oreKey(o), true])),
     }
-    found = []
     search = ''
-    try {
-      const sources = await fetchMiningSources(goods.goodsId)
-      if (!form || form.goods.goodsId !== goods.goodsId) return
-      form.sources = sources
-      // A new target takes what turns into it in one step; the rest is there to tick.
-      if (!current) for (const s of sources) form.ores[oreKey(s)] = s.hops <= 1
-    } catch (e) {
-      error = String(e)
-    }
+    oreSearch = ''
+    loadOres()
   }
+
+  // The outputs that are the product or that processing turns into it.
+  const suggested = $derived(
+    form && ores && form.product.variant === ''
+      ? ores.filter(
+          (o) =>
+            (o.name === form!.product.name && o.damage === form!.product.damage) ||
+            o.products.some((p) => p.name === form!.product.name && p.damage === form!.product.damage),
+        )
+      : [],
+  )
+  const oreFound = $derived.by(() => {
+    const words = oreSearch.toLowerCase().split(/\s+/).filter((w) => w !== '')
+    if (!ores || words.length === 0) return []
+    return ores.filter((o) => words.every((w) => o.label.toLowerCase().includes(w))).slice(0, 12)
+  })
+  // Taken ones stay listed whatever the search says.
+  const listed = $derived.by(() => {
+    if (!form) return []
+    const out = new Map<string, MiningOreInfo>()
+    for (const o of suggested) out.set(oreKey(o), o)
+    for (const [k, on] of Object.entries(form.ores)) {
+      const o = byKey.get(k)
+      if (on && o) out.set(k, o)
+    }
+    for (const o of oreFound) out.set(oreKey(o), o)
+    return [...out.values()]
+  })
 
   const thresholdValue = $derived(form ? parseAmount(form.threshold) : null)
   const priorityValue = $derived(form ? Number(form.priority) : NaN)
@@ -107,17 +131,17 @@
     event.preventDefault()
     const f = form
     if (!f || !formValid) return
-    const ores = taken.map((k) => {
+    const chosen = taken.map((k) => {
       const at = k.lastIndexOf(':')
       return { name: k.slice(0, at), damage: Number(k.slice(at + 1)) }
     })
+    const t = { threshold: thresholdValue!, priority: priorityValue, enabled: f.enabled, ores: chosen }
     act(async () => {
-      await putMiningTarget(f.goods.goodsId, {
-        threshold: thresholdValue!,
-        priority: priorityValue,
-        enabled: f.enabled,
-        ores,
-      })
+      if (f.goodsId === null) {
+        await postMiningTarget({ product: f.product, ...t })
+      } else {
+        await putMiningTarget(f.goodsId, t)
+      }
       form = null
     })
   }
@@ -180,25 +204,32 @@
 
     {#if form}
       <form class="panel" onsubmit={save}>
-        <div class="title"><Icon goods={form.goods} /> {shownLabel(form.goods)} <span class="muted">· now {amount(form.goods.amount)}</span></div>
+        <div class="title">
+          <Icon goods={form.product} /> {shownLabel(form.product)}
+          {#if form.amount !== null}<span class="muted">· now {amount(form.amount)}</span>{/if}
+        </div>
         <label>Keep <input bind:value={form.threshold} placeholder="e.g. 1M" size="10" /></label>
         <label>Priority <input bind:value={form.priority} size="4" /></label>
         <label><input type="checkbox" bind:checked={form.enabled} /> enabled</label>
         <div class="ores">
-          {#if form.sources === null}
-            <span class="muted">looking for the ores that make it…</span>
-          {:else if form.sources.length === 0}
-            <span class="error">No asteroid gives it, not even after processing: mining cannot keep it.</span>
-          {:else}
-            <div class="muted small">Made of (what the modules mine; the storage bus keeps these, the rest is voided):</div>
-            {#each form.sources as s (oreKey(s))}
-              <label class="ore">
-                <input type="checkbox" bind:checked={form.ores[oreKey(s)]} />
-                {plainLabel(s.label)}
-                <span class="muted small">{s.hops === 0 ? 'itself' : 'after processing'} · {s.asteroids.join(', ')}</span>
-              </label>
-            {/each}
-          {/if}
+          <div class="muted small">
+            Made of — what the modules mine; the storage bus keeps these, the rest is voided.
+            {#if ores && suggested.length === 0}
+              The catalog knows no ore that processing turns into it (chemistry is not followed): pick them.
+            {/if}
+          </div>
+          {#if !ores}<span class="muted">loading the ores…</span>{/if}
+          {#each listed as o (oreKey(o))}
+            <label class="ore">
+              <input type="checkbox" bind:checked={form.ores[oreKey(o)]} />
+              {plainLabel(o.label)}
+              <span class="muted small">
+                {suggested.includes(o) ? (o.name === form.product.name && o.damage === form.product.damage ? 'itself' : 'processing makes it') : ''}
+                · {o.asteroids.join(', ')}
+              </span>
+            </label>
+          {/each}
+          <input placeholder="find an ore" bind:value={oreSearch} />
         </div>
         <div class="buttons">
           <button type="submit" disabled={!formValid}>Save</button>
@@ -207,9 +238,9 @@
       </form>
     {:else}
       <div class="add">
-        <input placeholder="Add a target: search the stock" bind:value={search} oninput={find} />
-        {#each found as g (g.goodsId)}
-          <button class="found" onclick={() => open(g)}><Icon goods={g} /> {shownLabel(g)}</button>
+        <input placeholder="Add a target: any item or fluid" bind:value={search} />
+        {#each found as g (`${g.name}:${g.damage}:${g.variant}`)}
+          <button class="found" onclick={() => open(g)}><Icon goods={g} /> {plainLabel(g.label)}</button>
         {/each}
       </div>
     {/if}

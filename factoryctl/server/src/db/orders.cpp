@@ -245,12 +245,17 @@ auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,
       "     probe AS (SELECT * FROM unnest($1::text[], $2::integer[],"
       "                                    $3::text[], $4::bigint[])"
       "               AS p(name, damage, variant, amount)) "
-      "UPDATE factoryctl.stock s SET amount = probe.amount, probed_at = $5,"
-      "  scan_id = GREATEST(s.scan_id, coalesce(last.id, s.scan_id)) "
-      "FROM probe JOIN factoryctl.goods g"
-      "  ON g.kind = 'item' AND g.name = probe.name"
-      "  AND g.damage = probe.damage AND g.variant = probe.variant, last "
-      "WHERE s.goods_id = g.id",
+      "INSERT INTO factoryctl.stock AS s (goods_id, amount, scan_id, probed_at,"
+      "  craftable) "
+      "SELECT g.id, probe.amount, coalesce(last.id, x.scan_id), $5, false "
+      "FROM probe JOIN factoryctl.goods g ON g.kind = 'item'"
+      "  AND g.name = probe.name AND g.damage = probe.damage"
+      "  AND g.variant = probe.variant "
+      "LEFT JOIN factoryctl.stock x ON x.goods_id = g.id, last "
+      "WHERE coalesce(last.id, x.scan_id) IS NOT NULL "
+      "ON CONFLICT (goods_id) DO UPDATE SET amount = EXCLUDED.amount,"
+      "  probed_at = EXCLUDED.probed_at,"
+      "  scan_id = GREATEST(s.scan_id, coalesce(EXCLUDED.scan_id, s.scan_id))",
       names, damages, variants, amounts, pg::TimePointTz{now});
 }
 

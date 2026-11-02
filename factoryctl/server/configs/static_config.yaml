@@ -144,8 +144,13 @@ components_manager:
             method: PUT,DELETE
             task_processor: main-task-processor
 
-        handler-api-mining-sources:
-            path: /api/v1/mining/sources/{goods_id}
+        handler-api-mining-targets:
+            path: /api/v1/mining/targets
+            method: POST
+            task_processor: main-task-processor
+
+        handler-api-mining-ores:
+            path: /api/v1/mining/ores
             method: GET
             task_processor: main-task-processor
 

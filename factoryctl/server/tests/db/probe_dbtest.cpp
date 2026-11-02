@@ -2,6 +2,7 @@
 #include <userver/storages/postgres/transaction.hpp>
 
 #include "db/manual.hpp"
+#include "db/mining.hpp"
 #include "db/orders.hpp"
 #include "db/scan.hpp"
 #include "db/schema.hpp"
@@ -71,6 +72,22 @@ UTEST_F(ProbeTest, ProbeUpdatesTheStock) {
   ASSERT_TRUE(stock.has_value());
   EXPECT_EQ(stock->at(kRod), 61'097);
   EXPECT_EQ(stock->at(kPersulfate), 1'220'600);
+}
+
+// Goods made for a target (a mining one: below the scan threshold, never
+// scanned) get their stock from the probe.
+UTEST_F(ProbeTest, ProbeGivesUnscannedGoodsTheirStock) {
+  const ItemKey dust{"gregtech:gt.metaitem.01", 2324, ""};
+  {
+    auto tx = db().Begin(pg::ClusterHostType::kMaster, {});
+    (void)ensureGoods(tx, dust, "Naquadria Dust");
+    tx.Commit();
+  }
+  EXPECT_FALSE(currentStock(db())->contains(dust));
+  probe({{dust, 312}}, t0 + 1min);
+  EXPECT_EQ(currentStock(db())->at(dust), 312);
+  probe({{dust, 400}}, t0 + 2min);
+  EXPECT_EQ(currentStock(db())->at(dust), 400);
 }
 
 UTEST_F(ProbeTest, ProbedGoodsCountAfterAScanMissedThem) {
