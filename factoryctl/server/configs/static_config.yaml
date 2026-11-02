@@ -184,6 +184,11 @@ components_manager:
             method: GET
             task_processor: main-task-processor
 
+        handler-api-me:
+            path: /api/v1/me
+            method: GET
+            task_processor: main-task-processor
+
         # The web client: `npm run build` in factoryctl/web, served from web-dir.
         fs-cache-web:
             dir: $web-dir

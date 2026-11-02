@@ -11,6 +11,7 @@
 #include <userver/utils/datetime.hpp>
 
 #include "api/json.hpp"
+#include "api/user.hpp"
 #include "db/schema.hpp"
 #include "db/targets.hpp"
 
@@ -73,7 +74,8 @@ auto TargetHandler::HandleRequestThrow(
   if (!id) return fail(request, HttpStatus::kBadRequest, "bad goods id");
 
   if (request.GetMethod() == userver::server::http::HttpMethod::kDelete) {
-    if (!db::deleteTarget(*db_, *id, userver::utils::datetime::Now())) {
+    if (!db::deleteTarget(*db_, *id, userver::utils::datetime::Now(),
+                          userOf(request))) {
       return fail(request, HttpStatus::kNotFound, "no target");
     }
     LOG_INFO() << "target of goods " << *id << " deleted";
@@ -87,7 +89,8 @@ auto TargetHandler::HandleRequestThrow(
     return fail(request, HttpStatus::kBadRequest, settings.error());
   }
   if (auto ok = db::setTarget(*db_, *id, *settings,
-                                 userver::utils::datetime::Now()); !ok) {
+                              userver::utils::datetime::Now(), userOf(request));
+      !ok) {
     // Bad numbers or unknown goods; both are the caller's to fix.
     return fail(request, HttpStatus::kBadRequest, ok.error());
   }
@@ -116,7 +119,8 @@ auto TargetGroupsHandler::HandleRequestThrow(
   if (!body) return fail(request, HttpStatus::kBadRequest, body.error());
   const auto name = parseGroupName(*body);
   if (!name) return fail(request, HttpStatus::kBadRequest, name.error());
-  const auto id = db::addGroup(*db_, *name, userver::utils::datetime::Now());
+  const auto id = db::addGroup(*db_, *name, userver::utils::datetime::Now(),
+                               userOf(request));
   if (!id) return fail(request, HttpStatus::kBadRequest, id.error());
   LOG_INFO() << "target group " << *id << " added: " << *name;
   json::ValueBuilder out;
@@ -138,7 +142,7 @@ auto TargetGroupHandler::HandleRequestThrow(
   const auto now = userver::utils::datetime::Now();
 
   if (request.GetMethod() == userver::server::http::HttpMethod::kDelete) {
-    if (!db::deleteGroup(*db_, *id, now)) {
+    if (!db::deleteGroup(*db_, *id, now, userOf(request))) {
       return fail(request, HttpStatus::kNotFound, "no group");
     }
     LOG_INFO() << "target group " << *id << " deleted";
@@ -148,7 +152,7 @@ auto TargetGroupHandler::HandleRequestThrow(
   if (!body) return fail(request, HttpStatus::kBadRequest, body.error());
   const auto name = parseGroupName(*body);
   if (!name) return fail(request, HttpStatus::kBadRequest, name.error());
-  const auto renamed = db::renameGroup(*db_, *id, *name, now);
+  const auto renamed = db::renameGroup(*db_, *id, *name, now, userOf(request));
   if (!renamed) return fail(request, HttpStatus::kBadRequest, renamed.error());
   if (!*renamed) return fail(request, HttpStatus::kNotFound, "no group");
   LOG_INFO() << "target group " << *id << " renamed: " << *name;

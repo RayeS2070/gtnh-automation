@@ -14,10 +14,11 @@
 #include "api/cpus_handler.hpp"
 #include "api/events_handler.hpp"
 #include "api/orders_handler.hpp"
-#include "api/stock_handler.hpp"
 #include "api/pumps_handler.hpp"
 #include "api/qft_handler.hpp"
+#include "api/stock_handler.hpp"
 #include "api/targets_handler.hpp"
+#include "api/user.hpp"
 #include "config/file_updater.hpp"
 #include "db/events_cleanup.hpp"
 #include "db/schema.hpp"
@@ -56,6 +57,7 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::OrderCancelHandler>()
           .Append<factoryctl::api::CpusHandler>()
           .Append<factoryctl::api::EventsHandler>()
+          .Append<factoryctl::api::MeHandler>()
           // The web client (factoryctl/web, built): everything not matched
           // above.
           .Append<userver::components::FsCache>("fs-cache-web")

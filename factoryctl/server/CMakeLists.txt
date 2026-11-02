@@ -17,6 +17,7 @@ add_library(factoryctl_lib STATIC
         src/api/events_handler.cpp
         src/api/pumps_handler.cpp
         src/api/qft_handler.cpp
+        src/api/user.cpp
         src/domain/plan.cpp
         src/domain/order.cpp
         src/domain/scan.cpp
@@ -75,6 +76,7 @@ add_executable(factoryctl_unittest
         tests/compression_test.cpp
         tests/pumps_test.cpp
         tests/qft_test.cpp
+        tests/user_test.cpp
 )
 target_link_libraries(factoryctl_unittest
         PRIVATE

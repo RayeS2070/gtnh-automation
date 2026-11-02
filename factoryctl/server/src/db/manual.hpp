@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <expected>
 #include <string>
+#include <string_view>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
 
@@ -44,7 +45,8 @@ auto listOrders(pg::Cluster& db, std::int64_t limit) -> std::vector<OrderRow>;
 // Cancels an order (domain::requestCancel): a queued one at once, one in the
 // agent's hands through it. Fails for an unknown order; for a closed one it
 // does nothing.
-auto cancelOrder(pg::Cluster& db, std::int64_t id, domain::TimePoint now)
+auto cancelOrder(pg::Cluster& db, std::int64_t id, domain::TimePoint now,
+                 std::string_view by = {})
     -> std::expected<domain::CancelAction, std::string>;
 
 }  // namespace factoryctl::db

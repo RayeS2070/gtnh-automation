@@ -151,6 +151,11 @@ export type Cpu = {
 
 export const isIdle = (c: Cpu) => !c.busy && c.goods === null
 
+// The person the proxy in front signed in (nginx auth_basic); null without it (an SSH tunnel).
+export async function fetchMe(): Promise<string | null> {
+  return (await call<{ user: string | null }>('GET', '/api/v1/me')).user
+}
+
 export async function fetchCpus(): Promise<{ items: Cpu[]; lowFreeCpus: number }> {
   return await call('GET', '/api/v1/cpus')
 }

@@ -7,6 +7,7 @@
 #include <expected>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
 
@@ -47,26 +48,29 @@ auto listTargets(pg::Cluster& db) -> std::vector<TargetRow>;
 // Creates or replaces the target of the goods, and tells it (events). Fails
 // for unknown goods or an unknown group.
 auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s,
-               domain::TimePoint now) -> std::expected<void, std::string>;
+               domain::TimePoint now, std::string_view by = {})
+    -> std::expected<void, std::string>;
 
 // Returns false when there was no target.
-auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now)
-    -> bool;
+auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now,
+                  std::string_view by = {}) -> bool;
 
 // Every group, by name.
 auto listGroups(pg::Cluster& db) -> std::vector<TargetGroup>;
 
 // The new group's id. Fails for an empty name or one taken.
-auto addGroup(pg::Cluster& db, const std::string& name, domain::TimePoint now)
+auto addGroup(pg::Cluster& db, const std::string& name, domain::TimePoint now,
+              std::string_view by = {})
     -> std::expected<std::int64_t, std::string>;
 
 // false: no such group. Fails for an empty name or one taken.
 auto renameGroup(pg::Cluster& db, std::int64_t id, const std::string& name,
-                 domain::TimePoint now) -> std::expected<bool, std::string>;
+                 domain::TimePoint now, std::string_view by = {})
+    -> std::expected<bool, std::string>;
 
 // Its targets stay, ungrouped. Returns false when there was no such group.
-auto deleteGroup(pg::Cluster& db, std::int64_t id, domain::TimePoint now)
-    -> bool;
+auto deleteGroup(pg::Cluster& db, std::int64_t id, domain::TimePoint now,
+                 std::string_view by = {}) -> bool;
 
 // The settings for a person: "keep 100000, order 5000, low priority, fill".
 auto describe(const TargetSettings& s) -> std::string;

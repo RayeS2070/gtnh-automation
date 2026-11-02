@@ -11,6 +11,7 @@
 #include <userver/utils/datetime.hpp>
 
 #include "api/json.hpp"
+#include "api/user.hpp"
 #include "db/manual.hpp"
 #include "db/schema.hpp"
 
@@ -67,8 +68,11 @@ auto OrdersHandler::HandleRequestThrow(
     return fail(request, HttpStatus::kBadRequest,
                 std::string("bad JSON: ") + e.what());
   }
-  const auto order = parseOrderRequest(body);
+  auto order = parseOrderRequest(body);
   if (!order) return fail(request, HttpStatus::kBadRequest, order.error());
+  // Behind the proxy the person is known: what the page typed does not count.
+  if (auto user = userOf(request); !user.empty())
+    order->requestedBy = std::move(user);
   const auto id =
       db::orderOnce(*db_, order->goodsId, order->amount, order->requestedBy,
                     userver::utils::datetime::Now());
@@ -91,8 +95,8 @@ auto OrderCancelHandler::HandleRequestThrow(
   request.GetHttpResponse().SetContentType("application/json");
   const auto id = parseId(request.GetPathArg("order_id"));
   if (!id) return fail(request, HttpStatus::kBadRequest, "bad order id");
-  const auto action =
-      db::cancelOrder(*db_, *id, userver::utils::datetime::Now());
+  const auto action = db::cancelOrder(
+      *db_, *id, userver::utils::datetime::Now(), userOf(request));
   if (!action) return fail(request, HttpStatus::kNotFound, action.error());
   const char* result = "nothing";
   switch (*action) {

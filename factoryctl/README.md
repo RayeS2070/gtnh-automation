@@ -141,7 +141,9 @@ start of the volume) and drop the schema there all the time.
 Text answers (JSON, the web client) are compressed, zstd or gzip, as the browser asks; icons
 are not (they are compressed already).
 
-There is no authentication: reach the server through an SSH tunnel.
+The server keeps no accounts. People reach it through an SSH tunnel or through an HTTPS proxy
+that asks for a password (below); behind the proxy, the server takes the person's name from
+`X-Forwarded-User` for one-off orders and for the events of what they change.
 
 ## Deploy
 
@@ -186,6 +188,23 @@ docker compose logs server --no-log-prefix -f | jq -r 'select(.text != "") |
   "\(.timestamp[11:19]) \(.level) \(if .source == "agent" then "[agent] " else "" end)\(.text)"'
 docker compose logs server --no-log-prefix | jq -c 'select(.level == "ERROR" or .level == "WARNING")'
 ```
+
+### HTTPS and passwords
+
+`deploy/nginx/factoryctl.conf` is the nginx server block for it: TLS, `auth_basic` with a
+password per person, the person's name passed on in `X-Forwarded-User`, `/agent/` closed (the
+agents post to the server directly), and a day of cache for the icons. Passwords, one line per
+person (nginx reads the file on every request, no reload):
+
+```sh
+printf 'pavel:%s\n' "$(openssl passwd -6)" >> factoryctl.htpasswd
+```
+
+The server believes the header, so it must be reachable through the proxy only: it listens on
+`127.0.0.1` and the compose network, and nginx sets the header itself. `GET /api/v1/me` says who
+the server sees (`{"user": null}` through a tunnel); the order form shows that name instead of
+asking. With a self-signed certificate, add it to the browsers rather than click through the
+warning: a password over a connection nobody checked can be read by whoever sits in between.
 
 ## Agent (in game)
 

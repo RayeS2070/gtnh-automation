@@ -7,6 +7,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
 
@@ -32,6 +33,10 @@ struct Event {
 // In the transaction of what they tell: a step done again after a failure
 // does not tell it twice.
 auto addEvents(pg::Transaction& tx, std::span<const Event> events) -> void;
+
+// " (by pavel)": the end of the text of an event a person caused; empty for
+// no one (api::userOf: no proxy in front).
+auto byWho(std::string_view user) -> std::string;
 
 struct GoodsRef {
   std::int64_t id = 0;

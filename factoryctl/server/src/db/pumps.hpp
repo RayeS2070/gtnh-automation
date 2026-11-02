@@ -7,6 +7,7 @@
 #include <expected>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
 
@@ -62,18 +63,19 @@ auto pumpsView(pg::Cluster& db, domain::TimePoint since) -> PumpsView;
 
 // The batch and the threshold; the version goes up. Fails for bad values.
 auto setPumpGeneral(pg::Cluster& db, std::int32_t batch, double threshold,
-                    domain::TimePoint now)
+                    domain::TimePoint now, std::string_view by = {})
     -> std::expected<std::int64_t, std::string>;
 
 // Creates or replaces a target; the version goes up. Fails for a fluid no
 // module can pump and for bad numbers.
 auto setPumpTarget(pg::Cluster& db, const domain::PumpTarget& t,
-                   domain::TimePoint now)
+                   domain::TimePoint now, std::string_view by = {})
     -> std::expected<std::int64_t, std::string>;
 
 // The new version; none when there was no such target.
 auto deletePumpTarget(pg::Cluster& db, const std::string& fluid,
-                      domain::TimePoint now) -> std::optional<std::int64_t>;
+                      domain::TimePoint now, std::string_view by = {})
+    -> std::optional<std::int64_t>;
 
 auto deletePumpCyclesBefore(pg::Cluster& db, domain::TimePoint before)
     -> std::int64_t;

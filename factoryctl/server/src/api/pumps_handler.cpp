@@ -12,6 +12,7 @@
 #include <userver/utils/datetime.hpp>
 
 #include "api/json.hpp"
+#include "api/user.hpp"
 #include "db/pumps.hpp"
 #include "db/schema.hpp"
 
@@ -78,7 +79,7 @@ auto PumpSettingsHandler::HandleRequestThrow(
   if (!general) return fail(request, HttpStatus::kBadRequest, general.error());
   const auto version =
       db::setPumpGeneral(*db_, general->batch, general->threshold,
-                         userver::utils::datetime::Now());
+                         userver::utils::datetime::Now(), userOf(request));
   if (!version) return fail(request, HttpStatus::kBadRequest, version.error());
   LOG_INFO() << "pumping settings v" << *version << ": batch " << general->batch
              << ", threshold " << general->threshold;
@@ -100,7 +101,8 @@ auto PumpTargetHandler::HandleRequestThrow(
   const auto now = userver::utils::datetime::Now();
 
   if (request.GetMethod() == userver::server::http::HttpMethod::kDelete) {
-    const auto version = db::deletePumpTarget(*db_, fluid, now);
+    const auto version =
+        db::deletePumpTarget(*db_, fluid, now, userOf(request));
     if (!version) return fail(request, HttpStatus::kNotFound, "no target");
     LOG_INFO() << "pumping target " << fluid << " deleted, v" << *version;
     return versionJson(*version);
@@ -109,7 +111,7 @@ auto PumpTargetHandler::HandleRequestThrow(
   if (!body) return fail(request, HttpStatus::kBadRequest, body.error());
   const auto target = parsePumpTarget(*body, fluid);
   if (!target) return fail(request, HttpStatus::kBadRequest, target.error());
-  const auto version = db::setPumpTarget(*db_, *target, now);
+  const auto version = db::setPumpTarget(*db_, *target, now, userOf(request));
   if (!version) return fail(request, HttpStatus::kBadRequest, version.error());
   LOG_INFO() << "pumping target " << fluid << ": " << db::describe(*target)
              << ", v" << *version;

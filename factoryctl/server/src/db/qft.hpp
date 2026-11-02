@@ -7,6 +7,7 @@
 #include <expected>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <userver/formats/json/value.hpp>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
@@ -45,11 +46,11 @@ auto listQftSetups(pg::Cluster& db) -> std::vector<QftSetup>;
 // nullopt in the expected.
 auto setQftSettings(pg::Cluster& db, const std::string& name,
                     const userver::formats::json::Value& settings,
-                    domain::TimePoint now)
+                    domain::TimePoint now, std::string_view by = {})
     -> std::expected<std::optional<std::int64_t>, std::string>;
 
 // Forgets a setup (renamed, rebuilt elsewhere). Returns false when unknown.
 auto deleteQftSetup(pg::Cluster& db, const std::string& name,
-                    domain::TimePoint now) -> bool;
+                    domain::TimePoint now, std::string_view by = {}) -> bool;
 
 }  // namespace factoryctl::db

@@ -97,7 +97,8 @@ auto listOrders(pg::Cluster& db, std::int64_t limit) -> std::vector<OrderRow> {
   return out;
 }
 
-auto cancelOrder(pg::Cluster& db, std::int64_t id, domain::TimePoint now)
+auto cancelOrder(pg::Cluster& db, std::int64_t id, domain::TimePoint now,
+                 std::string_view by)
     -> std::expected<domain::CancelAction, std::string> {
   // Locked like the poll locks open orders: one waits for the other.
   auto tx = db.Begin(kMaster, {});
@@ -124,8 +125,9 @@ auto cancelOrder(pg::Cluster& db, std::int64_t id, domain::TimePoint now)
         .at = now,
         .source = "order",
         .text = action == domain::CancelAction::kCanceledNow
-                    ? "canceled before it reached the agent"
-                    : "cancel asked: the agent cancels the craft on its CPU",
+                    ? "canceled before it reached the agent" + byWho(by)
+                    : "cancel asked" + byWho(by) +
+                          ": the agent cancels the craft on its CPU",
         .order = id};
     addEvents(tx, {&told, 1});
   }

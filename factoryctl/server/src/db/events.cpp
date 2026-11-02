@@ -1,10 +1,15 @@
 #include "db/events.hpp"
 
+#include <format>
 #include <userver/storages/postgres/cluster.hpp>
 #include <userver/storages/postgres/io/chrono.hpp>
 #include <userver/storages/postgres/transaction.hpp>
 
 namespace factoryctl::db {
+
+auto byWho(std::string_view user) -> std::string {
+  return user.empty() ? std::string{} : std::format(" (by {})", user);
+}
 
 namespace {
 

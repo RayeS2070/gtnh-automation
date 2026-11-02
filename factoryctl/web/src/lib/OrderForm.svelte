@@ -1,7 +1,7 @@
 <script lang="ts">
   import { placeOrder } from './api'
   import { amount as format, parseAmount, shownLabel, unit } from './format'
-  import { loadName, saveName } from './who'
+  import { loadName, saveName, signedIn } from './who'
 
   type Props = {
     goods: { goodsId: number; label: string; variant: string }
@@ -12,6 +12,8 @@
 
   let count = $state('')
   let who = $state(loadName())
+  let user = $state<string | null>(null)
+  signedIn().then((u) => (user = u))
   let error = $state('')
   let saving = $state(false)
 
@@ -23,8 +25,8 @@
     if (!valid) return
     saving = true
     try {
-      saveName(who)
-      onplaced(await placeOrder(goods.goodsId, value!, who))
+      if (!user) saveName(who)
+      onplaced(await placeOrder(goods.goodsId, value!, user ?? who))
     } catch (e) {
       error = e instanceof Error ? e.message : String(e)
     } finally {
@@ -40,7 +42,11 @@
     <input bind:value={count} placeholder="e.g. 128, 10k" inputmode="numeric" />
     {#if value !== null}<span class="hint">{format(value)}{unit(goods)}</span>{/if}
   </label>
-  <label>Who <input bind:value={who} placeholder="your name" /></label>
+  {#if user}
+    <div class="row"><span>Who</span><span>{user}</span></div>
+  {:else}
+    <label>Who <input bind:value={who} placeholder="your name" /></label>
+  {/if}
   {#if error}<div class="error">{error}</div>{/if}
   <div class="buttons">
     <button type="submit" disabled={!valid || saving}>Order</button>
@@ -61,7 +67,8 @@
   .title {
     font-weight: 600;
   }
-  label {
+  label,
+  .row {
     display: grid;
     grid-template-columns: 8rem 12rem auto;
     align-items: center;

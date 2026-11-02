@@ -259,7 +259,7 @@ auto pumpsView(pg::Cluster& db, domain::TimePoint since) -> PumpsView {
 }
 
 auto setPumpGeneral(pg::Cluster& db, std::int32_t batch, double threshold,
-                    domain::TimePoint now)
+                    domain::TimePoint now, std::string_view by)
     -> std::expected<std::int64_t, std::string> {
   if (auto ok = domain::checkPumpSettings({.batch = batch, .threshold = threshold});
       !ok) {
@@ -270,17 +270,18 @@ auto setPumpGeneral(pg::Cluster& db, std::int32_t batch, double threshold,
   tx.Execute(
       "UPDATE factoryctl.pump_settings SET batch = $1, threshold = $2",
       batch, threshold);
-  const Event told{
-      .at = now,
-      .source = std::string{kSource},
-      .text = std::format("pumping: batch {} s, threshold {}", batch, threshold)};
+  const Event told{.at = now,
+                   .source = std::string{kSource},
+                   .text = std::format("pumping: batch {} s, threshold {}",
+                                       batch, threshold) +
+                           byWho(by)};
   addEvents(tx, {&told, 1});
   tx.Commit();
   return version;
 }
 
 auto setPumpTarget(pg::Cluster& db, const domain::PumpTarget& t,
-                   domain::TimePoint now)
+                   domain::TimePoint now, std::string_view by)
     -> std::expected<std::int64_t, std::string> {
   if (auto ok = domain::checkPumpSettings({.targets = {t}}); !ok) {
     return std::unexpected(ok.error());
@@ -299,7 +300,7 @@ auto setPumpTarget(pg::Cluster& db, const domain::PumpTarget& t,
       t.fluid, t.target, t.priority, t.enabled);
   const Event told{.at = now,
                    .source = std::string{kSource},
-                   .text = "pumping target: " + describe(t),
+                   .text = "pumping target: " + describe(t) + byWho(by),
                    .goods = fluidKey(t.fluid)};
   addEvents(tx, {&told, 1});
   tx.Commit();
@@ -307,7 +308,8 @@ auto setPumpTarget(pg::Cluster& db, const domain::PumpTarget& t,
 }
 
 auto deletePumpTarget(pg::Cluster& db, const std::string& fluid,
-                      domain::TimePoint now) -> std::optional<std::int64_t> {
+                      domain::TimePoint now, std::string_view by)
+    -> std::optional<std::int64_t> {
   auto tx = db.Begin(kMaster, {});
   if (tx.Execute("DELETE FROM factoryctl.pump_targets WHERE fluid = $1", fluid)
           .RowsAffected() == 0) {
@@ -316,7 +318,7 @@ auto deletePumpTarget(pg::Cluster& db, const std::string& fluid,
   const auto version = bump(tx, now);
   const Event told{.at = now,
                    .source = std::string{kSource},
-                   .text = "pumping target removed",
+                   .text = "pumping target removed" + byWho(by),
                    .goods = fluidKey(fluid)};
   addEvents(tx, {&told, 1});
   tx.Commit();

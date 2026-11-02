@@ -69,7 +69,8 @@ auto describe(const TargetSettings& s) -> std::string {
 }
 
 auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s,
-               domain::TimePoint now) -> std::expected<void, std::string> {
+               domain::TimePoint now, std::string_view by)
+    -> std::expected<void, std::string> {
   // Checked here, not left to the table's CHECKs: an error, not an exception.
   if (s.threshold < 0) return std::unexpected("threshold must be >= 0");
   if (s.batch <= 0) return std::unexpected("batch must be > 0");
@@ -97,7 +98,7 @@ auto setTarget(pg::Cluster& db, std::int64_t goodsId, const TargetSettings& s,
   }
   const Event told{.at = now,
                    .source = "target",
-                   .text = "target: " + describe(s),
+                   .text = "target: " + describe(s) + byWho(by),
                    .goodsId = goodsId};
   addEvents(tx, {&told, 1});
   tx.Commit();
@@ -119,8 +120,8 @@ auto listGroups(pg::Cluster& db) -> std::vector<TargetGroup> {
   return out;
 }
 
-auto addGroup(pg::Cluster& db, const std::string& name, domain::TimePoint now)
-    -> std::expected<std::int64_t, std::string> {
+auto addGroup(pg::Cluster& db, const std::string& name, domain::TimePoint now,
+              std::string_view by) -> std::expected<std::int64_t, std::string> {
   if (name.empty()) return std::unexpected("the name is empty");
   try {
     auto tx = db.Begin(kMaster, {});
@@ -130,8 +131,9 @@ auto addGroup(pg::Cluster& db, const std::string& name, domain::TimePoint now)
               "RETURNING id",
               name)
             .AsSingleRow<std::int64_t>();
-    const Event told{
-        .at = now, .source = "target", .text = "target group added: " + name};
+    const Event told{.at = now,
+                     .source = "target",
+                     .text = "target group added: " + name + byWho(by)};
     addEvents(tx, {&told, 1});
     tx.Commit();
     return id;
@@ -141,7 +143,8 @@ auto addGroup(pg::Cluster& db, const std::string& name, domain::TimePoint now)
 }
 
 auto renameGroup(pg::Cluster& db, std::int64_t id, const std::string& name,
-                 domain::TimePoint now) -> std::expected<bool, std::string> {
+                 domain::TimePoint now, std::string_view by)
+    -> std::expected<bool, std::string> {
   if (name.empty()) return std::unexpected("the name is empty");
   try {
     auto tx = db.Begin(kMaster, {});
@@ -155,7 +158,8 @@ auto renameGroup(pg::Cluster& db, std::int64_t id, const std::string& name,
     const Event told{.at = now,
                      .source = "target",
                      .text = std::format("target group renamed: {} -> {}",
-                                         old.AsSingleRow<std::string>(), name)};
+                                         old.AsSingleRow<std::string>(), name) +
+                             byWho(by)};
     addEvents(tx, {&told, 1});
     tx.Commit();
     return true;
@@ -164,23 +168,23 @@ auto renameGroup(pg::Cluster& db, std::int64_t id, const std::string& name,
   }
 }
 
-auto deleteGroup(pg::Cluster& db, std::int64_t id, domain::TimePoint now)
-    -> bool {
+auto deleteGroup(pg::Cluster& db, std::int64_t id, domain::TimePoint now,
+                 std::string_view by) -> bool {
   auto tx = db.Begin(kMaster, {});
   const auto res = tx.Execute(
       "DELETE FROM factoryctl.target_groups WHERE id = $1 RETURNING name", id);
   if (res.IsEmpty()) return false;
-  const Event told{
-      .at = now,
-      .source = "target",
-      .text = "target group deleted: " + res.AsSingleRow<std::string>()};
+  const Event told{.at = now,
+                   .source = "target",
+                   .text = "target group deleted: " +
+                           res.AsSingleRow<std::string>() + byWho(by)};
   addEvents(tx, {&told, 1});
   tx.Commit();
   return true;
 }
 
-auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now)
-    -> bool {
+auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now,
+                  std::string_view by) -> bool {
   auto tx = db.Begin(kMaster, {});
   if (tx.Execute("DELETE FROM factoryctl.targets WHERE goods_id = $1", goodsId)
           .RowsAffected() == 0) {
@@ -188,7 +192,7 @@ auto deleteTarget(pg::Cluster& db, std::int64_t goodsId, domain::TimePoint now)
   }
   const Event told{.at = now,
                    .source = "target",
-                   .text = "target removed",
+                   .text = "target removed" + byWho(by),
                    .goodsId = goodsId};
   addEvents(tx, {&told, 1});
   tx.Commit();

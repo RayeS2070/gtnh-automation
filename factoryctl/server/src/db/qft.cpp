@@ -77,7 +77,8 @@ auto listQftSetups(pg::Cluster& db) -> std::vector<QftSetup> {
 }
 
 auto setQftSettings(pg::Cluster& db, const std::string& name,
-                    const json::Value& settings, domain::TimePoint now)
+                    const json::Value& settings, domain::TimePoint now,
+                    std::string_view by)
     -> std::expected<std::optional<std::int64_t>, std::string> {
   auto tx = db.Begin(kMaster, {});
   auto setup = lockQftSetup(tx, name);
@@ -95,22 +96,24 @@ auto setQftSettings(pg::Cluster& db, const std::string& name,
       .source = "qft",
       .text = std::format("[{}] settings v{} from the client: mode {}", name,
                           setup->settingsVersion,
-                          settings["mode"].As<std::string>("?"))};
+                          settings["mode"].As<std::string>("?")) +
+              byWho(by)};
   addEvents(tx, {&told, 1});
   tx.Commit();
   return std::optional{setup->settingsVersion};
 }
 
 auto deleteQftSetup(pg::Cluster& db, const std::string& name,
-                    domain::TimePoint now) -> bool {
+                    domain::TimePoint now, std::string_view by) -> bool {
   auto tx = db.Begin(kMaster, {});
   if (tx.Execute("DELETE FROM factoryctl.qft_setups WHERE name = $1", name)
           .RowsAffected() == 0) {
     return false;
   }
-  const Event told{.at = now,
-                   .source = "qft",
-                   .text = std::format("[{}] setup forgotten", name)};
+  const Event told{
+      .at = now,
+      .source = "qft",
+      .text = std::format("[{}] setup forgotten", name) + byWho(by)};
   addEvents(tx, {&told, 1});
   tx.Commit();
   return true;

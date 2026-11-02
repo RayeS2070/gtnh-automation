@@ -1,6 +1,7 @@
 #include <userver/storages/postgres/cluster.hpp>
 #include <userver/storages/postgres/transaction.hpp>
 
+#include "db/events.hpp"
 #include "db/orders.hpp"
 #include "db/scan.hpp"
 #include "db/schema.hpp"
@@ -48,6 +49,16 @@ UTEST_F(TargetsTest, SetAndList) {
   EXPECT_EQ(list[0].goods.label, "Stick");
   EXPECT_EQ(list[0].goods.amount, 5);
   EXPECT_EQ(list[0].settings, s);
+}
+
+UTEST_F(TargetsTest, EventsSayWhoDidIt) {
+  ASSERT_TRUE(setTarget(db(), stick, {.threshold = 1, .batch = 1}, t0, "pavel")
+                  .has_value());
+  ASSERT_TRUE(deleteTarget(db(), stick, t0));
+  const auto events = listEvents(db(), {.source = "target"});
+  ASSERT_EQ(events.size(), 2);
+  EXPECT_EQ(events[0].text, "target removed");  // no one: no proxy in front
+  EXPECT_TRUE(events[1].text.ends_with(" (by pavel)")) << events[1].text;
 }
 
 UTEST_F(TargetsTest, SetAgainReplaces) {

@@ -12,6 +12,7 @@
 #include <userver/utils/datetime.hpp>
 
 #include "api/json.hpp"
+#include "api/user.hpp"
 #include "db/qft.hpp"
 #include "db/schema.hpp"
 
@@ -98,8 +99,8 @@ auto QftSettingsHandler::HandleRequestThrow(
   } catch (const json::Exception& e) {
     return fail(request, HttpStatus::kBadRequest, std::string("bad JSON: ") + e.what());
   }
-  const auto version =
-      db::setQftSettings(*db_, name, body, userver::utils::datetime::Now());
+  const auto version = db::setQftSettings(
+      *db_, name, body, userver::utils::datetime::Now(), userOf(request));
   if (!version) return fail(request, HttpStatus::kBadRequest, version.error());
   if (!*version) return fail(request, HttpStatus::kNotFound, "no such setup");
   LOG_INFO() << "qft " << name << ": settings v" << **version;
@@ -117,7 +118,8 @@ auto QftSetupHandler::HandleRequestThrow(
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
   const auto name = nameOf(request);
-  if (!db::deleteQftSetup(*db_, name, userver::utils::datetime::Now())) {
+  if (!db::deleteQftSetup(*db_, name, userver::utils::datetime::Now(),
+                          userOf(request))) {
     return fail(request, HttpStatus::kNotFound, "no such setup");
   }
   LOG_INFO() << "qft " << name << " forgotten";
