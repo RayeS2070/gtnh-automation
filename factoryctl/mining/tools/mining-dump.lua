@@ -37,6 +37,18 @@ local function ask(proxy, method, ...)
     return a
 end
 
+---All the values a method returns (getCoordinates gives x, y, z), or why there are none.
+local function askAll(proxy, method, ...)
+    if not proxy[method] then
+        return '<no method>'
+    end
+    local r = table.pack(pcall(proxy[method], ...))
+    if not r[1] then
+        return '<error: ' .. tostring(r[2]) .. '>'
+    end
+    return table.pack(table.unpack(r, 2, r.n))
+end
+
 local function methods(address)
     local out = {}
     for name, direct in pairs(component.methods(address)) do
@@ -89,7 +101,7 @@ for address in component.list('gt_machine', true) do
             address = address,
             name = name,
             methods = methods(address),
-            coordinates = ask(proxy, 'getCoordinates'),
+            coordinates = askAll(proxy, 'getCoordinates'),
             workAllowed = ask(proxy, 'isWorkAllowed'),
             active = ask(proxy, 'isMachineActive'),
             hasWork = ask(proxy, 'hasWork'),
@@ -117,7 +129,7 @@ for _, kind in ipairs({ 'me_inputbus', 'me_inputhatch' }) do
             address = address,
             name = ask(proxy, 'getName'),
             advanced = ask(proxy, 'isAdvanced'),
-            coordinates = ask(proxy, 'getCoordinates'),
+            coordinates = askAll(proxy, 'getCoordinates'),
             slotSize = size,
             autoPull = ask(proxy, 'getAutoPull'),
             workAllowed = ask(proxy, 'isWorkAllowed'),
