@@ -194,7 +194,8 @@ docker compose logs server --no-log-prefix | jq -c 'select(.level == "ERROR" or 
 `deploy/nginx/factoryctl.conf` is the nginx server block for it: TLS, `auth_basic` with a
 password per person, the person's name passed on in `X-Forwarded-User`, `/agent/` closed (the
 agents post to the server directly), and a day of cache for the icons. Passwords, one line per
-person (nginx reads the file on every request, no reload):
+person (nginx reads the file on every request, no reload; its workers, not root, read it: `0644`,
+it holds hashes only):
 
 ```sh
 printf 'pavel:%s\n' "$(openssl passwd -6)" >> factoryctl.htpasswd
