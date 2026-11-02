@@ -11,7 +11,6 @@ miner.__index = miner
 
 local kNames = { projectmoduleminert1 = 1, projectmoduleminert2 = 2, projectmoduleminert3 = 3 }
 local kDiscover = 60   -- s between looks for modules (adapters come and go)
-local kNear = 12       -- blocks: a stocking bus or hatch this close to a controller is its own
 local kPoll = 10       -- s between polls until the server says
 local kRetry = 30      -- s between polls while the server does not answer
 local kOffline = 60    -- s without the server before the buffer holds the modules
@@ -85,16 +84,29 @@ local function coords(proxy)
     return nil
 end
 
----The nearest stocking part of the kind to x, y, z within kNear, not taken by another module.
+---Whether a block at dx, dy, dz from a controller is in its module. A module is a wall two
+---blocks wide and five high around its controller (the third row), one deep:
+---    R B      R optical connector, B stocking bus, H stocking hatch,
+---      H      x the controller, D the drone bus, O the output bus
+---    x
+---    D        Which way it faces OC cannot tell: the width is along x or along z, either side.
+---    O
+local function inModule(dx, dy, dz)
+    return math.abs(dy) <= 2
+        and ((dx == 0 and math.abs(dz) <= 1) or (dz == 0 and math.abs(dx) <= 1))
+end
+
+---The stocking part of the kind inside the module of the controller at x, y, z, not taken by
+---another module; the nearest one if there were several.
 function miner:nearest(kind, x, y, z, taken)
     local best, bestD
     for address in self.deps.list(kind) do
         if not taken[address] then
             local proxy = self.deps.proxy(address)
             local px, py, pz = coords(proxy)
-            if px then
-                local d = math.max(math.abs(px - x), math.abs(py - y), math.abs(pz - z))
-                if d <= kNear and (not bestD or d < bestD) then best, bestD = proxy, d end
+            if px and inModule(px - x, py - y, pz - z) then
+                local d = math.abs(px - x) + math.abs(py - y) + math.abs(pz - z)
+                if not bestD or d < bestD then best, bestD = proxy, d end
             end
         end
     end

@@ -41,6 +41,24 @@ suite('discovery: nearest stocking parts, the drone path from the config', funct
     eq(mod.parts.interface, w.interface, 'interface by prefix')
 end)
 
+suite('stocking parts only inside the module', function()
+    local w = fakeWorld()
+    -- Close, but out of the wall: a diagonal and a row too high.
+    local function at(address, x, y, z)
+        return { address = address, getCoordinates = function() return x, y, z end }
+    end
+    w.components.me_inputbus = { at('bus-diag', 170, 33, -35), at('bus-high', 169, 36, -35) }
+    w.components.me_inputhatch = { at('hatch-x', 168, 31, -36) } -- the wall along x, at the bottom
+    local byAddress = {}
+    for _, list in pairs(w.components) do for _, p in ipairs(list) do byAddress[p.address] = p end end
+    w.deps.proxy = function(a) return byAddress[a] end
+    local m = miner.new(w.deps, 0)
+    m:discover(0)
+    local p = m.modules['169,33,-36'].parts
+    eq(p.bus, nil, 'no bus out of the wall')
+    eq(p.hatch and p.hatch.address, 'hatch-x', 'a hatch in a wall along x')
+end)
+
 suite('drone path found without config: one module, one transposer', function()
     local w = fakeWorld()
     w.deps.config.drones = nil
