@@ -12,6 +12,8 @@ agent (OpenComputers, in game) --HTTP poll--> server (C++, userver) --> PostgreS
 - `agent/` — OC program in the game: scans the ME network, places and cancels crafting orders.
 - `server/` — the server next to the game server: stock, thresholds, order journal.
 - `web/` — the web client (Svelte + TypeScript), built into static files the server serves.
+- `pumps/`, `qft/`, `mining/` — the agents of the Space Elevator pump modules, of a Quantum Force
+  Transformer and of the Space Elevator mining modules.
 
 Replaces `../maintainer/` and, for items and fluids, the InfluxDB exporter.
 
@@ -244,3 +246,54 @@ cd /home/factoryctl/pumps && edit config.lua && main
 
 Its local tests: `cd pumps && lua tests/run.lua`; against a running server, with fake modules and
 simulated time: `lua tests/live.lua` (the development server, http://localhost:8081).
+
+### Mining agent (`mining/`)
+
+The Space Elevator mining modules. Unlike the other agents it does not decide: the server plans
+every module, the agent carries the plan out and keeps its own safety.
+
+**Targets** (the Mining tab): keep a product — a dust, a fluid — at a threshold, made of some
+module outputs (ores). The tab suggests the ores from the mining catalog: what processing turns
+into the product, with the asteroids that drop them; which ones count is the player's call (an
+ore makes many dusts, a dust comes from many ores).
+
+**The plan** (`server/src/domain/mining.*`, on smc's mechanics: `../smc/core`). A module draws its
+asteroid at random among the candidates its drone and distance allow, every operation, so a
+setting (module tier, drone tier, distance, plasma, parallels) is a mix of outputs. Its worth is
+Σ ore demand × the ore's expected rate per second; the demand of an ore is the urgency
+(`1 - fill^priority`) of the targets it feeds. Modules are planned greedily, the bigger first:
+each takes the best setting it has a drone for, then discounts what it covers for the next; one
+keeps its setting unless the best is 25 % better (a change costs a drone swap). The plasma is
+the best one in stock (`plasma-minimum`); an ore with `buffer-limit` items in the buffer before
+processing is not given to any module until processing catches up. The rest is voided: the
+keeping storage bus gets the wanted ores only.
+
+**Hardware, per module**: an Adapter on the controller (an MFU works), its ME stocking input bus
+(drill tip and rod) and stocking input hatch (plasma) — both found by their coordinates, the
+nearest to the controller —, a plain input bus with a transposer between it and an interface of
+the drone pool: the module takes no drone from an ME bus and its controller slot allows no
+automation. Drill tips, rods and plasma come from the main network, where they are ordinary
+crafting targets. **Shared**: the drone pool network, the storage buses of the output network
+(keep: into processing; void: an Inverter Card, the same list, into the trash — nothing wanted is
+voided even when processing is full) and the buffer network.
+
+```
+gtnh-install factoryctl
+cd /home/factoryctl && mining/tools/mining-dump.lua   # addresses, sides, coordinates
+cd mining && edit config.lua && main
+```
+
+`config.lua`: the setup's name, per module (by its controller's coordinates) the transposer, its
+two sides and the pool interface, the storage buses and the buffer network. Several computers
+may share one server: each is a setup, the plan of one counts what the others mine.
+
+Without the server the modules go on with their last setting; once a kept ore fills the buffer
+the agent holds them until the buffer drains or the server is back. Ctrl+C: every module ends its
+operation and stands.
+
+Local tests: `cd mining && lua tests/run.lua`; against a running server, with a fake module and
+simulated time: `lua tests/live.lua` (the development server). The mining catalog
+(`server/data/mining_catalog.json`) comes from `mining/tools/mining-catalog.py`: smc's asteroids
+(GT5U), the item ids of their outputs (MEDINA's asteroid dump, `../gtnh-miner`) and the
+modpack's labels, checked against each other.
+
