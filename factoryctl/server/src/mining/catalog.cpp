@@ -1,6 +1,7 @@
 #include "mining/catalog.hpp"
 
 #include <format>
+#include <map>
 #include <stdexcept>
 // Registers the embedded mining_catalog.json: in exactly one source file.
 #include <generated/mining_catalog.json.hpp>
@@ -108,6 +109,31 @@ auto catalog() -> const domain::MiningCatalog& {
     return std::move(*parsed);
   }();
   return c;
+}
+
+auto labelOf(const domain::ItemKey& key) -> std::string {
+  static const auto labels = [] {
+    std::map<domain::ItemKey, std::string> out;
+    const auto add = [&](const domain::MiningItem& i) {
+      out.try_emplace(i.key, i.label);
+    };
+    const auto& c = catalog();
+    for (const auto& outputs : c.outputs) {
+      for (const auto& o : outputs) {
+        add(o.item);
+        for (const auto& p : o.products) add(p);
+      }
+    }
+    for (const auto& d : c.drones) {
+      add(d.drone);
+      add(d.tip);
+      add(d.rod);
+    }
+    return out;
+  }();
+  const auto it = labels.find(key);
+  return it != labels.end() ? it->second
+                            : std::format("{}:{}", key.name, key.damage);
 }
 
 }  // namespace factoryctl::mining

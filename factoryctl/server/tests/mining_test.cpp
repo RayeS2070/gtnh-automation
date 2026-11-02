@@ -1,8 +1,10 @@
 #include <chrono>
+#include <userver/formats/json/serialize.hpp>
 #include <userver/utest/utest.hpp>
 
 #include "core/mechanics.hpp"
 #include "domain/mining.hpp"
+#include "agent/mining_protocol.hpp"
 #include "mining/catalog.hpp"
 
 namespace {
@@ -242,6 +244,71 @@ TEST(MiningCatalog, PlanIsQuick) {
   for (const auto& a : p) busy += a.setting ? 1 : 0;
   EXPECT_EQ(busy, 12);
   EXPECT_LT(took, std::chrono::seconds(1));
+}
+
+}  // namespace
+
+namespace {
+
+using factoryctl::agent::parseMiningPoll;
+namespace json = userver::formats::json;
+
+TEST(MiningProtocol, ParsesAPoll) {
+  const auto r = parseMiningPoll(json::FromString(R"({
+    "setup": "mining-1", "run": "r1",
+    "modules": [{"x": 169, "y": 33, "z": -36, "tier": 2, "state": "running",
+                 "active": true, "drone": 9, "assignment": "9/121/3/4"}],
+    "pool": [{"tier": 5, "count": 2}],
+    "buffer": [{"name": "gregtech:gt.blockores2", "damage": 2982, "size": 640}],
+    "routing": {"slots": 63},
+    "log": [{"t": 1.5, "level": "inf", "text": "hi"}]})"));
+  ASSERT_TRUE(r) << r.error();
+  EXPECT_EQ(r->name, "mining-1");
+  ASSERT_EQ(r->modules.size(), 1);
+  EXPECT_EQ(factoryctl::agent::moduleId(r->modules[0].at), "169,33,-36");
+  EXPECT_EQ(r->modules[0].drone, 9);
+  EXPECT_EQ(r->pool.at(5), 2);
+  EXPECT_EQ(r->buffer.at(ore(2982)), 640);
+  EXPECT_EQ(r->slots, 63);
+  EXPECT_EQ(r->log.size(), 1);
+  EXPECT_EQ(r->status["modules"][0]["x"].As<int>(), 169);
+}
+
+TEST(MiningProtocol, RefusesWithAPath) {
+  const auto bad = [](std::string_view text) {
+    return parseMiningPoll(json::FromString(text)).error();
+  };
+  EXPECT_EQ(bad(R"({"run": "r"})"), "setup: missing");
+  EXPECT_EQ(bad(R"({"setup": "s", "run": "r", "modules": [{"x": 1, "y": 2,
+    "z": 3, "tier": 4, "state": "idle"}]})"),
+            "modules[0].tier: not in 1..3");
+  EXPECT_EQ(bad(R"({"setup": "s", "run": "r", "modules": [
+    {"x": 1, "y": 2, "z": 3, "tier": 1, "state": "idle"},
+    {"x": 1, "y": 2, "z": 3, "tier": 1, "state": "idle"}]})"),
+            "modules[1]: the same x, y, z twice");
+  EXPECT_EQ(bad(R"({"setup": "s", "run": "r", "buffer": [{"name": "a",
+    "damage": 1, "size": -1}]})"),
+            "buffer[0].size: negative");
+}
+
+TEST(MiningProtocol, Replies) {
+  const auto& c = factoryctl::mining::catalog();
+  factoryctl::agent::MiningReply reply{
+      .modules = {{.at = {169, 33, -36},
+                   .setting = MiningSetting{.droneTier = 9, .distance = 121,
+                                            .plasmaTier = 3, .parallel = 4}},
+                  {.at = {1, 2, 3}}},
+      .keep = {ore(2982)},
+      .bufferLimit = 100000};
+  const auto lua = factoryctl::agent::replyMiningPoll(reply, c);
+  ASSERT_TRUE(lua) << lua.error();
+  EXPECT_NE(lua->find(R"(id="9/121/3/4")"), std::string::npos) << *lua;
+  EXPECT_NE(lua->find(R"(plasma="plasma.radon")"), std::string::npos);
+  EXPECT_NE(lua->find(R"(tip={name="gregtech:gt.metaitem.02",damage=8129})"),
+            std::string::npos)
+      << *lua;
+  EXPECT_NE(lua->find("idle=true"), std::string::npos);
+  EXPECT_NE(lua->find("limit=100000"), std::string::npos);
 }
 
 }  // namespace

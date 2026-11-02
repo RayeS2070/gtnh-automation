@@ -34,7 +34,8 @@ probe() {
     done
     [[ -n $ok ]] || { $log 2>&1 | tail -5 >&2; fail "no answer on :$port"; }
     for path in / /health /api/v1/stock /api/v1/targets /api/v1/target-groups /api/v1/orders \
-        /api/v1/cpus /api/v1/events /api/v1/pumps /api/v1/qft /api/v1/me /data/data.bin; do
+        /api/v1/cpus /api/v1/events /api/v1/pumps /api/v1/qft /api/v1/mining /api/v1/me \
+        /data/data.bin; do
         local code
         code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$port$path")
         [[ $code == 200 ]] || fail ":$port$path answered $code"
@@ -51,7 +52,7 @@ probe() {
         grep '"level":"ERROR"' "$tmp/log" | head -3 >&2
         fail "errors in the log of :$port"
     fi
-    grep -q 'dynamic config from [^"]*: FACTORYCTL_EVENTS, FACTORYCTL_POLL' "$tmp/log" \
+    grep -q 'dynamic config from [^"]*: FACTORYCTL_EVENTS, FACTORYCTL_MINING, FACTORYCTL_POLL' "$tmp/log" \
         || fail ":$port did not take the dynamic config"
 }
 
@@ -73,6 +74,9 @@ FACTORYCTL_POLL:
   scan-slow-chunk: 5
 FACTORYCTL_EVENTS:
   keep: 30d
+FACTORYCTL_MINING:
+  buffer-limit: 100000
+  plasma-minimum: 100000
 YAML
 
 native_log() { cat "$tmp/native.log"; }

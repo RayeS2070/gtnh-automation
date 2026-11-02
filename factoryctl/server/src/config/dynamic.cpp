@@ -79,6 +79,7 @@ auto fill(T& out, const json::Value& value, std::string_view key,
 
 constexpr std::string_view kPollName = "FACTORYCTL_POLL";
 constexpr std::string_view kEventsName = "FACTORYCTL_EVENTS";
+constexpr std::string_view kMiningName = "FACTORYCTL_MINING";
 
 auto periodOf(seconds domain::Settings::* member) {
   return [member](domain::Settings& s, const json::Value& v,
@@ -136,6 +137,20 @@ auto eventsFields() -> const Fields<EventsSettings>& {
   return fields;
 }
 
+auto miningFields() -> const Fields<MiningSettings>& {
+  static const Fields<MiningSettings> fields{
+      {"buffer-limit",
+       [](MiningSettings& m, const json::Value& v, std::string_view field) {
+         m.bufferLimit = static_cast<double>(integer(v, kMiningName, field, 1));
+       }},
+      {"plasma-minimum",
+       [](MiningSettings& m, const json::Value& v, std::string_view field) {
+         m.plasmaMinimum = static_cast<double>(integer(v, kMiningName, field, 1));
+       }},
+  };
+  return fields;
+}
+
 }  // namespace
 
 auto parsePoll(const json::Value& value) -> domain::Settings {
@@ -145,6 +160,12 @@ auto parsePoll(const json::Value& value) -> domain::Settings {
     fail(kPollName, "scan-slow-from", "after scan-slow-to");
   }
   return s;
+}
+
+auto parseMining(const json::Value& value) -> MiningSettings {
+  MiningSettings m;
+  fill(m, value, kMiningName, miningFields());
+  return m;
 }
 
 auto parseEvents(const json::Value& value) -> EventsSettings {
@@ -158,6 +179,10 @@ const userver::dynamic_config::Key<domain::Settings> kPoll{
 
 const userver::dynamic_config::Key<EventsSettings> kEvents{
     kEventsName, parseEvents,
+    userver::dynamic_config::DefaultAsJsonString{"{}"}};
+
+const userver::dynamic_config::Key<MiningSettings> kMining{
+    kMiningName, parseMining,
     userver::dynamic_config::DefaultAsJsonString{"{}"}};
 
 auto parseDocs(std::string_view yaml) -> userver::dynamic_config::DocsMap {
@@ -186,6 +211,7 @@ auto parseDocs(std::string_view yaml) -> userver::dynamic_config::DocsMap {
 auto keyOfField(std::string_view field) -> std::optional<std::string_view> {
   if (pollFields().contains(field)) return kPollName;
   if (eventsFields().contains(field)) return kEventsName;
+  if (miningFields().contains(field)) return kMiningName;
   return std::nullopt;
 }
 

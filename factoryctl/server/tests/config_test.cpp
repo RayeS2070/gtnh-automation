@@ -87,6 +87,17 @@ TEST(DynamicConfig, BadPollValuesThrow) {
   EXPECT_THAT(throwsWith(R"([1])"), HasSubstr("object"));
 }
 
+TEST(DynamicConfig, Mining) {
+  EXPECT_EQ(parseMining(json::FromString("{}")), MiningSettings{});
+  EXPECT_EQ(parseMining(json::FromString(R"({"buffer-limit": 5000})")).bufferLimit,
+            5000);
+  EXPECT_THROW(parseMining(json::FromString(R"({"buffer-limit": 0})")),
+               std::runtime_error);
+  EXPECT_THROW(parseMining(json::FromString(R"({"plasma-minimum": "1k"})")),
+               std::runtime_error);
+  EXPECT_EQ(keyOfField("buffer-limit"), "FACTORYCTL_MINING");
+}
+
 TEST(DynamicConfig, Events) {
   EXPECT_EQ(parseEvents(json::FromString("{}")), EventsSettings{});
   EXPECT_EQ(parseEvents(json::FromString(R"({"keep": "7d"})")).keep,

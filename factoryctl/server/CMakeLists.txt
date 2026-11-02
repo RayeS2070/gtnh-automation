@@ -39,6 +39,10 @@ add_library(factoryctl_lib STATIC
         src/config/file_updater.cpp
         src/http/compression.cpp
         src/domain/mining.cpp
+        src/agent/mining_protocol.cpp
+        src/agent/mining_poll_handler.cpp
+        src/api/mining_handler.cpp
+        src/db/mining.cpp
         src/mining/catalog.cpp
 )
 # Compression of responses (http/compression.cpp): both libraries are userver's
@@ -100,6 +104,7 @@ add_executable(factoryctl_dbtest
         tests/db/orders_dbtest.cpp
         tests/db/stock_dbtest.cpp
         tests/db/targets_dbtest.cpp
+        tests/db/mining_dbtest.cpp
         tests/db/manual_dbtest.cpp
         tests/db/settling_dbtest.cpp
         tests/db/probe_dbtest.cpp

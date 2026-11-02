@@ -19,4 +19,8 @@ auto parseCatalog(const userver::formats::json::Value& json)
 // it throws.
 auto catalog() -> const domain::MiningCatalog&;
 
+// The label of an item the catalog knows (outputs, products, drones and their
+// drills); the key itself, "name:damage", when it does not.
+auto labelOf(const domain::ItemKey& key) -> std::string;
+
 }  // namespace factoryctl::mining

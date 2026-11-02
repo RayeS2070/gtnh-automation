@@ -19,7 +19,8 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 on_host() { ssh "${ssh_opts[@]}" "$host" "$@"; }
 rsync_to() { rsync -a -e "ssh ${ssh_opts[*]}" "$@"; }
 
-docker build -t factoryctl:latest "$here"
+# smc (../smc) is outside the context: its core comes in as a named one.
+docker build --build-context smc="$here/../smc" -t factoryctl:latest "$here"
 # Natively and in a container, against the test database: nothing leaves if it fails.
 "$here/deploy/check.sh"
 

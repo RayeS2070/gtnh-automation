@@ -11,7 +11,9 @@
 #include "agent/pumps_poll_handler.hpp"
 #include "agent/qft_poll_handler.hpp"
 #include "agent/scan_handler.hpp"
+#include "agent/mining_poll_handler.hpp"
 #include "api/cpus_handler.hpp"
+#include "api/mining_handler.hpp"
 #include "api/events_handler.hpp"
 #include "api/orders_handler.hpp"
 #include "api/pumps_handler.hpp"
@@ -50,6 +52,11 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::PumpTargetHandler>()
           .Append<factoryctl::agent::PumpsPollHandler>()
           .Append<factoryctl::agent::QftPollHandler>()
+          .Append<factoryctl::agent::MiningPollHandler>()
+          .Append<factoryctl::api::MiningHandler>()
+          .Append<factoryctl::api::MiningTargetHandler>()
+          .Append<factoryctl::api::MiningSourcesHandler>()
+          .Append<factoryctl::api::MiningSetupHandler>()
           .Append<factoryctl::api::QftSetupsHandler>()
           .Append<factoryctl::api::QftSettingsHandler>()
           .Append<factoryctl::api::QftSetupHandler>()

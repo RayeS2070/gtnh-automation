@@ -31,10 +31,12 @@ WORKDIR /src
 COPY CMakeLists.txt CMakePresets.json ./
 COPY cmake/ cmake/
 COPY server/ server/
+# smc's core (the mining mechanics) lives next to factoryctl: a named build context, see deploy.sh.
+COPY --from=smc core/ /smc/core/
 # CPM keeps userver's sources in ~/.cache/CPM (CMakePresets.json), ccache its objects: a rebuild
 # compiles only what changed.
 RUN --mount=type=cache,target=/root/.cache \
-    cmake --preset linux_clang_release \
+    cmake --preset linux_clang_release -DFACTORYCTL_SMC_DIR=/smc \
     && cmake --build --preset linux_clang_release --target factoryctl_server \
     && mkdir -p /out/lib \
     && cp build/linux/linux_clang_release/server/factoryctl_server /out/ \

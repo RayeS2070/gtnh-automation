@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (9);
+INSERT INTO factoryctl.schema_version VALUES (10);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -127,7 +127,7 @@ CREATE TABLE factoryctl.events (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     at           timestamptz NOT NULL,
     level        factoryctl.event_level NOT NULL,
-    source       text NOT NULL,  -- agent | server | order | scan | target | pumps | qft
+    source       text NOT NULL,  -- agent | server | order | scan | target | pumps | qft | mining
     text         text NOT NULL,
     order_id     bigint REFERENCES factoryctl.orders ON DELETE SET NULL,
     goods_id     bigint REFERENCES factoryctl.goods ON DELETE SET NULL,
@@ -228,3 +228,27 @@ CREATE TABLE factoryctl.qft_setups (
     settings_at      timestamptz
 );
 
+-- Mining setups (factoryctl/mining): one computer's mining modules. The server
+-- plans them (domain::planMining), the agent carries the plan out. status: the
+-- last report as the agent sent it (modules, pool, buffer, slots); plan: what
+-- was sent back, per module ({module, setting, value, rates}), for the web and
+-- for the other setups' plans.
+CREATE TABLE factoryctl.mining_setups (
+    name    text PRIMARY KEY,
+    run     text NOT NULL,
+    status  jsonb NOT NULL DEFAULT '{}',
+    plan    jsonb NOT NULL DEFAULT '[]',
+    seen_at timestamptz NOT NULL
+);
+
+-- What mining keeps stocked: a product (a dust, a fluid: goods of the stock)
+-- and the module outputs it is made of ({name, damage}: they need not be
+-- goods yet). priority as the pumps': urgency = 1 - fill^priority.
+CREATE TABLE factoryctl.mining_targets (
+    goods_id   bigint PRIMARY KEY REFERENCES factoryctl.goods ON DELETE CASCADE,
+    threshold  bigint NOT NULL CHECK (threshold > 0),
+    priority   double precision NOT NULL DEFAULT 1 CHECK (priority > 0),
+    enabled    boolean NOT NULL DEFAULT true,
+    ores       jsonb NOT NULL DEFAULT '[]',
+    updated_at timestamptz NOT NULL DEFAULT now()
+);

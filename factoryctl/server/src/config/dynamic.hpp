@@ -30,11 +30,25 @@ struct EventsSettings {
 // FACTORYCTL_EVENTS: keep, how long events stay.
 extern const userver::dynamic_config::Key<EventsSettings> kEvents;
 
+struct MiningSettings {
+  // Items of one ore in the buffer before processing at which mining stops
+  // giving it to modules: the factory is not keeping up.
+  double bufferLimit = 100'000;
+  // mB of a plasma below which it does not count as available.
+  double plasmaMinimum = 100'000;
+
+  auto operator==(const MiningSettings&) const -> bool = default;
+};
+
+// FACTORYCTL_MINING: buffer-limit, plasma-minimum.
+extern const userver::dynamic_config::Key<MiningSettings> kMining;
+
 // The parsers of the keys. A missing field keeps its default, a key without
 // fields (null) is all defaults; an unknown field or a bad value throws, and
 // userver refuses the whole update.
 auto parsePoll(const userver::formats::json::Value& value) -> domain::Settings;
 auto parseEvents(const userver::formats::json::Value& value) -> EventsSettings;
+auto parseMining(const userver::formats::json::Value& value) -> MiningSettings;
 
 // The file's text: a YAML mapping of keys; empty or only comments is none.
 // Throws on bad YAML or a document that is not a mapping.

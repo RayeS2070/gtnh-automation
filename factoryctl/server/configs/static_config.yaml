@@ -129,6 +129,31 @@ components_manager:
             method: GET
             task_processor: main-task-processor
 
+        handler-agent-mining-poll:
+            path: /agent/v1/mining/poll
+            method: POST
+            task_processor: main-task-processor
+
+        handler-api-mining:
+            path: /api/v1/mining
+            method: GET
+            task_processor: main-task-processor
+
+        handler-api-mining-target:
+            path: /api/v1/mining/targets/{goods_id}
+            method: PUT,DELETE
+            task_processor: main-task-processor
+
+        handler-api-mining-sources:
+            path: /api/v1/mining/sources/{goods_id}
+            method: GET
+            task_processor: main-task-processor
+
+        handler-api-mining-setup:
+            path: /api/v1/mining/setups/{name}
+            method: DELETE
+            task_processor: main-task-processor
+
         handler-api-qft-settings:
             path: /api/v1/qft/{name}/settings
             method: PUT
