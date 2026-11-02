@@ -36,4 +36,11 @@ target_compile_options(fctl_warnings INTERFACE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-missing-field-initializers>
 )
 
+# The mining module's mechanics: smc's core (../smc, a submodule), pure C++ without dependencies.
+# The image gets it as a named build context (Dockerfile, deploy.sh).
+set(FACTORYCTL_SMC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../smc" CACHE PATH "The smc source directory")
+# smc's targets link it; its warnings stay smc's business.
+add_library(smc_warnings INTERFACE)
+add_subdirectory(${FACTORYCTL_SMC_DIR}/core ${CMAKE_BINARY_DIR}/smc_core)
+
 add_subdirectory(server)

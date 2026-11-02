@@ -38,6 +38,8 @@ add_library(factoryctl_lib STATIC
         src/config/dynamic.cpp
         src/config/file_updater.cpp
         src/http/compression.cpp
+        src/domain/mining.cpp
+        src/mining/catalog.cpp
 )
 # Compression of responses (http/compression.cpp): both libraries are userver's
 # dependencies already.
@@ -51,6 +53,7 @@ target_link_libraries(factoryctl_lib
         userver::postgresql
         ZLIB::ZLIB
         PkgConfig::ZSTD
+        smc_core
         PRIVATE
         fctl_warnings
 )
@@ -58,6 +61,9 @@ target_link_libraries(factoryctl_lib
 # The schema goes into the binary: the server creates it in an empty database.
 userver_embed_file(factoryctl_schema NAME schema_sql FILEPATH schema/schema.sql)
 target_link_libraries(factoryctl_lib PUBLIC factoryctl_schema)
+# The mining catalog (factoryctl/mining/tools/mining-catalog.py), registered by mining/catalog.cpp.
+userver_embed_file(factoryctl_mining_catalog NAME mining_catalog FILEPATH data/mining_catalog.json)
+target_link_libraries(factoryctl_lib PUBLIC factoryctl_mining_catalog)
 
 add_executable(factoryctl_server src/main.cpp)
 target_link_libraries(factoryctl_server PRIVATE fctl_warnings factoryctl_lib)
@@ -77,6 +83,7 @@ add_executable(factoryctl_unittest
         tests/pumps_test.cpp
         tests/qft_test.cpp
         tests/user_test.cpp
+        tests/mining_test.cpp
 )
 target_link_libraries(factoryctl_unittest
         PRIVATE
