@@ -34,6 +34,7 @@ return {
         'qft/qft/slots.lua',
         'qft/qft/store.lua',
         'qft/tools/qft-dump.lua', -- what the QFT agent sees in game; changes nothing
+        'mining/tools/mining-dump.lua', -- what a mining agent would see; changes nothing
     },
     config = {
         'agent/config.lua',
