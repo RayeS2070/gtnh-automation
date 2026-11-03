@@ -15,7 +15,7 @@ agent (OpenComputers, in game) --HTTP poll--> server (C++, userver) --> PostgreS
 - `pumps/`, `qft/`, `mining/` — the agents of the Space Elevator pump modules, of a Quantum Force
   Transformer and of the Space Elevator mining modules.
 
-Replaces `../maintainer/` and, for items and fluids, the InfluxDB exporter.
+For items and fluids, it replaces the InfluxDB exporter.
 
 ## How it works
 

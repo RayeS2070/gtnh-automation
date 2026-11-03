@@ -6,9 +6,8 @@
 | Project | What it does |
 | --- | --- |
 | [nanoresinctl](nanoresinctl/) | Keeps molten rare-earth metals stocked in an ME network by switching bundled redstone colors. |
-| [space-mining-calc](space-mining-calc/) | C++ calculator of the best Space Elevator mining module settings. Not an in-game program. |
-| [maintainer](maintainer/) | Work in progress: keeping item stock via AE2 crafting with an external checker service. |
-| [factoryctl](factoryctl/) | Remote production control: OC agents (crafting orders; Space Elevator pumping; the Quantum Force Transformer, ex-qftctl), a C++ server (userver, PostgreSQL) and a web client. Replaces maintainer and the old pumpingctl. |
+| [smc](smc/) | C++ calculator of the best Space Elevator mining module settings. Not an in-game program. |
+| [factoryctl](factoryctl/) | Remote production control: OC agents (crafting orders; Space Elevator pumping; the Quantum Force Transformer, ex-qftctl), a C++ server (userver, PostgreSQL) and a web client. |
 
 Each project has its own README with installation and usage.
 
@@ -50,13 +49,6 @@ fetch the old version.
 Each project lists its files in `<project>/manifest.lua`: `code` (replaced on every install),
 `config` (kept) and `run` (the command printed at the end). A new `.lua` file must be added to
 the manifest, or it will not be installed. Check locally with `lua tools/check-manifests.lua`.
-
-## Known issues
-
-- **maintainer has unresolved licensing.** It was imported from another repository and has
-  several authors besides the owner of this repository. Their permission to publish the code
-  under the GPLv3 has not been obtained. Sort this out before the repository
-  becomes public.
 
 ## Development
 

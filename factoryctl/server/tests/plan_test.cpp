@@ -153,8 +153,8 @@ TEST(Plan, KeepsTheOrderOfTargets) {
 }
 
 // Low priority takes only idle CPUs and leaves a reserve of them for
-// everything else (the maintainer's rule, "no CPU does foreign work", never
-// let it run in a busy network: 11 of 32 CPUs were always busy).
+// everything else (the old rule, "no CPU does foreign work", never let it
+// run in a busy network: 11 of 32 CPUs were always busy).
 const ItemKey kForeign{"minecraft:diamond", 0, ""};
 
 auto cpus(int idle, int busy) -> std::vector<Cpu> {
