@@ -105,4 +105,4 @@ GTNH 2.9, so on 2.8.4 a few methods might be missing.
 
 ## License
 
-[Apache License 2.0](../LICENSE)
+[GNU General Public License v3.0](../LICENSE)

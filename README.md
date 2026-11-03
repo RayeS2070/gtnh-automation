@@ -55,7 +55,7 @@ the manifest, or it will not be installed. Check locally with `lua tools/check-m
 
 - **maintainer has unresolved licensing.** It was imported from another repository and has
   several authors besides the owner of this repository. Their permission to publish the code
-  under the Apache License 2.0 has not been obtained. Sort this out before the repository
+  under the GPLv3 has not been obtained. Sort this out before the repository
   becomes public.
 
 ## Development
@@ -99,4 +99,4 @@ cd factoryctl/qft && lua tests/run.lua
 
 ## License
 
-[Apache License 2.0](LICENSE)
+[GNU General Public License v3.0](LICENSE)
