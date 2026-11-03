@@ -235,13 +235,14 @@ suite('me', function()
 end)
 
 -- jobs: orders, AE crafting jobs, results ---------------------------------------------------------
----A crafting job whose state the test sets.
+---A crafting job whose state the test sets. `reason` is what hasFailed() gives with it: OC's
+---'no link' unless the request failed.
 function fake.job(state)
     state = state or {}
     return {
         state = state,
         isComputing = function() return state.computing == true end,
-        hasFailed = function() return state.failed == true end,
+        hasFailed = function() return state.failed == true, state.reason or 'no link' end,
         isCanceled = function() return state.canceled == true end,
         isDone = function() return state.done == true end,
     }
@@ -324,11 +325,23 @@ suite('jobs', function()
     j:update()
     eq(results(j), '2:canceled', 'canceled wins over failed (in game failed follows cancel)')
 
-    -- AE could not plan it
+    -- AE could not plan it: OC shows it as canceled too
+    j = jobs.new()
+    job = fake.job({ computing = true })
+    j:start(fake.crafting({ ['minecraft:stick'] = { { job = job } } }), { id = 3, amount = 1, filter = stickFilter })
+    j:confirm()
+    job.state.computing = false
+    job.state.failed, job.state.canceled = true, true
+    job.state.reason = 'request failed (missing resources?)'
+    j:update()
+    eq(results(j), '3:failed(AE could not plan the craft: request failed (missing resources?))',
+        'a plan that failed is failed, not canceled')
+
+    -- a world save before the first look: hasFailed() without a reason is not a failure
     j = jobs.new()
     j:start(fake.crafting({ ['minecraft:stick'] = { { job = fake.job({ failed = true }) } } }),
-        { id = 3, amount = 1, filter = stickFilter })
-    eq(results(j), '3:failed(AE could not plan the craft)', 'failed before acceptance')
+        { id = 7, amount = 1, filter = stickFilter })
+    eq(results(j), '7:accepted', 'failed with "no link" is not a failed plan')
 
     -- nothing or too much matches the filter
     j = jobs.new()

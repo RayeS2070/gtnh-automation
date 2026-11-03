@@ -1,8 +1,11 @@
 ---Orders on the agent's side: craft requests, the AE jobs they return, and the results for the
 ---server. Rules from the game (see factoryctl/AGENTS.md):
----  * a job's state is read as isCanceled, isDone, isComputing, in that order;
----  * hasFailed() counts only before the order was accepted: it turned true in the middle of a
----    craft that went on fine, and after every cancel;
+---  * a plan AE could not make is seen first: OC then fails the request, and isCanceled() is true
+---    as well as hasFailed(); only hasFailed()'s reason, 'request failed (...)', tells it from a
+---    cancel (source: OpenComputers, integration/appeng/NetworkControl.scala, CraftingStatus);
+---  * hasFailed() alone proves nothing: a world save makes it true for every job not done yet,
+---    with the reason 'no link' (in game: mid-craft and after every cancel);
+---  * then the state is read as isCanceled, isDone, isComputing, in that order;
 ---  * every order is requested at most once; a result waits until a poll got through.
 local jobs = {}
 jobs.__index = jobs
@@ -46,24 +49,36 @@ local function flag(job, method)
     return ok and v == true
 end
 
----The status a job shows now.
+---Why AE could not plan the job, or nil if it did.
+local function planFailure(job)
+    local ok, failed, reason = pcall(job.hasFailed)
+    if ok and failed == true and type(reason) == 'string' and reason:find('^request failed') then
+        return reason
+    end
+end
+
+---The status a job shows now, and a message for a failure.
+---@return string, string?
 local function observe(entry)
     local job = entry.job
+    if not entry.accepted then
+        local why = planFailure(job)
+        if why then return 'failed', 'AE could not plan the craft: ' .. why end
+    end
     if flag(job, 'isCanceled') then return 'canceled' end
     if flag(job, 'isDone') then return 'done' end
     if flag(job, 'isComputing') then return 'computing' end
-    if not entry.accepted and flag(job, 'hasFailed') then return 'failed' end
     entry.accepted = true
     return 'accepted'
 end
 
 function jobs:follow(id, entry)
-    local status = observe(entry)
+    local status, message = observe(entry)
     if status == entry.last then
         return
     end
     entry.last = status
-    self:report(id, status, status == 'failed' and 'AE could not plan the craft' or nil)
+    self:report(id, status, message)
     if kFinal[status] then
         self.held[id] = nil
     end
