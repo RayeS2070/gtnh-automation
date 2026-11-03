@@ -276,7 +276,11 @@ module: a wall two wide and five high, the controller in its second row from the
 it faces —, a plain input bus with a transposer between it and an interface of
 the drone pool: the module takes no drone from an ME bus and its controller slot allows no
 automation. Drill tips, rods and plasma come from the main network, where they are ordinary
-crafting targets. **Shared**: the drone pool network, the storage buses of the output network
+crafting targets: the server makes one, once, in the group "Mining", for the tip and the rod of
+every drone tier it sees (`drill-threshold`, `drill-batch`) and for the plasma set by `plasma`
+(none by default: which plasma is worth crafting is the player's call). A target already there
+is left as it is; one the player removes is not made again. A drone whose tip or rod is neither
+in stock (4, a parallel) nor craftable is left out of the plan, and the tab says so. **Shared**: the drone pool network, the storage buses of the output network
 (keep: into processing; void: an Inverter Card, the same list, into the trash — nothing wanted is
 voided even when processing is full) and the buffer network.
 

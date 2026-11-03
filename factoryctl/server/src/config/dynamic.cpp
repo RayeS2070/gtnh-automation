@@ -137,6 +137,13 @@ auto eventsFields() -> const Fields<EventsSettings>& {
   return fields;
 }
 
+auto miningInt(std::int64_t MiningSettings::* member, std::int64_t min) {
+  return [member, min](MiningSettings& m, const json::Value& v,
+                       std::string_view field) {
+    m.*member = integer(v, kMiningName, field, min);
+  };
+}
+
 auto miningFields() -> const Fields<MiningSettings>& {
   static const Fields<MiningSettings> fields{
       {"buffer-limit",
@@ -147,6 +154,15 @@ auto miningFields() -> const Fields<MiningSettings>& {
        [](MiningSettings& m, const json::Value& v, std::string_view field) {
          m.plasmaMinimum = static_cast<double>(integer(v, kMiningName, field, 1));
        }},
+      {"drill-threshold", miningInt(&MiningSettings::drillThreshold, 0)},
+      {"drill-batch", miningInt(&MiningSettings::drillBatch, 1)},
+      {"plasma",
+       [](MiningSettings& m, const json::Value& v, std::string_view field) {
+         if (!v.IsString()) fail(kMiningName, field, "a fluid name like plasma.radon");
+         m.plasma = v.As<std::string>();
+       }},
+      {"plasma-threshold", miningInt(&MiningSettings::plasmaThreshold, 0)},
+      {"plasma-batch", miningInt(&MiningSettings::plasmaBatch, 1)},
   };
   return fields;
 }

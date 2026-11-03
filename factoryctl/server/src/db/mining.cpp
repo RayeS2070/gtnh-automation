@@ -1,6 +1,7 @@
 #include "db/mining.hpp"
 
 #include <format>
+#include <set>
 #include <userver/formats/json/value_builder.hpp>
 #include <userver/storages/postgres/cluster.hpp>
 #include <userver/storages/postgres/exceptions.hpp>
@@ -9,6 +10,7 @@
 #include <userver/storages/postgres/transaction.hpp>
 
 #include "db/events.hpp"
+#include "db/targets.hpp"
 
 namespace factoryctl::db {
 
@@ -277,6 +279,81 @@ auto fluidStock(pg::Transaction& tx, const std::vector<std::string>& fluids)
            fluids)) {
     out[row["variant"].As<std::string>()] =
         static_cast<double>(row["amount"].As<std::int64_t>());
+  }
+  return out;
+}
+
+auto ensureMiningSupplies(pg::Transaction& tx, std::span<const MiningSupply> supplies,
+                          domain::TimePoint now) -> std::vector<Event> {
+  std::vector<Event> out;
+  if (supplies.empty()) return out;
+  std::set<domain::ItemKey> seen;
+  for (const auto& row : tx.Execute(
+           "SELECT g.name, g.damage, g.variant FROM factoryctl.mining_supplies m "
+           "JOIN factoryctl.goods g ON g.id = m.goods_id")) {
+    seen.insert({row["name"].As<std::string>(), row["damage"].As<std::int32_t>(),
+                 row["variant"].As<std::string>()});
+  }
+  std::optional<std::int64_t> group;
+  for (const auto& s : supplies) {
+    if (seen.contains(s.item.key)) continue;
+    const auto id = ensureGoods(tx, s.item.key, s.item.label);
+    tx.Execute("INSERT INTO factoryctl.mining_supplies (goods_id) VALUES ($1) "
+               "ON CONFLICT DO NOTHING",
+               id);
+    if (!tx.Execute("SELECT 1 FROM factoryctl.targets WHERE goods_id = $1", id)
+             .IsEmpty()) {
+      continue;  // the player's, as it is
+    }
+    if (!group) {
+      group = tx.Execute(
+                    "INSERT INTO factoryctl.target_groups (name) VALUES ('Mining') "
+                    "ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name "
+                    "RETURNING id")
+                  .AsSingleRow<std::int64_t>();
+    }
+    const TargetSettings t{.threshold = s.threshold,
+                           .batch = s.batch,
+                           .note = "for mining",
+                           .group = group};
+    tx.Execute(
+        "INSERT INTO factoryctl.targets (goods_id, threshold, batch, note, group_id) "
+        "VALUES ($1, $2, $3, $4, $5)",
+        id, t.threshold, t.batch, t.note, t.group);
+    out.push_back({.at = now,
+                   .source = "target",
+                   .text = "target: " + describe(t) + byWho("mining"),
+                   .goodsId = id});
+  }
+  return out;
+}
+
+auto miningStock(pg::Transaction& tx, std::span<const domain::ItemKey> keys)
+    -> std::map<domain::ItemKey, domain::MiningStock> {
+  std::map<domain::ItemKey, domain::MiningStock> out;
+  if (keys.empty()) return out;
+  std::vector<std::string> names, variants;
+  std::vector<std::int32_t> damages;
+  for (const auto& k : keys) {
+    names.push_back(k.name);
+    damages.push_back(k.damage);
+    variants.push_back(k.variant);
+  }
+  for (const auto& row : tx.Execute(
+           "WITH last AS (SELECT max(id) AS id FROM factoryctl.scans"
+           "              WHERE finished_at IS NOT NULL) "
+           "SELECT g.name, g.damage, g.variant,"
+           "       CASE WHEN s.scan_id >= last.id THEN s.amount ELSE 0 END AS amount,"
+           "       coalesce(s.craftable, false) AS craftable "
+           "FROM unnest($1::text[], $2::integer[], $3::text[]) AS k(name, damage, variant) "
+           "JOIN factoryctl.goods g USING (name, damage, variant) "
+           "LEFT JOIN factoryctl.stock s ON s.goods_id = g.id CROSS JOIN last",
+           names, damages, variants)) {
+    out[{row["name"].As<std::string>(), row["damage"].As<std::int32_t>(),
+         row["variant"].As<std::string>()}] = {
+        .amount = static_cast<double>(
+            row["amount"].As<std::optional<std::int64_t>>().value_or(0)),
+        .craftable = row["craftable"].As<bool>()};
   }
   return out;
 }

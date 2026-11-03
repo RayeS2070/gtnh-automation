@@ -257,6 +257,10 @@
             if (confirm(`Forget ${s.name}? A running agent comes back with its next poll.`)) act(() => forgetMiningSetup(s.name))
           }}>✕</button>
         </header>
+        {#if s.status.missing?.length}
+          <p class="error small">Drones left out: no {s.status.missing.map((p) => p.label).join(', ')}
+            in stock and no pattern.</p>
+        {/if}
         <table>
           <tbody>
             {#each s.status.modules ?? [] as m (idOf(m))}

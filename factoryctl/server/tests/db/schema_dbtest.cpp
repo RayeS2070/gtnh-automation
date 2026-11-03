@@ -17,7 +17,7 @@ UTEST_F(DbTest, EmptyDatabaseGetsTheSchema) {
                    "SELECT count(*) FROM information_schema.tables "
                    "WHERE table_schema = 'factoryctl'")
           .AsSingleRow<std::int64_t>();
-  EXPECT_EQ(tables, 20);
+  EXPECT_EQ(tables, 21);
 }
 
 UTEST_F(DbTest, SameVersionIsKept) {

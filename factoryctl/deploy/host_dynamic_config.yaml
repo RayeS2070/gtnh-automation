@@ -30,6 +30,11 @@ FACTORYCTL_EVENTS:
 FACTORYCTL_MINING:
 #   buffer-limit: 100000      # items of one ore before processing: past it, no module mines it
 #   plasma-minimum: 100000    # mB: a plasma with less does not count as available
+#   drill-threshold: 16384    # the target made once for a drone's drill tip and rod missing one
+#   drill-batch: 4096
+#   plasma: plasma.radon      # a target made once for this plasma; none by default
+#   plasma-threshold: 1000000 # mB
+#   plasma-batch: 100000
 #
 # userver's own keys work too, e.g. logging of each request and response:
 # USERVER_LOG_REQUEST: false

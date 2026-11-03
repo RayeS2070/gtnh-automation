@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -36,11 +37,21 @@ struct MiningSettings {
   double bufferLimit = 100'000;
   // mB of a plasma below which it does not count as available.
   double plasmaMinimum = 100'000;
+  // The target made for a drone's drill tip or rod missing one (domain::
+  // miningSupplies): large, so that the order is not lost in a busy queue.
+  std::int64_t drillThreshold = 16'384;
+  std::int64_t drillBatch = 4'096;
+  // The plasma kept stocked by a target made for it (its fluid name,
+  // plasma.radon); empty: none. Which one is worth crafting is the player's.
+  std::string plasma;
+  std::int64_t plasmaThreshold = 1'000'000;
+  std::int64_t plasmaBatch = 100'000;
 
   auto operator==(const MiningSettings&) const -> bool = default;
 };
 
-// FACTORYCTL_MINING: buffer-limit, plasma-minimum.
+// FACTORYCTL_MINING: buffer-limit, plasma-minimum, drill-threshold,
+// drill-batch, plasma, plasma-threshold, plasma-batch.
 extern const userver::dynamic_config::Key<MiningSettings> kMining;
 
 // The parsers of the keys. A missing field keeps its default, a key without

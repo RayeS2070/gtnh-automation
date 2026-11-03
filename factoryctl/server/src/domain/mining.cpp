@@ -210,6 +210,61 @@ auto bestPlasma(const MiningCatalog& catalog,
   return out;
 }
 
+auto miningDrillParts(const MiningCatalog& catalog,
+                      const std::map<int, int>& drones) -> std::vector<MiningItem> {
+  std::vector<MiningItem> out;
+  std::set<ItemKey> seen;
+  for (const auto& [tier, count] : drones) {
+    if (count <= 0 || tier < 0 || tier >= static_cast<int>(catalog.drones.size())) {
+      continue;
+    }
+    const auto& d = catalog.drones[static_cast<std::size_t>(tier)];
+    for (const MiningItem* part : {&d.tip, &d.rod}) {
+      if (seen.insert(part->key).second) out.push_back(*part);
+    }
+  }
+  return out;
+}
+
+auto miningPlasmaItem(const MiningCatalog& catalog, std::string_view fluid)
+    -> std::optional<MiningItem> {
+  for (const MiningPlasma& p : catalog.plasmas) {
+    if (p.fluid == fluid) {
+      return MiningItem{.key = {.name = "ae2fc:fluid_drop", .damage = 0, .variant = p.fluid},
+                        .label = p.label};
+    }
+  }
+  return std::nullopt;
+}
+
+auto miningUsableDrones(const MiningCatalog& catalog,
+                        const std::map<int, int>& drones,
+                        const std::map<ItemKey, MiningStock>& stock) -> MiningUsable {
+  constexpr double kPerParallel = 4;
+  const auto usable = [&](const MiningItem& part) {
+    const auto it = stock.find(part.key);
+    return it != stock.end() &&
+           (it->second.amount >= kPerParallel || it->second.craftable);
+  };
+  MiningUsable out;
+  std::set<ItemKey> told;
+  for (const auto& [tier, count] : drones) {
+    if (tier < 0 || tier >= static_cast<int>(catalog.drones.size())) {
+      out.drones[tier] = count;  // not in the catalog: the plan has no recipe
+      continue;
+    }
+    const auto& d = catalog.drones[static_cast<std::size_t>(tier)];
+    bool ok = true;
+    for (const MiningItem* part : {&d.tip, &d.rod}) {
+      if (usable(*part)) continue;
+      ok = false;
+      if (count > 0 && told.insert(part->key).second) out.missing.push_back(*part);
+    }
+    if (ok) out.drones[tier] = count;
+  }
+  return out;
+}
+
 auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
     -> std::vector<MiningAssignment> {
   auto needs = input.needs;

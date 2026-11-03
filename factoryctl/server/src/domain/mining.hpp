@@ -11,6 +11,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "core/model.hpp"
@@ -102,6 +103,33 @@ auto miningWhitelist(std::span<const MiningTarget> targets,
 auto bestPlasma(const MiningCatalog& catalog,
                 const std::map<std::string, double>& stock, double minimum)
     -> int;
+
+// What a module needs besides its targets: the drill tip and rod of every
+// drone tier there is (in the pool or a module), by tier, each once.
+auto miningDrillParts(const MiningCatalog& catalog,
+                      const std::map<int, int>& drones) -> std::vector<MiningItem>;
+
+// The plasma with that fluid name (plasma.radon) as goods: a fluid's key.
+auto miningPlasmaItem(const MiningCatalog& catalog, std::string_view fluid)
+    -> std::optional<MiningItem>;
+
+// What there is of a drill part.
+struct MiningStock {
+  double amount = 0;
+  bool craftable = false;  // AE has a pattern
+};
+
+struct MiningUsable {
+  std::map<int, int> drones;          // the ones a module can run
+  std::vector<MiningItem> missing;    // parts of the others: none, no pattern
+};
+
+// The drones whose tip and rod are there for a parallel (4 of each,
+// SpaceMiningRecipes) or can be crafted: a module given another one would not
+// start. A part not in `stock` counts as none.
+auto miningUsableDrones(const MiningCatalog& catalog,
+                        const std::map<int, int>& drones,
+                        const std::map<ItemKey, MiningStock>& stock) -> MiningUsable;
 
 struct MiningModule {
   std::string id;  // its coordinates: "x,y,z"

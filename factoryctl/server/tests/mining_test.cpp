@@ -241,6 +241,43 @@ TEST(MiningCatalog, Embedded) {
   EXPECT_TRUE(any);
 }
 
+TEST(MiningSupplies, DrillPartsOfTheDronesThereAre) {
+  const auto& c = factoryctl::mining::catalog();
+  // UV (7) and ZPM (6) take the same Naquadah parts; UEV (9) Neutronium; none of 5.
+  const auto parts = miningDrillParts(c, {{6, 1}, {7, 2}, {9, 1}, {5, 0}});
+  ASSERT_EQ(parts.size(), 4);
+  EXPECT_EQ(parts[0].key, c.drones[6].tip.key);
+  EXPECT_EQ(parts[1].key, c.drones[6].rod.key);
+  EXPECT_EQ(parts[1].key, (ItemKey{.name = "gregtech:gt.metaitem.01", .damage = 23324}));
+  EXPECT_EQ(parts[2].key, c.drones[9].tip.key);
+}
+
+TEST(MiningSupplies, PlasmaByFluid) {
+  const auto& c = factoryctl::mining::catalog();
+  const auto p = miningPlasmaItem(c, "plasma.radon");
+  ASSERT_TRUE(p);
+  EXPECT_EQ(p->key, (ItemKey{.name = "ae2fc:fluid_drop", .variant = "plasma.radon"}));
+  EXPECT_FALSE(miningPlasmaItem(c, "plasma.iron"));
+}
+
+TEST(MiningSupplies, DronesWithoutPartsLeftOut) {
+  const auto& c = factoryctl::mining::catalog();
+  const auto& uv = c.drones[7];
+  const auto& uev = c.drones[9];
+  const auto& uhv = c.drones[8];
+  const auto got = miningUsableDrones(
+      c, {{7, 1}, {8, 1}, {9, 2}},
+      {{uv.tip.key, {.amount = 100}},
+       {uv.rod.key, {.amount = 0, .craftable = true}},
+       {uev.tip.key, {.amount = 50}},
+       {uev.rod.key, {.amount = 3}},  // less than a parallel, no pattern
+       {uhv.tip.key, {.craftable = true}}});
+  EXPECT_EQ(got.drones, (std::map<int, int>{{7, 1}}));
+  ASSERT_EQ(got.missing.size(), 2);
+  EXPECT_EQ(got.missing[0].key, uhv.rod.key);  // not in stock at all
+  EXPECT_EQ(got.missing[1].key, uev.rod.key);
+}
+
 // The plan runs in every poll: a dozen modules with every drone must be quick.
 TEST(MiningCatalog, PlanIsQuick) {
   const auto& c = factoryctl::mining::catalog();

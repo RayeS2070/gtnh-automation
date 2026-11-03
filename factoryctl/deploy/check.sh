@@ -40,6 +40,13 @@ probe() {
         code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$port$path")
         [[ $code == 200 ]] || fail ":$port$path answered $code"
     done
+    # A mining poll goes through the whole plan (a new setup: no status before it).
+    local reply
+    reply=$(curl -s -X POST -H 'Content-Type: application/json' "localhost:$port/agent/v1/mining/poll" \
+        --data-binary '{"setup": "check", "run": "r", "pool": [{"tier": 5, "count": 1}],
+            "modules": [{"x": 1, "y": 2, "z": 3, "tier": 2, "state": "idle"}]}')
+    [[ $reply == *poll=* ]] || fail ":$port mining poll answered '${reply:0:200}'"
+    curl -s -o /dev/null -X DELETE "localhost:$port/api/v1/mining/setups/check"
     # The web client's bundle comes compressed to a browser that takes it.
     local js encoding
     js=$(curl -s "localhost:$port/" | grep -oE '/assets/[^"]+\.js' | head -1)
@@ -77,6 +84,11 @@ FACTORYCTL_EVENTS:
 FACTORYCTL_MINING:
   buffer-limit: 100000
   plasma-minimum: 100000
+  drill-threshold: 16384
+  drill-batch: 4096
+  plasma: ''
+  plasma-threshold: 1000000
+  plasma-batch: 100000
 YAML
 
 native_log() { cat "$tmp/native.log"; }

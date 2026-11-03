@@ -353,6 +353,8 @@ export type MiningSetup = {
     pool?: { tier: number; count: number }[]
     buffer?: { name: string; damage: number; size: number }[]
     slots?: number
+    // Drill parts neither in stock nor craftable: their drones are left out.
+    missing?: { name: string; damage: number; label: string }[]
   }
   plan: MiningPlanEntry[]
 }

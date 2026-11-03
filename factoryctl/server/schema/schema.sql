@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (10);
+INSERT INTO factoryctl.schema_version VALUES (11);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -251,4 +251,12 @@ CREATE TABLE factoryctl.mining_targets (
     enabled    boolean NOT NULL DEFAULT true,
     ores       jsonb NOT NULL DEFAULT '[]',
     updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Goods mining once made sure of a target for (db::ensureMiningSupplies): a
+-- drill part of a drone it has, the plasma set. A target the player removes is
+-- not made again.
+CREATE TABLE factoryctl.mining_supplies (
+    goods_id bigint PRIMARY KEY REFERENCES factoryctl.goods ON DELETE CASCADE,
+    added_at timestamptz NOT NULL DEFAULT now()
 );

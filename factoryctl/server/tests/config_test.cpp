@@ -96,6 +96,16 @@ TEST(DynamicConfig, Mining) {
   EXPECT_THROW(parseMining(json::FromString(R"({"plasma-minimum": "1k"})")),
                std::runtime_error);
   EXPECT_EQ(keyOfField("buffer-limit"), "FACTORYCTL_MINING");
+  const auto m = parseMining(json::FromString(
+      R"({"drill-threshold": 0, "plasma": "plasma.radon", "plasma-batch": 5})"));
+  EXPECT_EQ(m.drillThreshold, 0);
+  EXPECT_EQ(m.drillBatch, 4096);
+  EXPECT_EQ(m.plasma, "plasma.radon");
+  EXPECT_EQ(m.plasmaBatch, 5);
+  EXPECT_THROW(parseMining(json::FromString(R"({"drill-batch": 0})")),
+               std::runtime_error);
+  EXPECT_THROW(parseMining(json::FromString(R"({"plasma": 3})")),
+               std::runtime_error);
 }
 
 TEST(DynamicConfig, Events) {

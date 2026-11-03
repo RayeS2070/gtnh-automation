@@ -5,12 +5,14 @@
 #include <expected>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <userver/formats/json/value.hpp>
 #include <userver/storages/postgres/postgres_fwd.hpp>
 #include <vector>
 
+#include "db/events.hpp"
 #include "db/stock.hpp"
 #include "domain/mining.hpp"
 #include "domain/order.hpp"
@@ -74,6 +76,25 @@ auto addMiningTarget(pg::Cluster& db, const domain::ItemKey& product,
 
 // The goods with that id, its stock with it.
 auto goodsById(pg::Cluster& db, std::int64_t id) -> std::optional<StockRow>;
+
+// Goods mining needs kept stocked by a target: a drill part, the plasma.
+struct MiningSupply {
+  domain::MiningItem item;
+  std::int64_t threshold = 0;
+  std::int64_t batch = 1;
+};
+
+// Makes a high priority target, in the group "Mining" (made when missing),
+// for every supply that was never seen to before; a target there already is
+// left as it is. Either way the supply is seen to from then on: a target the
+// player removes is not made again. The events of what was made.
+auto ensureMiningSupplies(pg::Transaction& tx, std::span<const MiningSupply> supplies,
+                          domain::TimePoint now) -> std::vector<Event>;
+
+// The stock of the goods with these keys, as the stock page has it (0 when the
+// last finished scan did not see it); goods unknown are not in the result.
+auto miningStock(pg::Transaction& tx, std::span<const domain::ItemKey> keys)
+    -> std::map<domain::ItemKey, domain::MiningStock>;
 
 // The stock of the fluids named (variants of fluid drops: domain::keyOf).
 auto fluidStock(pg::Transaction& tx, const std::vector<std::string>& fluids)

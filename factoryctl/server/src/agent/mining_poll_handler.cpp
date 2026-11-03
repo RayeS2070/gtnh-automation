@@ -3,6 +3,7 @@
 #include <chrono>
 #include <format>
 #include <map>
+#include <set>
 #include <userver/components/component_context.hpp>
 #include <userver/dynamic_config/storage/component.hpp>
 #include <userver/formats/json/exception.hpp>
@@ -183,9 +184,53 @@ auto MiningPollHandler::HandleRequestThrow(
       told(std::format("{}: {}", id, m.error), "warning");
     }
   }
+  // The drill parts of the drones there are, and the plasma set: kept stocked
+  // by targets made once. A drone whose parts are neither there nor craftable
+  // is left out: its module would not start.
+  const auto parts = domain::miningDrillParts(catalog, drones);
+  std::vector<db::MiningSupply> supplies;
+  std::vector<domain::ItemKey> partKeys;
+  for (const auto& p : parts) {
+    supplies.push_back({p, settings.drillThreshold, settings.drillBatch});
+    partKeys.push_back(p.key);
+  }
+  if (!settings.plasma.empty()) {
+    if (const auto p = domain::miningPlasmaItem(catalog, settings.plasma)) {
+      supplies.push_back({*p, settings.plasmaThreshold, settings.plasmaBatch});
+    } else {
+      LOG_LIMITED_WARNING() << "FACTORYCTL_MINING.plasma: " << settings.plasma
+                            << " is not a mining plasma";
+    }
+  }
+  for (auto& e : db::ensureMiningSupplies(tx, supplies, now)) events.push_back(std::move(e));
+  const auto usable =
+      domain::miningUsableDrones(catalog, drones, db::miningStock(tx, partKeys));
+  std::set<std::string> missingBefore;
+  const auto& was = setup->status["missing"];
+  for (const auto& m : was.IsArray() ? was : json::FromString("[]")) {
+    missingBefore.insert(m["label"].As<std::string>(""));
+  }
+  json::ValueBuilder missing(json::Type::kArray);
+  std::set<std::string> missingNow;
+  for (const auto& p : usable.missing) {
+    missingNow.insert(p.label);
+    if (!missingBefore.contains(p.label)) {
+      told(std::format("no {} and no pattern for it: its drones are left out", p.label),
+           "warning");
+    }
+    json::ValueBuilder e;
+    e["name"] = p.key.name;
+    e["damage"] = p.key.damage;
+    e["label"] = p.label;
+    missing.PushBack(std::move(e));
+  }
+  for (const auto& l : missingBefore) {
+    if (!missingNow.contains(l)) told(std::format("{} is there: its drones are back", l));
+  }
+
   const auto plan = domain::planMining(catalog, {.modules = modules,
                                                  .others = others,
-                                                 .drones = drones,
+                                                 .drones = usable.drones,
                                                  .plasmaTier = plasma,
                                                  .needs = demand});
 
@@ -229,7 +274,9 @@ auto MiningPollHandler::HandleRequestThrow(
   }
 
   setup->run = report->run;
-  setup->status = report->status;
+  json::ValueBuilder status(report->status);
+  status["missing"] = std::move(missing);
+  setup->status = status.ExtractValue();
   setup->plan = kept.ExtractValue();
   setup->seenAt = now;
   for (const auto& l : report->log) {
