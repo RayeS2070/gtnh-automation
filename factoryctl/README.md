@@ -161,8 +161,8 @@ entry in `~/.ssh/config` is the simplest: `deploy/deploy.sh myserver`.
 
 On the host the server listens on `127.0.0.1:8080` only: the agent runs on the same machine
 (`server = 'http://127.0.0.1:8080'` in `agent/config.lua`), people open the web client through
-`ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is the `factoryctl_pgdata`
-volume.
+`ssh -L 8080:127.0.0.1:8080`. PostgreSQL is not published; its data is `~/factoryctl/pgdata`, next to the
+compose file.
 
 Ports, the same wherever the server is deployed (`127.0.0.1` only):
 
