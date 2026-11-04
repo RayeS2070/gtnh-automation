@@ -39,6 +39,7 @@ return {
         'mining/mm/miner.lua',
         'mining/mm/module.lua',
         'mining/tools/mining-dump.lua', -- what the mining agent sees in game; changes nothing
+        'nac/tools/nac-dump.lua', -- what OC sees of a Nanochip Assembly Complex; changes nothing
     },
     config = {
         'agent/config.lua',
