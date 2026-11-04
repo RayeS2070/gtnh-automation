@@ -182,12 +182,33 @@ TEST(PlanMining, OneDroneOneModule) {
 TEST(PlanMining, SecondModuleGoesForTheOtherNeed) {
   const auto c = twoAsteroids();
   // X at 1 (all of X a module can have) is worth 1, Z at 11 0.6: the first
-  // module takes X; the discount halves X and turns the second one to Z.
+  // module takes X; X is covered, so the second one turns to Z.
   const auto p = plan(c, {{.id = "m1"}, {.id = "m2"}},
                       {{ore(1), 1}, {ore(3), 0.6}});
   ASSERT_TRUE(p[0].setting && p[1].setting);
   EXPECT_EQ(p[0].setting->distance, 1);
   EXPECT_EQ(p[1].setting->distance, 11);
+}
+
+// X and Y come only together, from A: a module at 1 covers both in full. Each
+// is half of its value, yet both are covered: the second module goes for Z,
+// not for the same mix again.
+TEST(PlanMining, SecondModuleDoesNotRepeatAMix) {
+  const auto c = twoAsteroids();
+  const auto p = plan(c, {{.id = "m1"}, {.id = "m2"}},
+                      {{ore(1), 1}, {ore(2), 1}, {ore(3), 0.9}});
+  ASSERT_TRUE(p[0].setting && p[1].setting);
+  EXPECT_EQ(p[0].setting->distance, 1);
+  EXPECT_EQ(p[1].setting->distance, 11);
+}
+
+// One need, covered by the first module: the second does not idle, it mines
+// the same while stock is short.
+TEST(PlanMining, CoveredTwiceRatherThanIdle) {
+  const auto c = twoAsteroids();
+  const auto p = plan(c, {{.id = "m1"}, {.id = "m2"}}, {{ore(1), 1}});
+  ASSERT_TRUE(p[0].setting && p[1].setting);
+  EXPECT_EQ(p[1].setting->distance, p[0].setting->distance);
 }
 
 TEST(PlanMining, OthersCountFirst) {

@@ -101,14 +101,14 @@ auto worth(const Choice& c, std::span<const MiningNeed> needs,
   return v;
 }
 
-// What a module covers is wanted less by the next one: each need loses half
-// of its part of the module's value.
-auto discount(std::vector<MiningNeed>& needs, std::span<const double> shares,
-              double value) -> void {
-  if (value <= 0) return;
+// What a module covers is wanted less by the next one: each need loses the
+// share of it the module covers. A need's part of the module's value would
+// not do: a need covered in full, but next to others in a mix, kept most of
+// its weight, and the next modules took the same mix.
+auto discount(std::vector<MiningNeed>& needs, std::span<const double> shares)
+    -> void {
   for (std::size_t i = 0; i < needs.size(); ++i) {
-    const double part = needs[i].weight * shares[i] / value;
-    needs[i].weight *= 1.0 - 0.5 * std::min(part, 1.0);
+    needs[i].weight *= 1.0 - std::min(shares[i], 1.0);
   }
 }
 
@@ -281,8 +281,8 @@ auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
     const auto best = bests(all, needs);
     std::vector<double> shares;
     const auto c = evaluate(catalog, tier, s);
-    const double value = worth(c, needs, best, &shares);
-    discount(needs, shares, value);
+    worth(c, needs, best, &shares);
+    discount(needs, shares);
   }
 
   // The bigger modules first: they get the drones that are worth the most.
@@ -297,20 +297,27 @@ auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
     MiningAssignment a{.module = m->id};
     if (input.plasmaTier > 0 && !needs.empty()) {
       auto all = settings(catalog, m->tier, drones, input.plasmaTier);
-      const auto best = bests(all, needs);
-      const Choice* choice = nullptr;
-      for (auto& c : all) {
-        c.value = worth(c, needs, best);
-        if (c.value > 0 && (!choice || c.value > choice->value)) choice = &c;
-      }
+      std::vector<double> best;
       Choice kept;
-      if (m->current && m->current->plasmaTier == input.plasmaTier &&
-          drones[m->current->droneTier] > 0) {
-        kept = evaluate(catalog, m->tier, *m->current);
-        kept.value = worth(kept, needs, best);
-        if (kept.value > 0 &&
-            (!choice || kept.value * input.stickiness >= choice->value)) {
-          choice = &kept;
+      const Choice* choice = nullptr;
+      // Nothing left this module can cover: everything it could is covered.
+      // Better twice than idle while stock is short: a new round, from the
+      // whole demand.
+      for (int round = 0; round < 2 && !choice; ++round) {
+        if (round == 1) needs = input.needs;
+        best = bests(all, needs);
+        for (auto& c : all) {
+          c.value = worth(c, needs, best);
+          if (c.value > 0 && (!choice || c.value > choice->value)) choice = &c;
+        }
+        if (m->current && m->current->plasmaTier == input.plasmaTier &&
+            drones[m->current->droneTier] > 0) {
+          kept = evaluate(catalog, m->tier, *m->current);
+          kept.value = worth(kept, needs, best);
+          if (kept.value > 0 &&
+              (!choice || kept.value * input.stickiness >= choice->value)) {
+            choice = &kept;
+          }
         }
       }
       if (choice) {
@@ -322,7 +329,7 @@ auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
         for (const auto& [item, rate] : choice->rates) {
           if (wanted.contains(item)) a.rates[item] = rate;
         }
-        discount(needs, shares, choice->value);
+        discount(needs, shares);
       }
     }
     out.push_back(std::move(a));

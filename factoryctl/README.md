@@ -264,7 +264,7 @@ setting (module tier, drone tier, distance, plasma, parallels) is a mix of outpu
 setting's rate of the target's ores over the best rate the module could have for them — items of
 different ores do not compare, so a rare ore counts as much as a plentiful one and the weights
 decide. Modules are planned greedily, the bigger first:
-each takes the best setting it has a drone for, then discounts what it covers for the next; one
+each takes the best setting it has a drone for, then discounts what it covers for the next (a target loses the share of it covered); one
 keeps its setting unless the best is 25 % better (a change costs a drone swap). The plasma is
 the best one in stock (`plasma-minimum`); an ore with `buffer-limit` items in the buffer before
 processing is not given to any module until processing catches up. The rest is voided: the

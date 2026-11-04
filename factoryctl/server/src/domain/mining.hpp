@@ -161,7 +161,8 @@ struct MiningAssignment {
 // need's ores over the best rate this module could have for them. So a rare
 // ore counts as much as a plentiful one (items of different ores do not
 // compare); the weights decide. Each module discounts what it covers for the
-// next (half of its share of every need), after the other setups' modules did.
+// next (every need loses the share of it covered), after the other setups'
+// modules did.
 auto planMining(const MiningCatalog& catalog, const MiningPlanInput& input)
     -> std::vector<MiningAssignment>;
 
