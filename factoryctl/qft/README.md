@@ -231,6 +231,12 @@ modpack moves on; recipes with an ore dictionary input are left out: a bus slot 
 The calculator's data has no catalysts: the script has them in a table taken from the mods'
 sources and stops when a recipe has none.
 
+> **The calculator's data cannot be fully trusted.** It lags the modpack: Rubber Polymer has
+> Carbon 64 there, while GT5-Unofficial on the modpack's tag has Sulfur 32 + Carbon 32. The
+> inputs and outputs of the catalog are not checked against the mods' sources; before a recipe
+> is trusted, compare it with NEI in game. A wrong input leaves the stocking bus without it and
+> the recipe does not start.
+
 `config/catalysts.lua` lists every catalyst, commented out; uncomment the ones in the bulk
 catalyst housing and give how many, the parallels. Every recipe of a listed catalyst runs on this
 QFT (`0`: the recipes are there but never run):
