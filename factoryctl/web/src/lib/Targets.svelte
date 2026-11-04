@@ -57,6 +57,30 @@
     return out
   })
 
+  // Collapsed sections, by key; kept in this browser, so a reload or another tab keeps them.
+  const kCollapsedKey = 'factoryctl.targets.collapsed'
+  function loadCollapsed(): number[] {
+    try {
+      const v = JSON.parse(localStorage.getItem(kCollapsedKey) ?? '[]')
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'number') : []
+    } catch {
+      return []
+    }
+  }
+  let collapsed = $state<number[]>(loadCollapsed())
+  function setCollapsed(keys: number[]) {
+    collapsed = keys
+    try {
+      localStorage.setItem(kCollapsedKey, JSON.stringify(keys))
+    } catch {
+      // No storage (private window and the like): it lasts until the page is reloaded.
+    }
+  }
+  const isCollapsed = (key: number) => collapsed.includes(key)
+  const toggle = (key: number) =>
+    setCollapsed(isCollapsed(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key])
+  const named = $derived(sections.filter((s) => s.name))
+
   function add(event: SubmitEvent) {
     event.preventDefault()
     const name = newGroup.trim()
@@ -108,6 +132,11 @@
       <input bind:value={newGroup} placeholder="new group" />
       <button type="submit" disabled={!newGroup.trim()}>Add</button>
     </form>
+    {#if named.length > 1}
+      <span class="spacer"></span>
+      <button class="link" onclick={() => setCollapsed(named.map((s) => s.key))}>Collapse all</button>
+      <button class="link" onclick={() => setCollapsed([])}>Expand all</button>
+    {/if}
   </div>
   {#if targets.length === 0 && !error}
     <p class="muted">No targets yet: set one from the stock list.</p>
@@ -125,8 +154,19 @@
     {#each sections as section (section.key)}
     <tbody>
       {#if section.name}
-        <tr class="section"><th colspan="5">{section.name}</th></tr>
+        {@const short = section.items.filter(below).length}
+        <tr class="section">
+          <th colspan="5">
+            <button class="fold" aria-expanded={!isCollapsed(section.key)} onclick={() => toggle(section.key)}>
+              <span class="arrow">{isCollapsed(section.key) ? '▸' : '▾'}</span>
+              {section.name}
+              <span class="muted count">{section.items.length}</span>
+              {#if short > 0}<span class="tag warn" title="Targets below their threshold">{short} below</span>{/if}
+            </button>
+          </th>
+        </tr>
       {/if}
+      {#if !(section.name && isCollapsed(section.key))}
       {#each section.items as t (t.goodsId)}
         <tr class:off={!t.enabled}>
           <td>
@@ -170,6 +210,7 @@
           </tr>
         {/if}
       {/each}
+      {/if}
     </tbody>
     {/each}
   </table>
@@ -203,6 +244,30 @@
     padding-top: 0.8rem;
     color: inherit;
     font-size: 0.95rem;
+  }
+  button.fold {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: inherit;
+    cursor: pointer;
+  }
+  .arrow {
+    display: inline-block;
+    width: 0.8rem;
+    color: var(--muted);
+  }
+  .count {
+    font-weight: normal;
+    font-size: 0.85rem;
+  }
+  .spacer {
+    flex: 1;
   }
   table {
     width: 100%;
