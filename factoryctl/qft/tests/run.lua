@@ -269,33 +269,45 @@ do
         'a running disabled recipe is stopped')
 end
 
--- config.build: recipes from the catalog and the player's choice
+-- config.build: recipes from the catalog and the catalysts the QFT has
 do
     local catalog = {
-        plat = { name = 'Platinum Dust', tier = 1, seconds = 20,
+        plat = { name = 'Platinum Dust', tier = 1, seconds = 20, catalyst = 'PGC',
             inputs = { { item = 'Powder', name = 'bw:dust', damage = 47, amount = 32 },
                 { fluid = 'Oxygen', name = 'oxygen', amount = 100 } },
             outputs = { { item = 'Platinum Dust', name = 'gt:meta', damage = 2085, amount = 64,
                 molten = { fluid = 'Molten Platinum', name = 'molten.platinum', amount = 9216 } },
                 { item = 'Inert Dust', name = 'bw:dust', damage = 10113, amount = 1 } } },
+        pd = { name = 'Palladium Dust', tier = 1, seconds = 20, catalyst = 'PGC',
+            inputs = { { item = 'Pd Powder', name = 'bw:dust', damage = 48, amount = 32 } },
+            outputs = { { item = 'Palladium Dust', name = 'gt:meta', damage = 2052, amount = 64 } } },
+        glue = { name = 'Glue', tier = 1, seconds = 20, catalyst = 'APC',
+            inputs = { { item = 'Carbon Dust', name = 'gt:meta', damage = 2010, amount = 32 } },
+            outputs = { { fluid = 'Glue', name = 'glue', amount = 1000 } } },
     }
-    local r, problems = config.build(catalog, { plat = 2 }, false)
+    local r, problems = config.build(catalog, { PGC = 2 }, false)
     check(#problems == 0, 'build: no problems')
+    check(r.plat and r.pd and not r.glue, 'build: every recipe of a listed catalyst, no other')
     local p = r.plat
-    check(p.name == 'Platinum Dust' and p.tier == 1 and p.catalysts == 2, 'build: name, tier, catalysts')
+    check(p.name == 'Platinum Dust' and p.tier == 1 and p.catalysts == 2 and r.pd.catalysts == 2,
+        'build: name, tier, the catalyst count')
     check(p.trigger == 'deficit' and p.outputs[1].target == nil,
         'build: until the server\'s settings, a deficit recipe that tracks nothing')
     check(p.inputs[1].item == 'Powder' and p.inputs[1].name == 'bw:dust' and p.inputs[1].damage == 47
         and p.inputs[1].amount == 32 and p.inputs[2].fluid == 'Oxygen', 'build: inputs with names')
     check(p.outputs[1].item == 'Platinum Dust' and p.outputs[1].circuit == 1, 'build: outputs, circuit = place')
-    r = config.build(catalog, { plat = 1 }, true)
+    r = config.build(catalog, { PGC = 1 }, true)
     check(r.plat.outputs[1].fluid == 'Molten Platinum' and r.plat.outputs[1].name == 'molten.platinum',
         'fluid mode: a dust with a molten form counts as the fluid')
     check(r.plat.outputs[2].item == 'Inert Dust', 'fluid mode: one without stays an item')
-    local _, bad = config.build(catalog, { nope = 1, plat = { catalysts = 1 } }, false)
-    check(#bad == 2 and table.concat(bad, ' '):find('no such recipe') and table.concat(bad, ' '):find('old format'),
-        'build: an unknown id and the old format are problems')
-    assert(#config.normalize(config.build(catalog, { plat = 1 }, false)) == 0)
+    local _, bad = config.build(catalog, { Nope = 1, plat = 1 }, false)
+    check(#bad == 2 and table.concat(bad, ' '):find('no recipe takes Nope') and table.concat(bad, ' '):find('old config'),
+        'build: an unknown catalyst and a recipe id (the old config) are problems')
+    local zero = config.build(catalog, { PGC = 0 }, false)
+    check(zero.plat and zero.plat.catalysts == 0, 'build: 0 catalysts: the recipes are there, never run')
+    check(#config.checkValues(components(), config.build(catalog, { PGC = 1.5 }, false)) == 2,
+        'a count that is not an integer is refused')
+    assert(#config.normalize(config.build(catalog, { PGC = 1 }, false)) == 0)
 end
 
 -- resource.amount by internal name: the game's label need not match the catalog's

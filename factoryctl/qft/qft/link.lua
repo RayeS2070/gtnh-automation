@@ -2,11 +2,11 @@
 ---server keeps its settings and shows what it reports. Settings are the mode and, per recipe, its
 ---trigger, whether its inputs are counted, and per output the target and priority (deficit) or
 ---the weight (surplus). What a recipe is made of comes from qft/catalog.lua, its catalysts from
----config/recipes.lua: that is the build, not a setting.
+---config/catalysts.lua: that is the build, not a setting.
 ---
 ---Like the pumping agent: settings carry a version; newer ones from the server are applied and
 ---saved, so a restart without the server keeps them; until the server has any, the agent offers
----its own (config/recipes.lua). Pure: HTTP, the file and the clock come in as deps.
+---its own (the recipes as built: nothing set). Pure: HTTP, the file and the clock come in as deps.
 local json = require('fc.json')
 
 local link = {}
@@ -19,7 +19,7 @@ local kModes = { auto = true, deficit = true, surplus = true }
 ---@field mode qft.Mode
 ---@field recipes { id: string, enabled: boolean?, trigger: qft.Trigger?, countInputs: boolean?, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
 
----The settings config/recipes.lua stands for: what the agent offers a server that has none.
+---The settings the recipes stand for: what the agent offers a server that has none.
 ---@param recipes table<string, qft.Recipe>
 ---@param mode qft.Mode
 ---@return qft.LinkSettings
@@ -94,7 +94,7 @@ end
 ---deficit recipe run without counting its inputs (a surplus one always counts them);
 ---`enabled = false` switches the recipe off (recipe.off: plan treats it as disabled, a running one
 ---finishes its cycle and yields). A recipe the settings do not name stays as it is; a recipe or
----circuit config/recipes.lua does not have is warned of and skipped.
+---circuit this QFT does not have (config/catalysts.lua) is warned of and skipped.
 ---@param recipes table<string, qft.Recipe>
 ---@param s qft.LinkSettings
 ---@param warn fun(fmt: string, ...)
@@ -102,7 +102,7 @@ function link.apply(recipes, s, warn)
     for _, entry in ipairs(s.recipes) do
         local recipe = recipes[entry.id]
         if not recipe then
-            warn('settings: no recipe %s in config/recipes.lua; skipped', entry.id)
+            warn('settings: no recipe %s on this QFT (config/catalysts.lua); skipped', entry.id)
         else
             recipe.off = entry.enabled == false
             recipe.trigger = entry.trigger or 'deficit'
@@ -181,7 +181,7 @@ function link.new(deps)
         if s then
             l:take(s, 'saved')
         else
-            l.warn('saved settings refused (%s): config/recipes.lua instead', tostring(err))
+            l.warn('saved settings refused (%s): none until the server sends them', tostring(err))
         end
     end
     return l

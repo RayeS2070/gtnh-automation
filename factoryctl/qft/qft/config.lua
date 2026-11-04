@@ -11,26 +11,32 @@ local config = {}
 ---@field recipes table<qft.RecipeId, qft.Recipe>
 
 ---Builds the recipes the program runs from the catalog (qft/catalog.lua, generated) and the
----player's choice (config/recipes.lua: recipe id -> catalysts). How a recipe runs (trigger,
----countInputs, targets, weights) is a setting of the server (qft.link): until it is applied, a
----recipe is a deficit one that tracks nothing, so it never runs. In Fluid Mode
----(components.fluidMode) a dust output with a molten form is counted as that fluid.
+---catalysts the QFT has (config/catalysts.lua: catalyst label -> count): every catalog recipe
+---of a listed catalyst, with that many parallels. How a recipe runs (trigger, countInputs,
+---targets, weights) is a setting of the server (qft.link): until it is applied, a recipe is a
+---deficit one that tracks nothing, so it never runs. In Fluid Mode (components.fluidMode) a
+---dust output with a molten form is counted as that fluid.
 ---@param catalog table<string, table>
----@param chosen table<string, integer> # config/recipes.lua
+---@param catalysts table<string, integer> # config/catalysts.lua
 ---@param fluidMode boolean
 ---@return table<string, qft.Recipe> recipes
 ---@return string[] problems
-function config.build(catalog, chosen, fluidMode)
+function config.build(catalog, catalysts, fluidMode)
     local recipes, problems = {}, {}
-    for id, catalysts in pairs(chosen) do
-        local base = catalog[id]
-        if type(catalysts) == 'table' then
-            problems[#problems + 1] = ('recipes.%s: the old format; now only the catalysts: '
-                .. '%s = <number>, the rest is set on the server'):format(id, id)
-        elseif not base then
-            problems[#problems + 1] = ('recipes.%s: no such recipe in qft/catalog.lua (its ids are '
-                .. 'listed there)'):format(tostring(id))
-        else
+    local known = {}
+    for _, base in pairs(catalog) do known[base.catalyst] = true end
+    for label in pairs(catalysts) do
+        if catalog[label] then
+            problems[#problems + 1] = ('catalysts: %s is a recipe id, the old config/recipes.lua; '
+                .. 'list the catalysts instead (their labels)'):format(label)
+        elseif not known[label] then
+            problems[#problems + 1] = ('catalysts: no recipe takes %s (the labels are the '
+                .. '`catalyst` of qft/catalog.lua)'):format(tostring(label))
+        end
+    end
+    for id, base in pairs(catalog) do
+        local count = catalysts[base.catalyst]
+        if count ~= nil then
             local inputs = {}
             for i, input in ipairs(base.inputs) do
                 inputs[i] = { [input.item and 'item' or 'fluid'] = input.item or input.fluid,
@@ -49,7 +55,7 @@ function config.build(catalog, chosen, fluidMode)
                 outputs[i] = entry
             end
             recipes[id] = { name = base.name, trigger = 'deficit', tier = base.tier,
-                catalysts = catalysts, inputs = inputs, outputs = outputs }
+                catalyst = base.catalyst, catalysts = count, inputs = inputs, outputs = outputs }
         end
     end
     table.sort(problems)
@@ -108,7 +114,7 @@ function config.checkValues(components, recipes)
             add('recipes.%s: tier must be an integer 1..%d', id, kMaxTier)
         end
         if not isInt(recipe.catalysts, 0) then
-            add('recipes.%s = %s: the catalysts must be an integer >= 0', id,
+            add("catalysts['%s'] = %s: must be an integer >= 0", tostring(recipe.catalyst),
                 tostring(recipe.catalysts))
         end
         if #recipe.outputs == 0 then
@@ -166,7 +172,7 @@ end
 ---@return string[] problems
 function config.load()
     local components = require('config.components')
-    local recipes, problems = config.build(require('qft.catalog'), require('config.recipes'),
+    local recipes, problems = config.build(require('qft.catalog'), require('config.catalysts'),
         components.fluidMode == true)
     local cfg = { components = components, recipes = recipes }
     if #problems == 0 then

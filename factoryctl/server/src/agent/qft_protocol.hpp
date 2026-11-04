@@ -65,7 +65,7 @@ auto checkQftSettings(const userver::formats::json::Value& settings,
     -> std::expected<void, std::string>;
 
 // Recipes of the catalog the settings do not have yet, added with the
-// catalog's values (a recipe added to config/recipes.lua later). None
+// catalog's values (a recipe added to the agent later). None
 // missing: nullopt.
 auto mergeCatalog(const userver::formats::json::Value& settings,
                   const userver::formats::json::Value& catalog)

@@ -114,7 +114,7 @@ auto QftPollHandler::HandleRequestThrow(
   }
 
   if (setup->settingsVersion == 0 && report->offer) {
-    // The first meeting: the agent's own (config/recipes.lua) become version 1.
+    // The first meeting: the agent's own become version 1.
     setup->settings = withoutVersion(*report->offer);
     setup->settingsVersion = 1;
     told("settings taken from the agent");

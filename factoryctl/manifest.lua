@@ -45,7 +45,7 @@ return {
         'pumps/config.lua',
         'mining/config.lua',
         'qft/config/components.lua',
-        'qft/config/recipes.lua',
+        'qft/config/catalysts.lua',
     },
     run = 'cd agent && main   (pumping: cd pumps && main; QFT: cd qft && main setup;'
         .. ' mining: cd mining && main)',
