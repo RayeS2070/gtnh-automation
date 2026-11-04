@@ -4,8 +4,8 @@
 // agent (factoryctl/mining) carries it out. The module draws its asteroid at
 // random among the candidates its drone and distance allow, so a setting is a
 // mix of outputs: it is worth what its outputs are worth to the targets.
-// The mechanics are smc's (../smc/core); the planning on top is a greedy
-// placeholder, smc is where a better one belongs.
+// The mechanics are smc's (../smc/core); the planning on top is factoryctl's:
+// many modules, a drone pool and weighted targets are not smc's question.
 
 #include <map>
 #include <optional>
