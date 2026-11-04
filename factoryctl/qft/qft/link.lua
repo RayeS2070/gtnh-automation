@@ -1,7 +1,8 @@
 ---The QFT agent and the factoryctl server: the agent decides by itself (safety stays here), the
----server keeps its settings and shows what it reports. Settings are the mode and, per output, the
----target and priority (deficit) or the weight (surplus); what a recipe is made of (inputs,
----circuits, tier, catalysts) stays in config/recipes.lua: it is the build, not a setting.
+---server keeps its settings and shows what it reports. Settings are the mode and, per recipe, its
+---trigger, whether its inputs are counted, and per output the target and priority (deficit) or
+---the weight (surplus). What a recipe is made of comes from qft/catalog.lua, its catalysts from
+---config/recipes.lua: that is the build, not a setting.
 ---
 ---Like the pumping agent: settings carry a version; newer ones from the server are applied and
 ---saved, so a restart without the server keeps them; until the server has any, the agent offers
@@ -16,7 +17,7 @@ local kModes = { auto = true, deficit = true, surplus = true }
 ---@class qft.LinkSettings
 ---@field version integer # The server's; 0: never had any from it.
 ---@field mode qft.Mode
----@field recipes { id: string, enabled: boolean?, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
+---@field recipes { id: string, enabled: boolean?, trigger: qft.Trigger?, countInputs: boolean?, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
 
 ---The settings config/recipes.lua stands for: what the agent offers a server that has none.
 ---@param recipes table<string, qft.Recipe>
@@ -34,7 +35,8 @@ function link.defaults(recipes, mode)
                 weight = o.weight }
         end
         table.sort(outputs, function(a, b) return a.circuit < b.circuit end)
-        out.recipes[#out.recipes + 1] = { id = id, enabled = true, outputs = outputs }
+        out.recipes[#out.recipes + 1] = { id = id, enabled = true, trigger = recipes[id].trigger,
+            countInputs = recipes[id].countInputs, outputs = outputs }
     end
     return out
 end
@@ -60,6 +62,12 @@ function link.check(raw)
         if r.enabled ~= nil and type(r.enabled) ~= 'boolean' then
             return nil, ('recipes[%d]: enabled must be true or false'):format(i)
         end
+        if r.trigger ~= nil and r.trigger ~= 'deficit' and r.trigger ~= 'surplus' then
+            return nil, ('recipes[%d]: trigger must be deficit or surplus'):format(i)
+        end
+        if r.countInputs ~= nil and type(r.countInputs) ~= 'boolean' then
+            return nil, ('recipes[%d]: countInputs must be true or false'):format(i)
+        end
         local outputs = {}
         for j, o in ipairs(type(r.outputs) == 'table' and r.outputs or {}) do
             local circuit = math.tointeger(o.circuit)
@@ -75,15 +83,18 @@ function link.check(raw)
             outputs[#outputs + 1] = { circuit = circuit, target = o.target, priority = o.priority,
                 weight = o.weight }
         end
-        out.recipes[#out.recipes + 1] = { id = r.id, enabled = r.enabled ~= false, outputs = outputs }
+        out.recipes[#out.recipes + 1] = { id = r.id, enabled = r.enabled ~= false,
+            trigger = r.trigger or 'deficit', countInputs = r.countInputs ~= false, outputs = outputs }
     end
     return out
 end
 
----Puts the settings into the recipes in place: a deficit output takes target and priority (no
----target: not tracked), a surplus output its weight; `enabled = false` switches the recipe off
----(recipe.off: plan treats it as disabled, a running one finishes its cycle and yields). A recipe the settings do not name keeps its
----config values; a recipe or circuit the config does not know is warned of and skipped.
+---Puts the settings into the recipes in place: the trigger; a deficit output takes target and
+---priority (no target: not tracked), a surplus output its weight; `countInputs = false` lets a
+---deficit recipe run without counting its inputs (a surplus one always counts them);
+---`enabled = false` switches the recipe off (recipe.off: plan treats it as disabled, a running one
+---finishes its cycle and yields). A recipe the settings do not name stays as it is; a recipe or
+---circuit config/recipes.lua does not have is warned of and skipped.
 ---@param recipes table<string, qft.Recipe>
 ---@param s qft.LinkSettings
 ---@param warn fun(fmt: string, ...)
@@ -94,6 +105,8 @@ function link.apply(recipes, s, warn)
             warn('settings: no recipe %s in config/recipes.lua; skipped', entry.id)
         else
             recipe.off = entry.enabled == false
+            recipe.trigger = entry.trigger or 'deficit'
+            recipe.countInputs = recipe.trigger == 'surplus' or entry.countInputs ~= false
             local byCircuit = {}
             for _, o in ipairs(recipe.outputs) do byCircuit[o.circuit] = o end
             local given = {}
@@ -115,8 +128,8 @@ function link.apply(recipes, s, warn)
     end
 end
 
----What the server shows of the recipes: names, outputs and their config values (the server adds
----a recipe it does not know to its settings with these).
+---What the server shows of the recipes: names, tier, catalysts, inputs and outputs (the server
+---adds a recipe it does not know to its settings).
 ---@param recipes table<string, qft.Recipe>
 function link.catalog(recipes)
     local defaults = link.defaults(recipes, 'auto')
@@ -126,8 +139,7 @@ function link.catalog(recipes)
         local outputs = {}
         for _, o in ipairs(r.outputs) do
             outputs[#outputs + 1] = { circuit = o.circuit, kind = o.resource.kind,
-                label = o.resource.label, name = o.resource.name, target = o.target,
-                priority = o.priority, weight = o.weight }
+                label = o.resource.label, name = o.resource.name }
         end
         table.sort(outputs, function(a, b) return a.circuit < b.circuit end)
         local inputs = {}
@@ -135,8 +147,8 @@ function link.catalog(recipes)
             inputs[j] = { kind = input.resource.kind, label = input.resource.label,
                 amount = input.amount }
         end
-        out[i] = { id = d.id, name = r.name or d.id, trigger = r.trigger, tier = r.tier,
-            catalysts = r.catalysts, outputs = outputs, inputs = inputs }
+        out[i] = { id = d.id, name = r.name or d.id, tier = r.tier, catalysts = r.catalysts,
+            outputs = outputs, inputs = inputs }
     end
     return out
 end

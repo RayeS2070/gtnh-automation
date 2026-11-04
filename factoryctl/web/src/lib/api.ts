@@ -248,18 +248,25 @@ export async function deletePumpTarget(fluid: string): Promise<void> {
 
 // QFT setups (factoryctl/qft): one Quantum Force Transformer and its agent each.
 export type QftMode = 'auto' | 'deficit' | 'surplus'
+export type QftTrigger = 'deficit' | 'surplus'
 
 export type QftOutputSettings = { circuit: number; target?: number; priority?: number; weight?: number }
 export type QftSettings = {
   version: number
   mode: QftMode
-  recipes: { id: string; enabled?: boolean; outputs: QftOutputSettings[] }[] // enabled: absent = true
+  // Absent: enabled true, trigger deficit, countInputs true (a surplus recipe always counts them).
+  recipes: {
+    id: string
+    enabled?: boolean
+    trigger?: QftTrigger
+    countInputs?: boolean
+    outputs: QftOutputSettings[]
+  }[]
 }
 
 export type QftCatalogRecipe = {
   id: string
   name: string
-  trigger: 'deficit' | 'surplus'
   tier: number
   catalysts: number
   inputs: { kind: string; label: string; amount?: number }[]

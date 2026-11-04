@@ -8,8 +8,9 @@ local bind = require('qft.bind')
 local kNetwork = { 'fluid_interface', 'me_controller' }
 
 return {
-    -- The factoryctl server: settings (targets, weights, mode) come from it and are kept on this
-    -- computer; it shows what the QFT does. nil: no server, config/recipes.lua as it is.
+    -- The factoryctl server, required: the settings (triggers, targets, weights, mode) come from
+    -- it and are kept on this computer, so the QFT runs on while the server is away; it shows
+    -- what the QFT does.
     -- OpenComputers refuses private and local addresses by default (internet.filteringRules).
     server = 'http://127.0.0.1:8080',
     -- This setup's name on the server; nil: qft@x,y,z of the controller. Give each QFT its own.
@@ -25,7 +26,7 @@ return {
         production = bind.manual { type = kNetwork, prompt = 'Fluid interface of the PRODUCTS network' },
     },
     -- One ME stocking input bus and one hatch serve every recipe: before a recipe starts the
-    -- program sets their slots to its inputs (config/recipes.lua). The bus also holds the
+    -- program sets their slots to its inputs (qft/catalog.lua). The bus also holds the
     -- programmed circuit for Neptunium. Basic or advanced, both do.
     -- The bus and both hatches stock from the `source` network, so either hatch can be either:
     -- setup takes the only bus and the only two hatches the computer sees.

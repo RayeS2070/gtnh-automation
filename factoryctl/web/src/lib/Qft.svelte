@@ -7,6 +7,7 @@
     type QftMode,
     type QftOutputSettings,
     type QftSetup,
+    type QftTrigger,
   } from './api'
   import { amount, compact, parseAmount, plainLabel } from './format'
   import { every, kRefreshMs } from './refresh'
@@ -20,6 +21,8 @@
       {
         mode: QftMode
         enabled: Record<string, boolean>
+        trigger: Record<string, QftTrigger>
+        count: Record<string, boolean>
         fields: Record<string, Record<number, Record<string, string>>>
       }
     >
@@ -48,8 +51,10 @@
   const kOffline = 60_000 // ms without a poll: the agent or its computer is away
   const online = (s: QftSetup) => Date.now() - new Date(s.seenAt).getTime() < kOffline
 
-  const enabled = (s: QftSetup, recipe: string) =>
-    s.settings?.recipes.find((r) => r.id === recipe)?.enabled !== false
+  const recipeSettings = (s: QftSetup, recipe: string) => s.settings?.recipes.find((r) => r.id === recipe)
+  const enabled = (s: QftSetup, recipe: string) => recipeSettings(s, recipe)?.enabled !== false
+  const triggerOf = (s: QftSetup, recipe: string): QftTrigger => recipeSettings(s, recipe)?.trigger ?? 'deficit'
+  const counts = (s: QftSetup, recipe: string) => recipeSettings(s, recipe)?.countInputs !== false
   const outputSettings = (s: QftSetup, recipe: string, circuit: number): QftOutputSettings | undefined =>
     s.settings?.recipes.find((r) => r.id === recipe)?.outputs.find((o) => o.circuit === circuit)
   const recipeState = (s: QftSetup, recipe: string) => s.status.recipes.find((r) => r.id === recipe)
@@ -57,24 +62,31 @@
     recipeState(s, recipe)?.outputs.find((o) => o.circuit === circuit)
 
   // The fields a trigger edits: deficit keeps stock (target, priority), surplus weighs outputs.
-  const fieldsOf = (r: QftCatalogRecipe) => (r.trigger === 'surplus' ? ['weight'] : ['target', 'priority'])
+  const fieldsOf = (t: QftTrigger) => (t === 'surplus' ? ['weight'] : ['target', 'priority'])
+  // The trigger a row shows: the one being edited, else the saved one.
+  const shownTrigger = (s: QftSetup, r: QftCatalogRecipe) => editing[s.name]?.trigger[r.id] ?? triggerOf(s, r.id)
 
   function startEdit(s: QftSetup) {
     const fields: Record<string, Record<number, Record<string, string>>> = {}
     const on: Record<string, boolean> = {}
+    const trigger: Record<string, QftTrigger> = {}
+    const count: Record<string, boolean> = {}
     for (const r of s.catalog) {
       on[r.id] = enabled(s, r.id)
+      trigger[r.id] = triggerOf(s, r.id)
+      count[r.id] = counts(s, r.id)
       fields[r.id] = {}
       for (const o of r.outputs) {
         const cur = outputSettings(s, r.id, o.circuit)
         fields[r.id][o.circuit] = {}
-        for (const f of fieldsOf(r)) {
+        // Every field: the trigger may change while editing.
+        for (const f of ['target', 'priority', 'weight']) {
           const v = cur?.[f as keyof QftOutputSettings]
           fields[r.id][o.circuit][f] = v === undefined ? '' : String(v)
         }
       }
     }
-    editing[s.name] = { mode: s.settings?.mode ?? 'auto', enabled: on, fields }
+    editing[s.name] = { mode: s.settings?.mode ?? 'auto', enabled: on, trigger, count, fields }
   }
 
   // A typed value: empty is none (an output without a target is not tracked); k/M/G as elsewhere.
@@ -92,9 +104,11 @@
     const recipes = s.catalog.map((r) => ({
       id: r.id,
       enabled: e.enabled[r.id],
+      trigger: e.trigger[r.id],
+      countInputs: e.count[r.id],
       outputs: r.outputs.map((o) => {
         const out: QftOutputSettings = { circuit: o.circuit }
-        for (const f of fieldsOf(r)) {
+        for (const f of fieldsOf(e.trigger[r.id])) {
           const v = value(e.fields[r.id][o.circuit][f])
           if (v === null) throw new Error(`${r.name}, ${o.label}: ${f} is not a number`)
           if (v !== undefined) (out as Record<string, number>)[f] = v
@@ -115,6 +129,7 @@
     const recipes = s.catalog.map((r) => {
       const have = cur.recipes.find((x) => x.id === r.id)
       return {
+        ...have,
         id: r.id,
         enabled: r.id === id ? !enabled(s, r.id) : enabled(s, r.id),
         outputs: have?.outputs ?? [],
@@ -198,7 +213,20 @@
                 {/if}
                 {r.name}
                 {#if !enabled(s, r.id)}<span class="tag">off</span>{/if}
-                <span class="tag">{r.trigger}</span>
+                {#if editing[s.name]}
+                  <select class="small" bind:value={editing[s.name].trigger[r.id]}
+                    title="deficit: keeps products stocked; surplus: processes raw materials while they are in stock">
+                    <option value="deficit">deficit</option>
+                    <option value="surplus">surplus</option>
+                  </select>
+                  {#if editing[s.name].trigger[r.id] === 'deficit'}
+                    <label class="small" title="off: the inputs are supplied without limit, not counted">
+                      <input type="checkbox" bind:checked={editing[s.name].count[r.id]} /> count inputs</label>
+                  {/if}
+                {:else}
+                  <span class="tag">{triggerOf(s, r.id)}</span>
+                  {#if triggerOf(s, r.id) === 'deficit' && !counts(s, r.id)}<span class="tag">inputs not counted</span>{/if}
+                {/if}
                 <span class="muted small">tier {r.tier}, {r.catalysts} catalysts</span>
                 {#if st?.disabled}<span class="tag">no catalysts</span>
                 {:else if st?.low}<span class="tag warn">wants to run</span>{/if}
@@ -218,19 +246,19 @@
                 </td>
                 {#if editing[s.name]}
                   <td colspan="2">
-                    {#each fieldsOf(r) as f (f)}
+                    {#each fieldsOf(shownTrigger(s, r)) as f (f)}
                       <label class="field">{f} <input bind:value={editing[s.name].fields[r.id][o.circuit][f]} size="8" /></label>
                     {/each}
                   </td>
                 {:else}
                   <td class="num muted">
-                    {#if r.trigger === 'surplus'}
+                    {#if triggerOf(s, r.id) === 'surplus'}
                       {cur?.weight != null ? `weight ${cur.weight}` : 'not wanted'}
                     {:else}
                       {cur?.target != null ? `keep ${compact(cur.target)}` : 'not tracked'}
                     {/if}
                   </td>
-                  <td class="num muted">{r.trigger !== 'surplus' && cur?.priority != null ? `priority ${cur.priority}` : ''}</td>
+                  <td class="num muted">{triggerOf(s, r.id) !== 'surplus' && cur?.priority != null ? `priority ${cur.priority}` : ''}</td>
                 {/if}
               </tr>
             {/each}

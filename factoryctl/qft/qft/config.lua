@@ -11,20 +11,22 @@ local config = {}
 ---@field recipes table<qft.RecipeId, qft.Recipe>
 
 ---Builds the recipes the program runs from the catalog (qft/catalog.lua, generated) and the
----player's choice (config/recipes.lua): the catalog says what a recipe takes and gives, the
----choice how to run it. In Fluid Mode (components.fluidMode) a dust output with a molten form
----is counted as that fluid.
+---player's choice (config/recipes.lua: recipe id -> catalysts). How a recipe runs (trigger,
+---countInputs, targets, weights) is a setting of the server (qft.link): until it is applied, a
+---recipe is a deficit one that tracks nothing, so it never runs. In Fluid Mode
+---(components.fluidMode) a dust output with a molten form is counted as that fluid.
 ---@param catalog table<string, table>
----@param chosen table<string, table> # config/recipes.lua
+---@param chosen table<string, integer> # config/recipes.lua
 ---@param fluidMode boolean
 ---@return table<string, qft.Recipe> recipes
 ---@return string[] problems
 function config.build(catalog, chosen, fluidMode)
     local recipes, problems = {}, {}
-    for id, c in pairs(chosen) do
+    for id, catalysts in pairs(chosen) do
         local base = catalog[id]
-        if type(c) ~= 'table' then
-            problems[#problems + 1] = ('recipes.%s: must be a table'):format(id)
+        if type(catalysts) == 'table' then
+            problems[#problems + 1] = ('recipes.%s: the old format; now only the catalysts: '
+                .. '%s = <number>, the rest is set on the server'):format(id, id)
         elseif not base then
             problems[#problems + 1] = ('recipes.%s: no such recipe in qft/catalog.lua (its ids are '
                 .. 'listed there)'):format(tostring(id))
@@ -32,11 +34,9 @@ function config.build(catalog, chosen, fluidMode)
             local inputs = {}
             for i, input in ipairs(base.inputs) do
                 inputs[i] = { [input.item and 'item' or 'fluid'] = input.item or input.fluid,
-                    name = input.name, damage = input.damage,
-                    amount = c.countInputs ~= false and input.amount or nil }
+                    name = input.name, damage = input.damage, amount = input.amount }
             end
             local outputs = {}
-            local set = type(c.outputs) == 'table' and c.outputs or {}
             for i, out in ipairs(base.outputs) do
                 local entry
                 if fluidMode and out.molten then
@@ -45,19 +45,11 @@ function config.build(catalog, chosen, fluidMode)
                     entry = { [out.item and 'item' or 'fluid'] = out.item or out.fluid,
                         name = out.name, damage = out.damage }
                 end
-                local o = set[i] or {}
-                entry.circuit, entry.target, entry.priority, entry.weight = i, o.target, o.priority,
-                    o.weight
+                entry.circuit = i
                 outputs[i] = entry
             end
-            for circuit in pairs(set) do
-                if not base.outputs[circuit] then
-                    problems[#problems + 1] = ('recipes.%s.outputs[%s]: the recipe has %d outputs')
-                        :format(id, tostring(circuit), #base.outputs)
-                end
-            end
-            recipes[id] = { name = c.name or base.name, trigger = c.trigger, tier = base.tier,
-                catalysts = c.catalysts, inputs = inputs, outputs = outputs }
+            recipes[id] = { name = base.name, trigger = 'deficit', tier = base.tier,
+                catalysts = catalysts, inputs = inputs, outputs = outputs }
         end
     end
     table.sort(problems)
@@ -80,8 +72,8 @@ function config.checkValues(components, recipes)
         problems[#problems + 1] = fmt:format(...)
     end
 
-    if components.server ~= nil and type(components.server) ~= 'string' then
-        add('components: server must be a URL or nil (no server)')
+    if type(components.server) ~= 'string' then
+        add('components: server must be the URL of the factoryctl server: the settings come from it')
     end
     if components.name ~= nil and (type(components.name) ~= 'string' or components.name == '') then
         add('components: name must be a non-empty string or nil (qft@x,y,z)')
@@ -116,81 +108,32 @@ function config.checkValues(components, recipes)
             add('recipes.%s: tier must be an integer 1..%d', id, kMaxTier)
         end
         if not isInt(recipe.catalysts, 0) then
-            add('recipes.%s: catalysts must be an integer >= 0', id)
+            add('recipes.%s = %s: the catalysts must be an integer >= 0', id,
+                tostring(recipe.catalysts))
         end
-        local outputs = recipe.outputs or {}
-        if #outputs == 0 then
+        if #recipe.outputs == 0 then
             add('recipes.%s: no outputs', id)
         end
-        local trigger = recipe.trigger
-        if trigger ~= 'deficit' and trigger ~= 'surplus' then
-            add("recipes.%s: trigger must be 'deficit' or 'surplus'", id)
-        end
-        -- Inputs set the slots of the bus and the hatch: every recipe has them.
-        local inputs = recipe.inputs
-        if type(inputs) ~= 'table' or #inputs == 0 then
-            add('recipes.%s: inputs must be a list of { item|fluid = <label>[, amount = n] }: the '
-                .. 'bus and the hatch are set from them', id)
-        else
-            local items, fluids = 0, 0
-            for i, input in ipairs(inputs) do
-                if input.amount ~= nil and not (type(input.amount) == 'number' and input.amount > 0) then
-                    add('recipes.%s.inputs[%d]: amount must be a number > 0 or absent', id, i)
-                elseif input.amount == nil and trigger == 'surplus' then
-                    add('recipes.%s.inputs[%d]: a surplus recipe needs the amount of every input: '
-                        .. 'it decides when the recipe runs', id, i)
-                end
-                if input.item ~= nil then
-                    items = items + 1
-                elseif input.fluid ~= nil then
-                    fluids = fluids + 1
-                end
+        -- Inputs set the slots of the bus and the hatch, and say when a recipe can run.
+        local items, fluids = 0, 0
+        for i, input in ipairs(recipe.inputs) do
+            if not (type(input.amount) == 'number' and input.amount > 0) then
+                add('recipes.%s.inputs[%d]: amount must be a number > 0', id, i)
             end
-            if items > slots.kSize then
-                add('recipes.%s: %d item inputs, the bus has %d slots', id, items, slots.kSize)
-            end
-            if fluids > slots.kSize then
-                add('recipes.%s: %d fluid inputs, the hatch has %d slots', id, fluids, slots.kSize)
-            end
-        end
-        local targets = 0
-        local seen = {}
-        for i, out in ipairs(outputs) do
-            if not isInt(out.circuit, 1) then
-                add('recipes.%s.outputs[%d]: circuit must be an integer >= 1', id, i)
-            elseif out.circuit > #outputs then
-                -- The chances depend on the number of outputs: every output must be listed.
-                add('recipes.%s.outputs[%d]: circuit %d > %d outputs listed; list every output',
-                    id, i, out.circuit, #outputs)
-            elseif seen[out.circuit] then
-                add('recipes.%s.outputs[%d]: circuit %d is already used by outputs[%d]',
-                    id, i, out.circuit, seen[out.circuit])
+            if input.item ~= nil then
+                items = items + 1
             else
-                seen[out.circuit] = i
-            end
-            if out.target ~= nil and not (type(out.target) == 'number' and out.target > 0) then
-                add('recipes.%s.outputs[%d]: target must be a number > 0 or absent', id, i)
-            end
-            if out.priority ~= nil and not (type(out.priority) == 'number' and out.priority > 0) then
-                add('recipes.%s.outputs[%d]: priority must be a number > 0 or absent', id, i)
-            end
-            if out.weight ~= nil and not (type(out.weight) == 'number' and out.weight >= 0) then
-                add('recipes.%s.outputs[%d]: weight must be a number >= 0 or absent', id, i)
-            end
-            if out.target ~= nil then
-                targets = targets + 1
-            end
-            -- Each field belongs to one trigger; a stray one means the trigger is wrong.
-            if trigger == 'surplus' and (out.target ~= nil or out.priority ~= nil) then
-                add('recipes.%s.outputs[%d]: target/priority are for deficit recipes, use weight',
-                    id, i)
-            elseif trigger == 'deficit' and out.weight ~= nil then
-                add('recipes.%s.outputs[%d]: weight is for surplus recipes, use target/priority',
-                    id, i)
+                fluids = fluids + 1
             end
         end
-        if trigger == 'deficit' and targets == 0 then
-            add('recipes.%s: a deficit recipe needs a target on some output', id)
+        if #recipe.inputs == 0 then
+            add('recipes.%s: no inputs: the bus and the hatch are set from them', id)
+        end
+        if items > slots.kSize then
+            add('recipes.%s: %d item inputs, the bus has %d slots', id, items, slots.kSize)
+        end
+        if fluids > slots.kSize then
+            add('recipes.%s: %d fluid inputs, the hatch has %d slots', id, fluids, slots.kSize)
         end
     end
     table.sort(problems)

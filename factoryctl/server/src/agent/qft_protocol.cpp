@@ -77,9 +77,19 @@ auto checkQftSettings(const json::Value& settings, const json::Value& catalog)
     const auto path = std::format("settings.recipes[{}]", i);
     const auto& r = recipes[i];
     if (!r.IsObject()) return fail(path, "not an object");
-    if (auto ok = onlyFields(r, path, {"id", "enabled", "outputs"}); !ok) return ok;
-    if (const auto& e = r["enabled"]; !e.IsMissing() && !e.IsBool()) {
-      return fail(std::format("{}.enabled", path), "not a boolean");
+    if (auto ok = onlyFields(r, path, {"id", "enabled", "trigger", "countInputs", "outputs"});
+        !ok) {
+      return ok;
+    }
+    for (const auto* field : {"enabled", "countInputs"}) {
+      if (const auto& e = r[field]; !e.IsMissing() && !e.IsBool()) {
+        return fail(std::format("{}.{}", path, field), "not a boolean");
+      }
+    }
+    if (const auto& t = r["trigger"]; !t.IsMissing()) {
+      if (!t.IsString() || (t.As<std::string>() != "deficit" && t.As<std::string>() != "surplus")) {
+        return fail(std::format("{}.trigger", path), "not deficit or surplus");
+      }
     }
     const auto id = text(r["id"], std::format("{}.id", path));
     if (!id) return std::unexpected(id.error());

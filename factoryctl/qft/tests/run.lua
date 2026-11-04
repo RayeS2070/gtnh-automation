@@ -22,7 +22,7 @@ end
 
 -- What config.checkValues needs of the components.
 local function components()
-    return { shieldingTier = 1, bus = bind.manual { type = 'me_inputbus', prompt = 'bus' },
+    return { server = 'http://127.0.0.1:8080', shieldingTier = 1, bus = bind.manual { type = 'me_inputbus', prompt = 'bus' },
         hatch = bind.manual { type = 'me_inputhatch', prompt = 'hatch' },
         plasma = { hatch = bind.manual { type = 'me_inputhatch', prompt = 'plasma' },
             neptunium = 'Neptunium Plasma', fermium = 'Fermium Plasma' } }
@@ -139,62 +139,39 @@ do
     check(plan.choose(states, nil) == 'glue', 'mixed recipe is chosen')
 end
 
--- config: each trigger has its own fields
+-- config.checkValues: the components, and what the catalog gives of a recipe
 do
-    local function problems(recipe, keepInputs)
+    local function problems(recipe)
         recipe.tier, recipe.catalysts = recipe.tier or 1, recipe.catalysts or 1
-        if not keepInputs and recipe.inputs == nil and recipe.trigger ~= 'surplus' then
-            recipe.inputs = { { fluid = 'Water' } }
-        end
-        local list = config.checkValues(components(), { r = recipe })
-        return table.concat(list, '\n')
+        recipe.inputs = recipe.inputs or { { item = 'Dust', amount = 32 } }
+        recipe.outputs = recipe.outputs or { { fluid = 'A', circuit = 1 } }
+        return table.concat(config.checkValues(components(), { r = recipe }), '\n')
     end
-    local out = function(extra)
-        local o = { fluid = 'A', circuit = 1 }
-        for k, v in pairs(extra or {}) do o[k] = v end
-        return { o }
-    end
-    local input = { { item = 'Dust', amount = 32 } }
-    check(problems({ trigger = 'deficit', outputs = out({ target = 1 }) }) == '', 'valid deficit')
-    check(problems({ trigger = 'surplus', inputs = input, outputs = out({ weight = 2 }) }) == '',
-        'valid surplus')
-    check(problems({ outputs = out({ target = 1 }) }):find('trigger'), 'trigger is required')
-    check(problems({ trigger = 'deficit', outputs = out() }):find('needs a target'),
-        'deficit without a target refused')
-    check(problems({ trigger = 'deficit', outputs = out({ target = 1, weight = 1 }) })
-        :find('weight is for surplus'), 'weight on deficit refused')
-    check(problems({ trigger = 'surplus', inputs = input, outputs = out({ target = 1 }) })
-        :find('use weight'), 'target on surplus refused')
-    check(problems({ trigger = 'surplus', outputs = out({ weight = 1 }) }):find('inputs must be'),
-        'surplus without inputs refused')
-    check(problems({ trigger = 'deficit', outputs = out({ target = 1 }) }, true):find('inputs must be'),
-        'deficit without inputs refused: the bus is set from them')
-    check(problems({ trigger = 'deficit', inputs = { { fluid = 'Water' } },
-        outputs = out({ target = 1 }) }) == '', 'a deficit input needs no amount')
+    check(problems({}) == '', 'a valid recipe')
+    check(problems({ inputs = {} }):find('no inputs'), 'a recipe without inputs refused: the bus is set from them')
+    check(problems({ inputs = { { item = 'Dust' } } }):find('amount'), 'an input without amount refused')
     local many = {}
-    for i = 1, 17 do many[i] = { item = 'Dust ' .. i } end
-    check(problems({ trigger = 'deficit', inputs = many, outputs = out({ target = 1 }) })
-        :find('17 item inputs'), 'more items than bus slots refused')
-    check(table.concat(config.checkValues({ shieldingTier = 1 }, {}), ' '):find('bus must be'),
+    for i = 1, 17 do many[i] = { item = 'Dust ' .. i, amount = 1 } end
+    check(problems({ inputs = many }):find('17 item inputs'), 'more items than bus slots refused')
+    check(problems({ catalysts = 0 }) == '', 'catalysts = 0 allowed')
+    check(problems({ catalysts = -1 }):find('catalysts'), 'negative catalysts refused')
+    check(problems({ tier = 5 }):find('tier'), 'a tier past 4 refused')
+    check(table.concat(config.checkValues({ server = 'x', shieldingTier = 1 }, {}), ' '):find('bus must be'),
         'the bus and the hatch are required components')
-    check(table.concat(config.checkValues({ shieldingTier = 1, plasma = {
+    check(table.concat(config.checkValues({ server = 'x', shieldingTier = 1, plasma = {
         neptunium = { hatch = bind.manual { type = 'me_inputhatch', prompt = 'n' } } } }, {}), ' ')
         :find('plasma: hatch must be'), 'old per-plasma hatches refused')
     local named = components()
-    named.server, named.name = 'http://127.0.0.1:8080', 'qft-main'
+    named.name = 'qft-main'
     check(#config.checkValues(named, {}) == 0, 'server and name are fine')
     named.name = ''
     check(table.concat(config.checkValues(named, {}), ' '):find('name must be'), 'an empty name refused')
+    named.name, named.server = nil, nil
+    check(table.concat(config.checkValues(named, {}), ' '):find('server must be'), 'the server is required')
     local old = components()
     old.recipes = {}
     check(table.concat(config.checkValues(old, {}), ' '):find('recipes are gone'),
         'per-recipe components are refused with a hint')
-    check(problems({ trigger = 'surplus', inputs = { item = 'Dust', amount = 32 },
-        outputs = out() }):find('must be a list'), 'old single-input format refused')
-    check(problems({ trigger = 'surplus', inputs = { { item = 'Dust' } }, outputs = out() })
-        :find('amount'), 'input without amount refused')
-    check(problems({ trigger = 'surplus', inputs = input, outputs = out({ weight = -1 }) })
-        :find('weight must be'), 'negative weight refused')
     local r = { r = { inputs = { { circuit = 1, amount = 1 } }, outputs = {} } }
     local np = config.normalize(r)
     check(#np == 1 and np[1]:find('inputs%[1%]'), 'normalize reports a bad input')
@@ -290,14 +267,6 @@ do
     check(plan.choose(st, nil) == 'plat', 'disabled recipes do not block the others')
     check(plan.choose(st, 'ore') == 'plat' and plan.choose(st, 'glue') == 'plat',
         'a running disabled recipe is stopped')
-
-    local function problemsOf(catalysts)
-        return config.checkValues(components(), { r = { tier = 1, catalysts = catalysts,
-            trigger = 'deficit', inputs = { { fluid = 'W' } },
-            outputs = { { fluid = 'A', circuit = 1, target = 1 } } } })
-    end
-    check(#problemsOf(0) == 0, 'config: catalysts = 0 allowed')
-    check(#problemsOf(-1) == 1, 'config: negative catalysts refused')
 end
 
 -- config.build: recipes from the catalog and the player's choice
@@ -310,27 +279,23 @@ do
                 molten = { fluid = 'Molten Platinum', name = 'molten.platinum', amount = 9216 } },
                 { item = 'Inert Dust', name = 'bw:dust', damage = 10113, amount = 1 } } },
     }
-    local r, problems = config.build(catalog, { plat = { trigger = 'surplus', catalysts = 2,
-        outputs = { [1] = { weight = 3 } } } }, false)
+    local r, problems = config.build(catalog, { plat = 2 }, false)
     check(#problems == 0, 'build: no problems')
     local p = r.plat
     check(p.name == 'Platinum Dust' and p.tier == 1 and p.catalysts == 2, 'build: name, tier, catalysts')
+    check(p.trigger == 'deficit' and p.outputs[1].target == nil,
+        'build: until the server\'s settings, a deficit recipe that tracks nothing')
     check(p.inputs[1].item == 'Powder' and p.inputs[1].name == 'bw:dust' and p.inputs[1].damage == 47
         and p.inputs[1].amount == 32 and p.inputs[2].fluid == 'Oxygen', 'build: inputs with names')
-    check(p.outputs[1].item == 'Platinum Dust' and p.outputs[1].circuit == 1 and p.outputs[1].weight == 3,
-        'build: outputs, circuit = place, settings by circuit')
-    r = config.build(catalog, { plat = { trigger = 'surplus', catalysts = 1 } }, true)
+    check(p.outputs[1].item == 'Platinum Dust' and p.outputs[1].circuit == 1, 'build: outputs, circuit = place')
+    r = config.build(catalog, { plat = 1 }, true)
     check(r.plat.outputs[1].fluid == 'Molten Platinum' and r.plat.outputs[1].name == 'molten.platinum',
         'fluid mode: a dust with a molten form counts as the fluid')
     check(r.plat.outputs[2].item == 'Inert Dust', 'fluid mode: one without stays an item')
-    r = config.build(catalog, { plat = { trigger = 'deficit', catalysts = 1, countInputs = false,
-        name = 'Platinum Group' } }, false)
-    check(r.plat.name == 'Platinum Group' and r.plat.inputs[1].amount == nil,
-        'build: own name, inputs not counted')
-    local _, bad = config.build(catalog, { nope = {}, plat = { outputs = { [7] = {} } } }, false)
-    check(#bad == 2 and table.concat(bad, ' '):find('no such recipe') and table.concat(bad, ' '):find('2 outputs'),
-        'build: an unknown id and a circuit past the outputs are problems')
-    assert(#config.normalize(config.build(catalog, { plat = { trigger = 'surplus', catalysts = 1 } }, false)) == 0)
+    local _, bad = config.build(catalog, { nope = 1, plat = { catalysts = 1 } }, false)
+    check(#bad == 2 and table.concat(bad, ' '):find('no such recipe') and table.concat(bad, ' '):find('old format'),
+        'build: an unknown id and the old format are problems')
+    assert(#config.normalize(config.build(catalog, { plat = 1 }, false)) == 0)
 end
 
 -- resource.amount by internal name: the game's label need not match the catalog's
@@ -708,13 +673,14 @@ do
     local warned = {}
     link.apply(r, { version = 3, mode = 'deficit', recipes = {
         { id = 'glue', outputs = { { circuit = 2, target = 50 }, { circuit = 9, target = 1 } } },
-        { id = 'plat', outputs = { { circuit = 2, weight = 5 } } },
+        { id = 'plat', trigger = 'surplus', outputs = { { circuit = 2, weight = 5 } } },
         { id = 'gone', outputs = {} },
     } }, function(fmt, ...) warned[#warned + 1] = fmt:format(...) end)
     check(r.glue.outputs[1].target == nil and r.glue.outputs[2].target == 50,
         'apply: deficit targets as the server says, an output it leaves out is not tracked')
     check(r.plat.outputs[1].weight == nil and r.plat.outputs[2].weight == 5, 'apply: surplus weights')
     check(#warned == 2, 'apply: an unknown circuit and recipe are warned of')
+    check(r.plat.trigger == 'surplus' and r.glue.trigger == 'deficit', 'apply: the trigger, absent = deficit')
     link.apply(r, { version = 4, mode = 'auto', recipes = { { id = 'glue', enabled = false, outputs = {} } } },
         function() end)
     check(r.glue.off == true and not r.plat.off, 'apply: a recipe switched off')
@@ -727,6 +693,30 @@ do
     check(r.glue.off == false, 'apply: and back on')
     check(link.check({ mode = 'auto', recipes = { { id = 'glue', enabled = 'no' } } }) == nil,
         'enabled must be a boolean')
+    check(link.check({ mode = 'auto', recipes = { { id = 'glue', trigger = 'often' } } }) == nil,
+        'a bad trigger is refused')
+    check(link.check({ mode = 'auto', recipes = { { id = 'glue', countInputs = 1 } } }) == nil,
+        'countInputs must be a boolean')
+    local checked = link.check({ mode = 'auto', recipes = { { id = 'glue' } } })
+    check(checked.recipes[1].trigger == 'deficit' and checked.recipes[1].countInputs == true,
+        'check: absent trigger = deficit, inputs counted')
+
+    -- countInputs: a deficit recipe may run without counting its inputs; a surplus one counts them
+    local c = rs()
+    c.glue.inputs = { { fluid = 'Water', amount = 100 } }
+    assert(#config.normalize(c) == 0)
+    local dry = resource.snapshot({}, { { label = 'Water', name = 'water', amount = 0 } })
+    local function counted(entry)
+        entry.id = 'glue'
+        entry.outputs = { { circuit = 1, target = 100 } }
+        link.apply(c, { version = 6, mode = 'auto', recipes = { entry } }, function() end)
+        return (plan.evaluate(c, fluids({ Glue = 0 }), dry)).glue
+    end
+    check(not counted({}).low, 'counted: no water, no start')
+    check(counted({ countInputs = false }).low, 'not counted: starts without water')
+    check(c.glue.countInputs == false, '... countInputs = false on the recipe')
+    counted({ trigger = 'surplus', countInputs = false })
+    check(c.glue.countInputs == true, 'surplus always counts its inputs')
 
     -- a poll: offer and catalog first; the server's settings are taken and saved
     local saved, requests, replies = nil, {}, {}
@@ -772,7 +762,7 @@ do
     local l2 = link.new(deps2)
     check(l2.settings.version == 1 and deps2.recipes.glue.outputs[1].target == 500,
         'saved settings at the start: no server needed')
-    check(l2.offer.recipes[1].outputs[1].target == 100, 'the offer is still the config\'s')
+    check(l2.offer.recipes[1].outputs[1].target == 100, 'the offer is still the recipes\' own')
 
     -- a copy saved by an older agent lacks a field (enabled): the first poll of a run asks for
     -- the server's settings and takes them even at the same version

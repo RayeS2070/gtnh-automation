@@ -91,8 +91,9 @@ local function inputCycles(recipe, source)
     end
     local cycles = math.huge
     for _, input in ipairs(recipe.inputs) do
-        -- Without an amount it is in the bus or the hatch but not counted: supplied without limit.
-        if input.amount then
+        -- Not counted (countInputs = false, or no amount): in the bus or the hatch, but supplied
+        -- without limit.
+        if input.amount and recipe.countInputs ~= false then
             local amount, err, absent = resource.amount(source, input.resource)
             if not amount then
                 return nil, err, missing
@@ -186,7 +187,7 @@ function plan.evaluate(recipes, production, source, opts)
             for _, out in ipairs(recipe.outputs) do
                 st.weights[out.circuit] = out.weight or 0
             end
-            -- Inputs are required for surplus recipes (config.checkValues).
+            -- A surplus recipe always counts its inputs (link.apply).
             st.low = (st.cycles or 0) >= startCycles
             st.done = (st.cycles or 0) < stopCycles
         elseif not err then

@@ -9,20 +9,22 @@ GregTech: New Horizons modpack.
 
 ## The factoryctl server
 
-With `server` in `config/components.lua` (the default: the address the other factoryctl agents
-use) the agent reports to the server every 10 seconds and takes its settings: the mode and,
-per output, the target and priority (maintaining products) or the weight (processing raw
-materials), and which recipes may run at all (Off/On on the tab: an off recipe never runs, a
-running one finishes its cycle and yields). They are edited on the **QFT** tab of the web client and kept on this computer
-(`/etc/qftctl.settings`), so the QFT goes on with them when the server is away, also after a
-restart. What a recipe is made of (inputs, circuits, tier, catalysts) stays in
-`config/recipes.lua`. The first time, the server takes the agent's own values from
-`config/recipes.lua`. `--mode` on the command line wins over the server's mode.
+The server is required: `server` in `config/components.lua` (the default: the address the
+other factoryctl agents use), and an Internet Card. The agent reports to it every 10 seconds
+and takes its settings: the mode and, per recipe, its trigger (maintaining products or
+processing raw materials), whether its inputs are counted, which recipes may run at all
+(Off/On on the tab: an off recipe never runs, a running one finishes its cycle and yields) and,
+per output, the target and priority or the weight. They are edited on the **QFT** tab of the web
+client and kept on this computer (`/etc/qftctl.settings`), so the QFT goes on with them when the
+server is away, also after a restart. A recipe the server has no settings for yet is a
+maintaining one that tracks nothing: it never runs until it is set on the tab. What a recipe is
+made of comes from `qft/catalog.lua`, its catalysts from `config/recipes.lua`. `--mode` on the
+command line wins over the server's mode.
 
 Each QFT has its own computer and its own name on the server: `name` in
 `config/components.lua`, or `qft@x,y,z` of the controller when it is not set. A second QFT
 reporting under a name another QFT (at other coordinates) holds is refused until it gets its own
-name, or the other one is forgotten on the web page. `server = nil` runs without the server.
+name, or the other one is forgotten on the web page.
 
 ## Why setup is needed
 
@@ -142,8 +144,6 @@ to another output when that output beats it by 10%.
   after every hatch is off.
 - Moving the focus only changes the circuit, without stopping the machine. Switching
   Neptunium on or off goes through a stop after the cycle, like Fermium.
-- `circuit` of the outputs must cover 1..N: the chances depend on the number of outputs, so
-  every output of the recipe has to be listed (outputs without `target` are fine).
 
 Saved addresses live in `/etc/qftctl.bindings`. Deleting that file is the same as
 `main setup --all`.
@@ -197,7 +197,7 @@ The configuration is two files. You edit them by hand; the program only reads th
 | File | What it holds |
 | --- | --- |
 | `config/components.lua` | Which components the setup needs and how to find them; the server, the name, Fluid Mode. |
-| `config/recipes.lua` | Which catalog recipes this QFT runs: trigger, catalysts, first targets and weights. |
+| `config/recipes.lua` | Which catalog recipes this QFT runs, and their catalysts. |
 
 ### Components
 
@@ -228,44 +228,37 @@ What a recipe takes and gives is not typed in: `qft/catalog.lua` holds every QFT
 modpack (inputs with their internal names, outputs in NEI order, the focus tier), generated
 from the GTNH calculator's data by `tools/qft-recipes.py` (run it again when the modpack moves
 on; recipes with an ore dictionary input are left out: a bus slot takes one item).
-`config/recipes.lua` picks the recipes this QFT runs by their catalog ids and says how:
+`config/recipes.lua` picks the recipes this QFT runs by their catalog ids and gives the number
+of catalysts in each one's bulk catalyst housing, the parallels (0: never run it):
 
 ```lua
-['molten_silicone_rubber'] = {
-    name = 'Rubber Polymer',   -- shown instead of the catalog's name (its first output)
-    trigger = 'deficit',
-    catalysts = 1,             -- catalysts in the bulk catalyst housing = parallels; 0 = never
-    countInputs = false,       -- supplied without limit: inputs not counted (deficit only)
-    outputs = {                -- by circuit = the output's place in the catalog (in NEI)
-        [1] = { target = 10e8, priority = 2 },
-        [4] = { target = 10e6 },   -- an output without a target is not tracked
-    },
-},
-['platinum_dust'] = {
-    name = 'Platinum Group',
-    trigger = 'surplus',
-    catalysts = 1,
-    outputs = { [1] = { weight = 100 }, [3] = { weight = 200 } },  -- no weight: not wanted
-},
+return {
+    ['molten_silicone_rubber'] = 1,
+    ['platinum_dust'] = 1,
+    ['inert_naquadah_dust'] = 16,
+}
 ```
 
-| Field | Trigger | Meaning |
-| --- | --- | --- |
-| `target` | deficit | Amount to keep in the products network. At least one output needs it. |
-| `priority` | deficit | Default 1. Higher means more urgent at the same fill level. |
-| `weight` | surplus | How much the output is wanted, for Neptunium. Only the ratio matters. |
+The rest is set on the QFT tab of the server, per recipe:
 
-With the factoryctl server these values are only the first ones: its settings (the QFT tab)
-replace them. Before a recipe starts, the stocking bus and hatch slots are set to its inputs.
-Inputs are counted (the recipe waits for stock for a cycle) unless `countInputs = false`; a
-surplus recipe always counts them. Outputs and inputs are found in the networks by their
-internal names, so a label that reads differently in game does not matter. In Fluid Mode
-(`fluidMode` in `config/components.lua`) a dust output with a molten form counts as that fluid
-(the catalog's `molten`, guessed from the label).
+| Setting | Meaning |
+| --- | --- |
+| trigger | `deficit` keeps products stocked: runs when a tracked output is below its target. `surplus` processes raw materials: runs while its inputs are in stock. |
+| count inputs | Deficit only. Off: the inputs are supplied without limit and not counted; on (the default) the recipe waits for stock for a cycle. A surplus recipe always counts them. |
+| `target` | Deficit. Amount to keep in the products network; an output without one is not tracked. |
+| `priority` | Deficit. Default 1. Higher means more urgent at the same fill level. |
+| `weight` | Surplus. How much the output is wanted, for Neptunium. Only the ratio matters; none = 0. |
+
+Before a recipe starts, the stocking bus and hatch slots are set to its inputs. Outputs and
+inputs are found in the networks by their internal names, so a label that reads differently in
+game does not matter. In Fluid Mode (`fluidMode` in `config/components.lua`) a dust output with
+a molten form counts as that fluid (the catalog's `molten`, guessed from the label).
 
 ### Adding a recipe
 
-Find its id in `qft/catalog.lua` and add an entry to `config/recipes.lua`. No new blocks.
+Find its id in `qft/catalog.lua`, add `['<id>'] = <catalysts>` to `config/recipes.lua` and
+restart the agent; the recipe shows on the QFT tab, where its trigger and targets or weights are
+set. No new blocks.
 
 ## Troubleshooting
 

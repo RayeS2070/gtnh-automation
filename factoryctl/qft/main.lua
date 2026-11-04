@@ -342,13 +342,10 @@ local settingsStore = {
     decode = serialization.unserialize,
 }
 
----The link to the factoryctl server, when components.server names one.
+---The link to the factoryctl server: the settings come from it. nil without an Internet Card.
 local function makeLink(components, recipes, mode)
-    if not components.server then
-        return nil
-    end
     if not component.isAvailable('internet') then
-        log.wrn('no Internet Card: running without the server')
+        log.err('no Internet Card: the settings come from the server, the QFT cannot run')
         return nil
     end
     local logs = logbuf.new()
@@ -381,7 +378,10 @@ local function run(components, recipes, mode, fixedMode)
     log.clock = computer.uptime
     -- Before the runner: saved settings of the server change the recipes and the mode.
     local l = makeLink(components, recipes, mode)
-    if l and not fixedMode then
+    if not l then
+        return
+    end
+    if not fixedMode then
         mode = l.settings.mode
     end
     local ctx = {
