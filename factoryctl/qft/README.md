@@ -157,7 +157,12 @@ Saved addresses live in `/etc/qftctl.bindings`. Deleting that file is the same a
    in alphabetical order of its path (`network.production`, `network.source`,
    `bus`, `controller`, `hatch`, `network.production`, ...). A component that is already bound and still present prints `ok` and
    is skipped; with `--all` every saved address is forgotten and everything is bound again.
-3. **Binding a component** — the program prints what it needs, for example:
+3. **Found by itself.** The stocking bus and the two stocking hatches (`bus`, `hatch`,
+   `plasma.hatch`) all stock from the raw materials network, so any hatch can serve as either.
+   When the computer sees exactly one stocking bus and two stocking hatches that no other
+   component holds, setup binds them on its own and prints `found`; which hatch gets which role
+   does not matter. If it sees more or fewer, it says how many it found and asks for them as below.
+4. **Binding a component** — the program prints what it needs, for example:
    ```
    [network.source] Fluid interface of the RAW MATERIALS network
      Connect the fluid_interface or me_controller now, or connect it and press Enter. [s] skip.
@@ -171,9 +176,9 @@ Saved addresses live in `/etc/qftctl.bindings`. Deleting that file is the same a
    Other keys while waiting:
    - **`s`** — skip this component, it stays unbound;
    - **Ctrl+C** — stop setup. Everything bound so far is kept.
-4. **Saving.** Each address is written to `/etc/qftctl.bindings` as soon as it is bound, so
+5. **Saving.** Each address is written to `/etc/qftctl.bindings` as soon as it is bound, so
    stopping or crashing halfway loses nothing.
-5. **Result.** At the end setup lists the components left unbound, if any. Run `main setup`
+6. **Result.** At the end setup lists the components left unbound, if any. Run `main setup`
    again to finish them.
 
 Safety checks during setup:

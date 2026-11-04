@@ -121,6 +121,27 @@ function setup.run(config, opts)
         end
     end
 
+    -- Auto slots first, all at once: which component goes where depends on how many there are.
+    local wanting, taken = {}, {}
+    for _, slot in ipairs(slots) do
+        local entry = saved[slot.path]
+        if store.isValid(entry, slot.binding) then
+            taken[entry.address] = true
+        elseif slot.binding.auto then
+            wanting[#wanting + 1] = slot
+        end
+    end
+    local picked, problems = bind.pickAuto(wanting, taken, function(ctype)
+        local out = {}
+        for address in component.list(ctype, true) do
+            out[#out + 1] = address
+        end
+        return out
+    end)
+    for _, problem in ipairs(problems) do
+        print('cannot find by itself, ' .. problem .. '; asking')
+    end
+
     local unbound = {}
     for _, slot in ipairs(slots) do
         local b = slot.binding
@@ -130,7 +151,15 @@ function setup.run(config, opts)
             print(('[%s] ok: %s'):format(slot.path, entry.address))
         else
             local used = usedAddresses(saved, slot.path)
-            local address, why = waitForManual(slot.path, b, used)
+            local address, why = picked[slot.path], nil
+            if address and used[address] then
+                address = nil -- a manual slot before it took it
+            end
+            if address then
+                print(('[%s] found: %s'):format(slot.path, address))
+            else
+                address, why = waitForManual(slot.path, b, used)
+            end
 
             if address then
                 saved[slot.path] = { address = address, type = component.type(address) }

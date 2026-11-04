@@ -356,6 +356,40 @@ do
     check(not pcall(bind.manual, { type = {}, prompt = 'x' }), 'an empty type list is refused')
 end
 
+-- bind.auto: the only components of a type fill its slots
+do
+    local cfg = {
+        bus = bind.auto { type = 'me_inputbus', prompt = 'bus' },
+        hatch = bind.auto { type = 'me_inputhatch', prompt = 'hatch' },
+        plasma = { hatch = bind.auto { type = 'me_inputhatch', prompt = 'plasma' } },
+    }
+    check(bind.auto { type = 'x', prompt = 'y' }.auto and not bind.manual { type = 'x', prompt = 'y' }.auto,
+        'auto is marked')
+    local seen = { me_inputbus = { 'b1' }, me_inputhatch = { 'h2', 'h1' } }
+    local function list(ctype) return seen[ctype] or {} end
+    local picked, problems = bind.pickAuto(bind.collect(cfg), {}, list)
+    check(picked.bus == 'b1', 'the only bus')
+    check(picked.hatch == 'h1', 'two hatches for two slots, by address')
+    check(picked['plasma.hatch'] == 'h2', '... the other one')
+    check(#problems == 0, 'no problems')
+
+    -- one hatch still bound: the other slot takes the free one
+    local slots = {}
+    for _, s in ipairs(bind.collect(cfg)) do
+        if s.path ~= 'hatch' then slots[#slots + 1] = s end
+    end
+    picked = bind.pickAuto(slots, { h1 = true }, list)
+    check(picked['plasma.hatch'] == 'h2', 'the free hatch, not the taken one')
+
+    -- a third hatch: no guessing
+    seen.me_inputhatch = { 'h1', 'h2', 'h3' }
+    picked, problems = bind.pickAuto(bind.collect(cfg), {}, list)
+    check(picked.hatch == nil and picked['plasma.hatch'] == nil, 'three hatches, two slots: asks')
+    check(picked.bus == 'b1', 'the bus is found anyway')
+    check(problems[1] and problems[1]:find('3 free me_inputhatch for 2 slot', 1, true),
+        'says why: ' .. tostring(problems[1]))
+end
+
 -- resource.identify and slots: what a stocking bus or hatch slot takes
 do
     local source = resource.snapshot({
