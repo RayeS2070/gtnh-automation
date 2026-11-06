@@ -3,8 +3,9 @@
 ---
 ---  controller   gt_machine at the BHC controller (its getName() has "blackhole")
 ---  redstone     Redstone I/O next to the Utility Hatch (pulse mode)
----  transposer   touches the supplies interface (items), the supplies tank, the catalyst
----               input bus and a spacetime hatch
+---  transposer   touches the supplies interface (seeds, collapsers) and the catalyst input bus
+---  hatch        me_inputhatch: a stocking hatch of the supplies subnet in a spacetime place;
+---               its slot set to spacetime is a hold
 ---  ingredients  ME component of the ingredients subnet: is there work
 ---  supplies     ME component of the supplies subnet: seeds, collapsers, spacetime
 local network = require('fc.network')
@@ -75,7 +76,9 @@ function rig.new(deps)
         end
         self[role .. 'Me'] = deps.proxy(address)
     end
-    for _, side in ipairs({ 'pulse', 'supplies', 'tank', 'bus', 'hatch' }) do
+    self.hatch = deps.proxy(one(deps.list, 'me_inputhatch', c.hatch, 'spacetime hatch'))
+    self.hatchSlot = c.hatchSlot or 1
+    for _, side in ipairs({ 'pulse', 'supplies', 'bus' }) do
         if type(c.sides) ~= 'table' or type(c.sides[side]) ~= 'number' then
             error(('config.lua: sides.%s is not set (bhc-dump shows the sides)'):format(side), 0)
         end
@@ -91,8 +94,8 @@ local function same(stack, want)
         and (want.damage == nil or stack.damage == want.damage)
 end
 
----Makes the supplies interface stock seeds, collapsers and spacetime (config.stock). Leaves a
----slot that holds something else alone. Returns false and why when it could not.
+---Makes the supplies interface stock seeds and collapsers (config.stock). Leaves a slot that
+---holds something else alone. Returns false and why when it could not.
 ---@param log table
 ---@return boolean, string?
 function rig:stock(log)
@@ -100,7 +103,7 @@ function rig:stock(log)
     if not c then
         return true
     end
-    if not (me.setInterfaceConfiguration and me.setFluidInterfaceConfiguration) then
+    if not me.setInterfaceConfiguration then
         return false, 'the supplies component is not an interface: stock it by hand'
     end
     local items = {
@@ -121,28 +124,50 @@ function rig:stock(log)
             log.inf('interface slot %d now stocks %d %ss', it.slot, it.size, it.what)
         end
     end
-    local name = self.config.spacetime or rig.kSpacetime
-    local now = me.getFluidInterfaceConfiguration(c.spacetimeSlot)
-    if same(now, { name = name }) then
-        return true
-    elseif type(now) == 'table' and now.name then
-        return false, ('fluid slot %d stocks %s, not spacetime: free it or change stock')
-            :format(c.spacetimeSlot, tostring(now.label or now.name))
-    end
-    -- throws "fluid not found" when the name is wrong
-    me.setFluidInterfaceConfiguration(c.spacetimeSlot, { name = name })
-    log.inf('interface fluid slot %d now stocks %s', c.spacetimeSlot, name)
     return true
+end
+
+---Readies the spacetime hatch: auto-pull off (it would set the slots itself), and tells whether
+---its slot holds spacetime now. Other slots must stay empty: anything there is drained too.
+---@param log table
+---@return boolean holding
+function rig:prepareHatch(log)
+    local h = self.hatch
+    if h.getAutoPull and h.getAutoPull() then
+        h.setAutoPull(false)
+        log.wrn('auto-pull of the spacetime hatch was on: turned off')
+    end
+    local name = self.config.spacetime or rig.kSpacetime
+    local holding = false
+    for slot = 1, h.getSlotSize and h.getSlotSize() or 1 do
+        local now = h.getConfiguration(slot)
+        if type(now) == 'table' and now.name then
+            if slot == self.hatchSlot and now.name == name then
+                holding = true
+            else
+                log.wrn('spacetime hatch slot %d stocks %s: it is not the agent\'s', slot,
+                    tostring(now.label or now.name))
+            end
+        end
+    end
+    return holding
+end
+
+---Sets (a hold at the next pulse) or clears the hatch slot. Throws "fluid not found" on a wrong
+---spacetime name.
+---@param on boolean
+function rig:hold(on)
+    if on then
+        local name = self.config.spacetime or rig.kSpacetime
+        self.hatch.setConfiguration(self.hatchSlot, { name = name })
+    else
+        self.hatch.setConfiguration(self.hatchSlot)
+    end
 end
 
 ---Is this redstone_changed signal the pulse's rising edge?
 function rig:isPulse(address, side, old, new)
     return address == self.redstone.address and side == self.sides.pulse and new > 0 and old == 0
-end
-
-function rig:level()
-    local n = self.transposer.getTankLevel(self.sides.hatch)
-    return math.floor(n or 0)
 end
 
 function rig:busy()
@@ -175,16 +200,20 @@ function rig:hasWork(now)
     return work
 end
 
+function rig:spacetime()
+    local fluid = self.suppliesMe.getFluidInNetwork(self.config.spacetime or rig.kSpacetime)
+    return fluid and math.floor(fluid.amount or 0) or 0
+end
+
 function rig:supplies()
     local function size(stack)
         return stack and math.floor(stack.size or 0) or 0
     end
-    local fluid = self.suppliesMe.getFluidInNetwork(self.config.spacetime or rig.kSpacetime)
     return {
         seeds = size(self.suppliesMe.getItemInNetwork(rig.kSeed.name, rig.kSeed.damage)),
         collapsers = size(self.suppliesMe.getItemInNetwork(rig.kCollapser.name,
             rig.kCollapser.damage)),
-        spacetime = fluid and math.floor(fluid.amount or 0) or 0,
+        spacetime = self:spacetime(),
     }
 end
 
@@ -207,10 +236,14 @@ end
 ---What the state machine sees now. Costly reads only where the phase needs them.
 ---@param pulse boolean
 ---@param phase bhc.Phase
+---@param holding boolean? # the slot is set: on a pulse, see what the supplies hold
 ---@return bhc.Observation
-function rig:observe(pulse, phase)
+function rig:observe(pulse, phase, holding)
     local now = self.deps.clock()
-    local obs = { now = now, pulse = pulse, level = self:level(), busy = self:busy() }
+    local obs = { now = now, pulse = pulse, busy = self:busy() }
+    if pulse and holding then
+        obs.spacetime = self:spacetime()
+    end
     obs.work = self:hasWork(now)
     if phase == 'idle' then
         obs.catalyst = self:catalyst()
@@ -252,28 +285,16 @@ function rig:apply(actions, s, hole, log)
             if moved ~= 1 then
                 log.wrn('no %s in the supplies interface to put in the bus', a.insert)
             end
-        elseif a.fill then
-            local before = self:level()
-            local need = a.fill - before
-            if need > 0 then
-                local _, moved = t.transferFluid(sides.tank, sides.hatch, need)
-                log.dbg('fill to %d L (%s, stability ~%d%s): hatch had %d, moved %s', a.fill,
-                    s.phase, hole.stability(s), s.unknown and (', probe ' .. tostring(s.probe))
-                    or '', before, tostring(moved))
+        elseif a.hold ~= nil then
+            local ok, err = pcall(self.hold, self, a.hold)
+            if ok then
+                hole.settle(s, a.hold)
+                log.dbg('hold %s (%s, stability ~%d, holds %d)', a.hold and 'on' or 'off',
+                    s.phase, hole.stability(s), s.holds)
+            else
+                log.wrn('spacetime hatch slot not %s: %s', a.hold and 'set' or 'cleared',
+                    tostring(err))
             end
-            local level = self:level()
-            hole.settle(s, level)
-            if level < a.fill then
-                log.wrn('spacetime hatch holds %d L of %d: the supplies tank is short', level,
-                    a.fill)
-            end
-        elseif a.empty then
-            local level = self:level()
-            if level > 0 then
-                local _, moved = t.transferFluid(sides.hatch, sides.tank, level)
-                log.dbg('empty %d L (%s): moved %s', level, s.phase, tostring(moved))
-            end
-            hole.settle(s, self:level())
         elseif a.clearBus then
             for slot = 1, t.getInventorySize(sides.bus) or 0 do
                 local stack = t.getStackInSlot(sides.bus, slot)

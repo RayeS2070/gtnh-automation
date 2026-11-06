@@ -61,6 +61,11 @@ local function main()
     if not okStock or not stocked then
         log.wrn('supplies interface not stocked: %s', tostring(okStock and why or stocked))
     end
+    local okHatch, holding = pcall(r.prepareHatch, r, log)
+    if not okHatch then
+        log.err('spacetime hatch: %s', tostring(holding))
+        return 1
+    end
     local cfg = settings()
     local path = config.statePath or store.defaultPath
 
@@ -75,6 +80,7 @@ local function main()
         log.inf('resumed %s, session %d, stability ~%d%s', s.phase, s.session,
             hole.stability(s), elapsed and '' or ' (time lost: winding down)')
     end
+    hole.settle(s, holding)
 
     local cost = store.newCost()
     local function save()
@@ -93,21 +99,21 @@ local function main()
 
     local function step(pulse)
         local phase = s.phase
-        local obs = r:observe(pulse, s.phase)
+        local obs = r:observe(pulse, s.phase, s.holding)
         local actions = hole.step(s, obs, cfg)
         r:apply(actions, s, hole, log)
         if pulse or s.phase ~= phase then
             save()
         end
         if pulse then
-            log.dbg('%s: stability ~%d, holds %d, hatch %d L, busy %s', s.phase,
-                hole.stability(s), s.holds, s.level or 0, tostring(obs.busy))
+            log.dbg('%s: stability ~%d, holds %d, holding %s, busy %s', s.phase,
+                hole.stability(s), s.holds, tostring(s.holding), tostring(obs.busy))
         end
     end
 
     local first = r:observe(false, s.phase)
-    log.inf('start: %s, hatch %d L, busy %s, work %s, catalyst in bus %s', s.phase, first.level,
-        tostring(first.busy), tostring(first.work), tostring(first.catalyst))
+    log.inf('start: %s, holding %s, busy %s, work %s, catalyst in bus %s', s.phase,
+        tostring(s.holding), tostring(first.busy), tostring(first.work), tostring(first.catalyst))
     log.inf('black hole agent; Ctrl+C to stop')
     local nextCheck = 0
     while true do
@@ -129,6 +135,12 @@ local function main()
     end
 
     pcall(r.controller.setWorkAllowed, false)
+    -- A slot left set would drain the supplies at a cost doubling every 30 s.
+    if pcall(r.hold, r, false) then
+        hole.settle(s, false)
+    else
+        log.err('the spacetime hatch slot may still be set: clear it by hand')
+    end
     if s.phase ~= hole.Phase.kIdle then
         log.wrn('stopped with the hole %s at stability ~%d: work is stopped, nothing holds it',
             s.phase, hole.stability(s))

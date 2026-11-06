@@ -40,7 +40,7 @@ end
 ---A BHC as the source has it, one second per tick() call.
 local function newMachine(opts)
     local m = {
-        status = 1, stab = 100, mod = 1, counter = 0, hatch = 0, bus = {}, allowed = false,
+        status = 1, stab = 100, mod = 1, counter = 0, slot = nil, bus = {}, allowed = false,
         recipe = nil, jobs = opts.jobs or 0, duration = opts.duration or 20,
         done = 0, voided = 0, seeds = opts.seeds or 5, collapsers = opts.collapsers or 5,
         spacetime = opts.spacetime or 100000, drained = 0, pulse = false,
@@ -80,8 +80,8 @@ local function newMachine(opts)
         end
         self.pulse = false
         if self.status ~= 1 then
-            if self.stab > 0 and self.hatch >= self.mod then
-                self.hatch = self.hatch - self.mod
+            if self.stab > 0 and self.slot == 'molten.spacetime' and self.spacetime >= self.mod then
+                self.spacetime = self.spacetime - self.mod
                 self.drained = self.drained + self.mod
                 self.counter = self.counter + 1
                 if self.counter >= 30 then
@@ -106,25 +106,22 @@ end
 local kSeed, kCollapser = 32418, 32419
 
 local function deps(m, clock)
-    local sides = { pulse = 1, supplies = 2, tank = 3, bus = 4, hatch = 5 }
+    local sides = { pulse = 1, supplies = 2, bus = 4 }
+    local hatch = {
+        getAutoPull = function() return m.autoPull or false end,
+        setAutoPull = function(v) m.autoPull = v end,
+        getSlotSize = function() return 16 end,
+        getConfiguration = function(slot)
+            return slot == 1 and m.slot and { name = m.slot } or nil
+        end,
+        setConfiguration = function(slot, detail)
+            assert(slot == 1)
+            m.slot = detail and detail.name or nil
+            m.slotWrites = (m.slotWrites or 0) + 1
+            return true
+        end,
+    }
     local transposer = {
-        getTankLevel = function(side)
-            if side == sides.hatch then return m.hatch end
-            if side == sides.tank then return m.spacetime end
-            return 0
-        end,
-        transferFluid = function(src, dst, n)
-            if src == sides.tank and dst == sides.hatch then
-                n = math.min(n, m.spacetime)
-                m.spacetime, m.hatch = m.spacetime - n, m.hatch + n
-            elseif src == sides.hatch and dst == sides.tank then
-                n = math.min(n, m.hatch)
-                m.spacetime, m.hatch = m.spacetime + n, m.hatch - n
-            else
-                return false, 0
-            end
-            return true, n
-        end,
         getInventorySize = function(side)
             return side == sides.bus and 4 or side == sides.supplies and 2 or 0
         end,
@@ -174,9 +171,9 @@ local function deps(m, clock)
         getFluidInNetwork = function() return { amount = m.spacetime } end,
     }
     local byAddress = { ['bhc-1'] = controller, ['rs-1'] = { address = 'rs-1' },
-        ['tp-1'] = transposer, ['ing-1'] = ingredients, ['sup-1'] = supplies }
+        ['tp-1'] = transposer, ['ing-1'] = ingredients, ['sup-1'] = supplies, ['mh-1'] = hatch }
     local byKind = { gt_machine = { ['bhc-1'] = 'gt_machine' }, redstone = { ['rs-1'] = 'redstone' },
-        transposer = { ['tp-1'] = 'transposer' },
+        transposer = { ['tp-1'] = 'transposer' }, me_inputhatch = { ['mh-1'] = 'me_inputhatch' },
         me_interface = { ['ing-1'] = 'me_interface', ['sup-1'] = 'me_interface' } }
     return {
         list = function(kind) return byKind[kind] or {} end,
@@ -194,6 +191,7 @@ local function run(m, s, seconds, opts)
     opts = opts or {}
     local now = opts.start or 0
     local r = rig.new(deps(m, function() return now end))
+    hole.settle(s, r:prepareHatch(log))
     local lowest = 100
     local unsafe = 0
     for _ = 1, seconds do
@@ -206,9 +204,9 @@ local function run(m, s, seconds, opts)
             lowest = m.stab
         end
         if not opts.agentDown then
-            r:apply(hole.step(s, r:observe(m.pulse, s.phase), kCfg), s, hole, log)
+            r:apply(hole.step(s, r:observe(m.pulse, s.phase, s.holding), kCfg), s, hole, log)
             now = now + 0.001
-            r:apply(hole.step(s, r:observe(false, s.phase), kCfg), s, hole, log)
+            r:apply(hole.step(s, r:observe(false, s.phase, s.holding), kCfg), s, hole, log)
         end
     end
     return { lowest = lowest, unsafe = unsafe, rig = r }
@@ -225,7 +223,7 @@ do
     check(m.status == 1 and s.phase == 'idle', 'closed at the end: ' .. s.phase)
     check(res.lowest >= kCfg.holdAt - 1, 'held near holdAt, lowest ' .. res.lowest)
     check(m.seeds == 4 and m.collapsers == 4, 'one seed and one collapser')
-    check(m.hatch == 0 and #m.bus == 0, 'hatch and bus left empty')
+    check(m.slot == nil and #m.bus == 0, 'hatch slot cleared, bus empty')
     check(m.drained == hole.total(s.holds) and s.spent == m.drained,
         ('spent what the holds cost: %d / %d'):format(m.drained, hole.total(s.holds)))
     check(#warnings == 0, 'no warnings: ' .. table.concat(warnings, '; '))
@@ -301,18 +299,52 @@ do
     check(m.status == 1, 'foreign hole closed')
 end
 
--- An unstable hole found with a recipe running: the machine takes nothing, the offer stops.
+-- An unstable hole found with a recipe running: held to its end (nothing is drained at 0), closed.
 do
     warnings = {}
-    local m = newMachine({ jobs = 1, duration = 200 })
+    local m = newMachine({ duration = 200 })
     m.status, m.stab, m.allowed = 3, -50, true
-    m.jobs = 0
-    m.recipe = { left = 200, void = true }
+    m.recipe = { left = 60, void = true }
     local s = hole.new()
-    run(m, s, 60)
-    check(m.hatch == 0 and m.spacetime == 100000, ('unstable hole: nothing poured (hatch %d, %d L)')
-        :format(m.hatch, 100000 - m.spacetime))
-    check(#warnings >= 1, 'unstable hole: warned')
+    run(m, s, 120)
+    check(m.drained == 0 and m.slot == nil, 'unstable hole: nothing drained, slot cleared')
+    check(m.status == 1 and s.phase == 'idle', 'unstable hole closed')
+end
+
+-- The hatch as a previous run or the player left it: auto-pull on, our slot set, hole closed.
+do
+    warnings = {}
+    local m = newMachine({})
+    m.autoPull, m.slot = true, 'molten.spacetime'
+    local s = hole.new()
+    run(m, s, 3)
+    check(not m.autoPull and m.slot == nil and not s.holding, 'auto-pull off, slot cleared')
+end
+
+-- Supplies fall below minSpacetime while holding: no new work, the running recipe is finished.
+do
+    warnings = {}
+    local m = newMachine({ jobs = 30, duration = 20, spacetime = 60 })
+    local s = hole.new()
+    kCfg.minSpacetime = 40
+    local res = run(m, s, 400)
+    kCfg.minSpacetime = 1000
+    check(res.unsafe == 0, 'dry supplies: nothing runs unstable, lowest ' .. res.lowest)
+    check(s.spent == m.drained, ('dry supplies: counted right (%d/%d)'):format(s.spent, m.drained))
+    check(m.jobs > 0 and m.status == 1, 'dry supplies: no new work, closed')
+end
+
+-- Supplies empty under a long recipe: the missed holds are seen and counted as such.
+do
+    warnings = {}
+    local m = newMachine({ jobs = 1, duration = 150, spacetime = 35 })
+    local s = hole.new()
+    kCfg.minSpacetime = 10
+    run(m, s, 300)
+    kCfg.minSpacetime = 1000
+    check(s.spent == m.drained, ('empty supplies: counted right (%d/%d)'):format(s.spent, m.drained))
+    check(#warnings > 0, 'empty supplies: warned')
+    check(m.status == 1, 'empty supplies: closed')
 end
 
 -- A seed nobody takes (wrong bus): back to idle, the bus is cleared, tried again.
@@ -337,21 +369,16 @@ end
 do
     local m = newMachine({})
     local d = deps(m, function() return 0 end)
-    local cfgItems, cfgFluids, sets = {}, {}, 0
+    local cfgItems, sets = {}, 0
     local sup = d.proxy('sup-1')
     sup.getInterfaceConfiguration = function(slot) return cfgItems[slot] end
     sup.setInterfaceConfiguration = function(slot, t) cfgItems[slot] = t; sets = sets + 1 end
-    sup.getFluidInterfaceConfiguration = function(slot) return cfgFluids[slot] end
-    sup.setFluidInterfaceConfiguration = function(slot, t)
-        cfgFluids[slot] = { name = t.name, amount = 8000 }; sets = sets + 1
-    end
-    d.config.stock = { seedSlot = 1, seeds = 2, collapserSlot = 2, collapsers = 2,
-        spacetimeSlot = 1 }
+    d.config.stock = { seedSlot = 1, seeds = 2, collapserSlot = 2, collapsers = 2 }
     local r = rig.new(d)
-    check(r:stock(log) and sets == 3, 'stocks the empty slots')
+    check(r:stock(log) and sets == 2, 'stocks the empty slots')
     check(cfgItems[1].damage == kSeed and cfgItems[2].damage == kCollapser
-        and cfgItems[2].size == 2 and cfgFluids[1].name == 'molten.spacetime', 'stocks the right things')
-    check(r:stock(log) and sets == 3, 'leaves a right config alone')
+        and cfgItems[2].size == 2, 'stocks the right things')
+    check(r:stock(log) and sets == 2, 'leaves a right config alone')
     cfgItems[2] = { name = 'minecraft:stone', damage = 0, size = 64 }
     local ok, why = r:stock(log)
     check(not ok and why:find('slot 2') and cfgItems[2].name == 'minecraft:stone',

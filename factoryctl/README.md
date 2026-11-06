@@ -327,14 +327,21 @@ over, and takes the spacetime left in the hatch back. Work is gated with `setWor
 stays off while the hole is closed, so the stocking bus may keep auto-pull on.
 
 **Hardware**: an Adapter on the controller; a Redstone I/O at the Black Hole Utility Hatch in pulse
-mode (its pulse is the machine's second); a transposer touching an interface of the supplies
-subnet (seeds and collapsers in its slots), a tank of spacetime (a dual or fluid interface), a
-plain input bus of the BHC used only for catalysts, and one spacetime hatch; an Adapter on an
-ME part of each subnet — ingredients (behind the BHC's stocking bus/hatch) and supplies
-(spacetime, seeds, collapsers, kept stocked by the player). Before a hole opens the agent checks
-there is a seed, a collapser and `minSpacetime`. One dual interface may serve as both the item
-and the fluid side; if the supplies Adapter sits on it, the agent sets its stocking at start
-(`stock` in config.lua: slots and counts; a slot holding something else is left alone).
+mode (its pulse is the machine's second); an ME stocking input hatch of the supplies subnet in a
+spacetime place of the structure, auto-pull off and its slots empty: the agent sets one slot to
+spacetime for a hold and clears it after (the machine then drains the network itself; a plain
+input hatch can be filled from outside but not emptied); a transposer touching an interface of
+the supplies subnet (seeds and collapsers in its slots) and a plain input bus of the BHC used
+only for catalysts; an Adapter on an ME part of each subnet — ingredients (behind the BHC's
+stocking bus/hatch) and supplies (spacetime, seeds, collapsers, kept stocked by the player).
+Before a hole opens the agent checks there is a seed, a collapser and `minSpacetime`; below
+`minSpacetime` it takes no new work. If the supplies Adapter sits on the interface, the agent
+sets its stocking of seeds and collapsers at start (`stock` in config.lua; a slot holding
+something else is left alone).
+
+A slot left set drains the supplies at a cost doubling every 30 s: the agent clears it on start
+and on Ctrl+C, but not if the computer dies. Keep only a bounded amount of spacetime in the
+supplies subnet.
 
 ```
 gtnh-install factoryctl
@@ -344,7 +351,6 @@ cd bhc && edit config.lua && main
 
 The session state is written to `bhc/state.dat` every pulse: after a restart the agent counts on
 from it (the gap by uptime, or by world time after a reboot); with the time lost it trusts
-nothing, holds the running recipe, finds the spacetime cost by doubling what it offers, and
-closes. Ctrl+C stops work; the running recipe is not held any more.
+nothing, holds the running recipe to its end and closes. Ctrl+C stops work; the running recipe is not held any more.
 
 Local tests against a fake BHC that follows the source: `cd bhc && lua tests/run.lua`.

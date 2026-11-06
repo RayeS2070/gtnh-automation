@@ -1,6 +1,7 @@
 ---What OC sees around a Pseudostable Black Hole Containment Field, for setting up the black hole
 ---agent. Changes nothing (no transfers, no setWorkAllowed).
----  bhc-dump                 components, sides of the transposer and Redstone I/O, supplies lookups
+---  bhc-dump                 components, stocking hatches, sides of the transposer and Redstone
+---                           I/O, supplies lookups
 ---  bhc-dump --watch=60      then for 60 s: every redstone change and the transposer's tanks
 ---                           once a second (compare with the stability in WAILA)
 ---  bhc-dump --out=/home/bhc-dump.txt   also write everything to a file
@@ -70,6 +71,20 @@ for address in component.list('redstone', true) do
             tostring(try(p.getInput, side)))
     end
     say('%s  inputs: %s', address, table.concat(inputs, ', '))
+end
+
+say('== me_inputhatch (the spacetime hatch is one of them: auto-pull off, slots empty)')
+for address in component.list('me_inputhatch', true) do
+    local p = component.proxy(address)
+    local slots = {}
+    for slot = 1, try(p.getSlotSize) or 16 do
+        local fluid = try(p.getConfiguration, slot)
+        if type(fluid) == 'table' and fluid.name then
+            slots[#slots + 1] = ('%d=%s'):format(slot, tostring(fluid.name))
+        end
+    end
+    say('%s  auto-pull %s, slots: %s', address, tostring(try(p.getAutoPull)),
+        #slots > 0 and table.concat(slots, ' ') or 'empty')
 end
 
 local transposers = {}

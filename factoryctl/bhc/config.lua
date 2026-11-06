@@ -8,6 +8,11 @@ return {
     controller = nil,
     redstone = nil,
     transposer = nil,
+    -- The spacetime hatch: an ME stocking input hatch of the supplies subnet in a spacetime place
+    -- of the structure, auto-pull off, all slots empty (the agent sets and clears `hatchSlot`).
+    -- The stocking hatch of the ingredients is an me_inputhatch too: give this one's prefix.
+    hatch = nil,
+    hatchSlot = 1,
     -- The two subnets look alike to OC: both must be given (fluid_interface, me_controller or
     -- me_interface of each).
     ingredients = 'e721', -- what the recipes eat, behind the stocking bus/hatch of the BHC
@@ -16,21 +21,18 @@ return {
     sides = {
         pulse = sides.bottom,   -- of the Redstone I/O: the Utility Hatch
         supplies = sides.east,  -- of the transposer: the supplies interface, seeds and collapsers
-        tank = sides.east,      -- of the transposer: where spacetime comes from and goes back to
         bus = sides.west,       -- of the transposer: a plain input bus of the BHC, for catalysts
-        hatch = sides.south,    -- of the transposer: a spacetime hatch
     },
     -- The spacetime fluid's internal name.
     spacetime = 'molten.spacetime',
-    -- What the agent makes the supplies interface stock at start (slots from 1; a fluid slot
-    -- always holds 8000 L). A slot holding something else is left alone. nil: stocked by hand.
+    -- What the agent makes the supplies interface stock at start (slots from 1). A slot holding
+    -- something else is left alone. nil: stocked by hand.
     stock = {
         seedSlot = 1, seeds = 2,
         collapserSlot = 2, collapsers = 2,
-        spacetimeSlot = 1,
     },
     -- Stability at which holding starts: below 20 the parallels are x4 already, so lower is
-    -- cheaper; the gap to 0 is the margin for a missed fill.
+    -- cheaper; the gap to 0 is the margin for a missed pulse.
     holdAt = 5,
     -- Work stops if the stability gets this low anyway.
     floor = 2,
