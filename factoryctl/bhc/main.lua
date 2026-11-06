@@ -34,7 +34,7 @@ local kFailuresToStopBeat = 5 -- failed steps in a row that stop the heartbeat: 
 
 local function settings()
     return {
-        holdAt = config.holdAt or 5,
+        holdAt = config.holdAt or 20,
         floor = config.floor or 2,
         maxHolds = config.maxHolds or 120,
         minSpacetime = config.minSpacetime or 10000,
@@ -101,7 +101,7 @@ local function main()
 
     local function step(pulse)
         local phase = s.phase
-        local obs = r:observe(pulse, s.phase, s.holding)
+        local obs = r:observe(pulse, s.phase)
         local actions = hole.step(s, obs, cfg)
         r:apply(actions, s, hole, log)
         if pulse or s.phase ~= phase then

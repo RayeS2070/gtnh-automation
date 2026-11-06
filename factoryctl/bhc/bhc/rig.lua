@@ -237,12 +237,11 @@ end
 ---What the state machine sees now. Costly reads only where the phase needs them.
 ---@param pulse boolean
 ---@param phase bhc.Phase
----@param holding boolean? # the slot is set: on a pulse, see what the supplies hold
 ---@return bhc.Observation
-function rig:observe(pulse, phase, holding)
+function rig:observe(pulse, phase)
     local now = self.deps.clock()
     local obs = { now = now, pulse = pulse, busy = self:busy() }
-    if pulse and holding then
+    if pulse and phase ~= 'idle' then -- every hold is measured by the supplies' loss
         obs.spacetime = self:spacetime()
     end
     obs.work = self:hasWork(now)

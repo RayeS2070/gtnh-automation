@@ -321,14 +321,22 @@ A hole lives 100 s, losing 1 % stability a second; at 0 it is unstable and voids
 while a new recipe would still start. Below 20 % the parallels are ×4, and spacetime in the
 hatches behind the lasers stops the loss — at a cost that doubles every 30 s held. So the agent:
 opens a hole with a seed when the ingredients subnet has something; lets it fall to `holdAt`
-(5 %: 20 → 5 is free and already ×4); holds it there while work goes on, up to `maxHolds`; holds
-a running recipe to its end in any case; then stops work, puts a collapser in once the recipe is
-over, and takes the spacetime left in the hatch back. Work is gated with `setWorkAllowed`: it
+(20 %: above the longest recipe, so a missed hold still lets the running one end); holds it there
+while work goes on, up to `maxHolds`; holds a running recipe to its end in any case; then stops
+work and puts a collapser in once the recipe is over. Work is gated with `setWorkAllowed`: it
 stays off while the hole is closed, so the stocking bus may keep auto-pull on.
+
+No hold is taken on trust: on every pulse the supplies must have lost exactly its cost, and one
+test hold on the first pulse proves the hatch, its place and the network at 99 %. A hold that
+went wrong (nothing drained, or the supplies lost another amount) stops new work — the running
+recipe is still held — and no new hole is opened until the agent is restarted: whatever is wrong
+would burn a seed and a collapser per hole. Nothing else may take spacetime from the supplies
+subnet, or fill it, while a hole is open.
 
 **Hardware**: an Adapter on the controller; a Redstone I/O at the Black Hole Utility Hatch in pulse
 mode (its pulse is the machine's second); an ME stocking input hatch of the supplies subnet in a
-spacetime place of the structure, auto-pull off and its slots empty: the agent sets one slot to
+place behind a laser (hint 2 of the structure: a hatch elsewhere is a recipe input, and the
+recipes would eat the spacetime), auto-pull off and its slots empty: the agent sets one slot to
 spacetime for a hold and clears it after (the machine then drains the network itself; a plain
 input hatch can be filled from outside but not emptied); a transposer touching an interface of
 the supplies subnet (seeds and collapsers in its slots) and a plain input bus of the BHC used
@@ -353,6 +361,7 @@ cd bhc && edit config.lua && main
 
 The session state is written to `bhc/state.dat` every pulse: after a restart the agent counts on
 from it (the gap by uptime, or by world time after a reboot); with the time lost it trusts
-nothing, holds the running recipe to its end and closes. Ctrl+C stops work; the running recipe is not held any more.
+nothing, holds the running recipe to its end and closes. Ctrl+C stops work; the running recipe
+is not held any more.
 
 Local tests against a fake BHC that follows the source: `cd bhc && lua tests/run.lua`.

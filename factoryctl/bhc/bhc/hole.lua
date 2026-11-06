@@ -10,6 +10,10 @@
 --- * The spacetime hatch here is a stocking hatch on the supplies subnet: with its slot set to
 ---   spacetime the machine drains the network itself (MTEHatchInputME.drain outside a recipe), so
 ---   a hold is the slot set before a pulse. A plain input hatch cannot be emptied from outside.
+---   Only hatches behind the lasers (hint 2 of the structure) hold; elsewhere a hatch is a recipe
+---   input, so the slot set there feeds the recipes instead.
+--- * A hold is never assumed: the supplies must lose exactly its cost by the next pulse. One test
+---   hold at opening proves the whole path (place, network, toggle bus, fluid name) at 99.
 --- * At stability 0 the hole is unstable: running recipes are voided, and a new recipe still
 ---   starts. So work is never allowed there.
 local hole = {}
@@ -24,7 +28,8 @@ hole.Phase = {
 }
 
 ---@class bhc.Settings
----@field holdAt integer # stability at which holding starts (below 20 the parallels are x4)
+---@field holdAt integer # stability at which holding starts: above the longest recipe, in s,
+---                      # so that the running one ends after a missed hold
 ---@field floor integer # never let it lower: stop work if a hold failed and it got here
 ---@field maxHolds integer # holds per session for new work; a running recipe is held anyway
 ---@field minSpacetime integer # L of spacetime in supplies to open a hole and to take new work
@@ -39,8 +44,9 @@ hole.Phase = {
 ---@field lastPulse number? # agent clock of the last pulse
 ---@field since number? # agent clock when the phase started
 ---@field holding boolean? # the stocking slot is set: the next pulse is a hold
----@field short boolean? # the supplies cannot pay the next hold
+---@field spacetime integer? # L in supplies at the last pulse: what a hold is measured from
 ---@field low boolean? # the supplies are below minSpacetime: no new work
+---@field blocked boolean? # a hold went wrong: no new hole until the agent restarts
 ---@field spent integer # L of spacetime drained by the machine this session
 ---@field session integer # sessions opened, for the log
 
@@ -73,7 +79,7 @@ end
 ---@class bhc.Observation
 ---@field now number # agent clock, s
 ---@field pulse boolean # this step is a pulse (rising edge of the Utility Hatch)
----@field spacetime integer? # L in supplies, read on pulses while holding
+---@field spacetime integer? # L in supplies, read on pulses while the hole is open
 ---@field busy boolean # a recipe runs
 ---@field work boolean # the ingredients subnet has something
 ---@field supplies { seeds: integer, collapsers: integer, spacetime: integer }? # read when idle
@@ -115,27 +121,62 @@ local function feed(s, obs, cfg, closing, out)
     setHold(s, wantsHold(s, obs, cfg, closing), out)
 end
 
----Accounts a pulse: was it a hold? With the count lost the cost is not known, so neither is the
----stability: only `holds` and `pulses` are kept as they come.
+---Accounts a pulse by what the supplies lost since the last one: exactly the cost is a hold,
+---less is a missed one, more is a hold with something else using the supplies. Returns false
+---when anything but exactly the cost was lost. With the count lost the cost is not known, so
+---neither is the stability: any loss is taken as a hold.
 local function count(s, obs, cfg, out)
+    local stable = hole.stability(s) > 0 -- before this pulse: the machine drains only then
     s.pulses = s.pulses + 1
     s.lastPulse = obs.now
-    if not s.holding or not s.unknown and hole.stability(s) <= 0 then
-        return -- no drain on an unstable hole
+    local before, now = s.spacetime, obs.spacetime
+    s.spacetime = now
+    if now then
+        s.low = now < cfg.minSpacetime or nil
+    end
+    if not s.holding or before == nil or now == nil then
+        return true -- no hold due, or nothing to measure it by (after a restart): taken as none
+    end
+    local lost = before - now
+    if s.unknown then
+        if lost > 0 then
+            s.holds, s.spent = s.holds + 1, s.spent + lost
+        end
+        return true
+    end
+    if not stable then
+        return true -- no drain on an unstable hole
     end
     local cost = hole.cost(s.holds)
-    if s.short and not s.unknown then
-        s.short = obs.spacetime ~= nil and obs.spacetime < cost or nil
-        out[#out + 1] = { warn = ('supplies held less than the %d L of the hold: missed'):format(
-            cost) }
-        return
+    if lost >= cost then
+        -- The machine pays all or nothing: more than the cost is the hold and someone else.
+        s.holds, s.spent = s.holds + 1, s.spent + cost
+        if lost == cost then
+            return true
+        end
+        out[#out + 1] = { warn = ('the supplies lost %d L in a hold of %d L: something else uses'
+            .. ' them'):format(lost, cost) }
+        return false
     end
-    s.holds = s.holds + 1
-    s.spent = s.spent + cost
-    -- What is left after this drain pays the next hold or not.
-    s.short = obs.spacetime ~= nil and obs.spacetime < hole.cost(s.holds) or nil
-    if obs.spacetime then
-        s.low = obs.spacetime < cfg.minSpacetime or nil
+    local why
+    if lost ~= 0 then
+        why = ('the supplies lost %d L, less than the %d L of the hold: something else uses them')
+            :format(lost, cost)
+    elseif s.holds == 0 then
+        why = 'the spacetime hatch drained nothing: is it behind a laser (hint 2 of the'
+            .. ' structure)? Is it connected, is the spacetime there?'
+    else
+        why = ('hold %d of %d L missed: the supplies lost nothing'):format(s.holds + 1, cost)
+    end
+    out[#out + 1] = { warn = why }
+    return false
+end
+
+---A hold went wrong: what is wrong stays so, and a hole each time would burn the catalysts.
+local function block(s, out)
+    if not s.blocked then
+        s.blocked = true
+        out[#out + 1] = { warn = 'no new hole until the agent is restarted' }
     end
 end
 
@@ -161,7 +202,7 @@ function hole.step(s, obs, cfg)
     -- A pulse in any phase means the hole is open.
     if obs.pulse and (s.phase == P.kIdle) then
         s.unknown = true
-        s.pulses, s.holds, s.spent = 0, 0, 0
+        s.pulses, s.holds, s.spent, s.spacetime = 0, 0, 0, nil
         enter(s, P.kClosing, obs.now)
         out[#out + 1] = { allow = false }
         out[#out + 1] = { warn = 'the hole is open but the agent did not open it: winding down' }
@@ -175,9 +216,12 @@ function hole.step(s, obs, cfg)
             out[#out + 1] = { clearBus = true }
             return out
         end
+        if s.blocked then
+            return out
+        end
         if obs.work and suppliesOk(obs.supplies, cfg) then
             s.session = s.session + 1
-            s.pulses, s.holds, s.spent, s.unknown, s.short, s.low = 0, 0, 0, nil, nil, nil
+            s.pulses, s.holds, s.spent, s.unknown, s.spacetime, s.low = 0, 0, 0, nil, nil, nil
             enter(s, P.kOpening, obs.now)
             out[#out + 1] = { insert = 'seed' }
             out[#out + 1] = { allow = true }
@@ -194,7 +238,7 @@ function hole.step(s, obs, cfg)
             enter(s, P.kOpen, obs.now)
             count(s, obs, cfg, out)
             out[#out + 1] = { info = ('session %d: open'):format(s.session) }
-            feed(s, obs, cfg, false, out)
+            setHold(s, not s.unknown, out) -- the test hold
         elseif obs.now - s.since > cfg.catalystTimeout then
             enter(s, P.kIdle, obs.now)
             out[#out + 1] = { allow = false }
@@ -217,11 +261,17 @@ function hole.step(s, obs, cfg)
         return out
     end
 
-    count(s, obs, cfg, out)
+    local held = count(s, obs, cfg, out)
+    if not held then
+        block(s, out)
+    end
     local stab = hole.stability(s)
 
     if s.phase == P.kOpen then
-        if s.unknown or not wantsHold(s, obs, cfg, false) and stab <= cfg.holdAt then
+        if not held then
+            enter(s, P.kClosing, obs.now) -- the running recipe is still held: the miss may pass
+            out[#out + 1] = { allow = false }
+        elseif s.unknown or not wantsHold(s, obs, cfg, false) and stab <= cfg.holdAt then
             enter(s, P.kClosing, obs.now)
             out[#out + 1] = { allow = false }
         elseif stab <= cfg.floor then
@@ -281,6 +331,7 @@ end
 ---@param elapsed number?
 function hole.resume(s, elapsed)
     local P = hole.Phase
+    s.blocked = nil -- what blocked the old run may be fixed now
     if s.phase == P.kIdle then
         return
     end
@@ -292,6 +343,7 @@ function hole.resume(s, elapsed)
     end
     s.lastPulse = nil
     s.since = nil
+    s.spacetime = nil -- the gap may have holds in it
 end
 
 return hole

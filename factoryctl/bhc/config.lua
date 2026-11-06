@@ -35,9 +35,9 @@ return {
         seedSlot = 1, seeds = 2,
         collapserSlot = 2, collapsers = 2,
     },
-    -- Stability at which holding starts: below 20 the parallels are x4 already, so lower is
-    -- cheaper; the gap to 0 is the margin for a missed pulse.
-    holdAt = 5,
+    -- Stability at which holding starts. Lower is cheaper, but a missed hold leaves only this many
+    -- seconds to the running recipe: keep it above the longest recipe (Eternal Singularity: 20 s).
+    holdAt = 20,
     -- Work stops if the stability gets this low anyway.
     floor = 2,
     -- Holds per session while there is new work; a running recipe is held to its end anyway.

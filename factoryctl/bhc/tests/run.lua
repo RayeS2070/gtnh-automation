@@ -80,7 +80,8 @@ local function newMachine(opts)
         end
         self.pulse = false
         if self.status ~= 1 then
-            if self.stab > 0 and self.slot == 'molten.spacetime' and self.spacetime >= self.mod then
+            if self.stab > 0 and self.slot == 'molten.spacetime' and self.spacetime >= self.mod
+                and not self.recipePlace then
                 self.spacetime = self.spacetime - self.mod
                 self.drained = self.drained + self.mod
                 self.counter = self.counter + 1
@@ -183,7 +184,7 @@ local function deps(m, clock)
     }
 end
 
-local kCfg = { holdAt = 5, floor = 2, maxHolds = 120, minSpacetime = 1000, pulseTimeout = 2.5,
+local kCfg = { holdAt = 20, floor = 2, maxHolds = 120, minSpacetime = 1000, pulseTimeout = 2.5,
     catalystTimeout = 10 }
 
 ---Runs agent and machine together for `seconds`; one pulse step and one plain step a second.
@@ -204,9 +205,9 @@ local function run(m, s, seconds, opts)
             lowest = m.stab
         end
         if not opts.agentDown then
-            r:apply(hole.step(s, r:observe(m.pulse, s.phase, s.holding), kCfg), s, hole, log)
+            r:apply(hole.step(s, r:observe(m.pulse, s.phase), kCfg), s, hole, log)
             now = now + 0.001
-            r:apply(hole.step(s, r:observe(false, s.phase, s.holding), kCfg), s, hole, log)
+            r:apply(hole.step(s, r:observe(false, s.phase), kCfg), s, hole, log)
         end
     end
     return { lowest = lowest, unsafe = unsafe, rig = r }
@@ -375,6 +376,48 @@ do
     check(s.phase ~= 'open', 'not open without the machine')
     run(m, s, 3)
     check(#m.bus <= 1, 'never two catalysts in the bus')
+end
+
+-- The spacetime hatch in a recipe place: the test hold at opening drains nothing, so no work is
+-- taken past the first recipe, and the hole is closed long before it decays.
+do
+    warnings = {}
+    local m = newMachine({ jobs = 10, duration = 20 })
+    m.recipePlace = true
+    local s = hole.new()
+    local res = run(m, s, 60)
+    check(m.voided == 0 and res.unsafe == 0, 'hatch misplaced: nothing voided')
+    check(m.done == 1 and m.status == 1, ('hatch misplaced: one recipe, closed (%d done)')
+        :format(m.done))
+    check(warnings[1] and warnings[1]:find('hint 2', 1, true), 'hatch misplaced: told where to put'
+        .. ' it: ' .. tostring(warnings[1]))
+    check(m.seeds == 4 and s.blocked, 'hatch misplaced: no second hole, blocked')
+    -- The player moves the hatch and restarts the agent.
+    m.recipePlace = nil
+    hole.resume(s, 1)
+    run(m, s, 400, { start = 100 })
+    check(m.done == 10 and m.voided == 0 and m.status == 1, ('hatch fixed: all done after the'
+        .. ' restart (%d)'):format(m.done))
+end
+
+-- Something else takes spacetime from the supplies mid-session: no new work, nothing voided.
+do
+    warnings = {}
+    local m = newMachine({ jobs = 10, duration = 20 })
+    local tick, seconds = m.tick, 0
+    m.tick = function(self)
+        seconds = seconds + 1
+        if seconds == 110 then
+            self.spacetime = self.spacetime - 72
+        end
+        tick(self)
+    end
+    local s = hole.new()
+    local res = run(m, s, 300)
+    check(m.voided == 0 and res.unsafe == 0, 'foreign drain: nothing voided')
+    check(m.done < 10 and m.status == 1, 'foreign drain: work stopped, closed')
+    check(#warnings == 2 and warnings[1]:find('something else', 1, true),
+        'foreign drain: warned: ' .. table.concat(warnings, '; '))
 end
 
 -- Stocking the supplies interface: fills empty slots, keeps what is right, never overwrites.
