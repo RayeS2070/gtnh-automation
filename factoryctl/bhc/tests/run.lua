@@ -319,6 +319,32 @@ do
     check(#m.bus <= 1, 'never two catalysts in the bus')
 end
 
+-- Stocking the supplies interface: fills empty slots, keeps what is right, never overwrites.
+do
+    local m = newMachine({})
+    local d = deps(m, function() return 0 end)
+    local cfgItems, cfgFluids, sets = {}, {}, 0
+    local sup = d.proxy('sup-1')
+    sup.getInterfaceConfiguration = function(slot) return cfgItems[slot] end
+    sup.setInterfaceConfiguration = function(slot, t) cfgItems[slot] = t; sets = sets + 1 end
+    sup.getFluidInterfaceConfiguration = function(slot) return cfgFluids[slot] end
+    sup.setFluidInterfaceConfiguration = function(slot, t)
+        cfgFluids[slot] = { name = t.name, amount = 8000 }; sets = sets + 1
+    end
+    d.config.stock = { seedSlot = 1, seeds = 2, collapserSlot = 2, collapsers = 2,
+        spacetimeSlot = 1 }
+    local r = rig.new(d)
+    check(r:stock(log) and sets == 3, 'stocks the empty slots')
+    check(cfgItems[1].damage == kSeed and cfgItems[2].damage == kCollapser
+        and cfgItems[2].size == 2 and cfgFluids[1].name == 'molten.spacetime', 'stocks the right things')
+    check(r:stock(log) and sets == 3, 'leaves a right config alone')
+    cfgItems[2] = { name = 'minecraft:stone', damage = 0, size = 64 }
+    local ok, why = r:stock(log)
+    check(not ok and why:find('slot 2') and cfgItems[2].name == 'minecraft:stone',
+        'keeps a foreign item: ' .. tostring(why))
+    d.config.stock = nil
+end
+
 if failures == 0 then
     print('all bhc tests passed')
 else

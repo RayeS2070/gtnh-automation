@@ -22,6 +22,13 @@ return {
     },
     -- The spacetime fluid's internal name.
     spacetime = 'molten.spacetime',
+    -- What the agent makes the supplies interface stock at start (slots from 1; a fluid slot
+    -- always holds 8000 L). A slot holding something else is left alone. nil: stocked by hand.
+    stock = {
+        seedSlot = 1, seeds = 2,
+        collapserSlot = 2, collapsers = 2,
+        spacetimeSlot = 1,
+    },
     -- Stability at which holding starts: below 20 the parallels are x4 already, so lower is
     -- cheaper; the gap to 0 is the margin for a missed fill.
     holdAt = 5,

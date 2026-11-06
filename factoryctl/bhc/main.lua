@@ -57,6 +57,10 @@ local function main()
         log.err('%s', tostring(r))
         return 1
     end
+    local okStock, stocked, why = pcall(r.stock, r, log)
+    if not okStock or not stocked then
+        log.wrn('supplies interface not stocked: %s', tostring(okStock and why or stocked))
+    end
     local cfg = settings()
     local path = config.statePath or store.defaultPath
 

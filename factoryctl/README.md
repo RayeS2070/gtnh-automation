@@ -332,7 +332,9 @@ subnet (seeds and collapsers in its slots), a tank of spacetime (a dual or fluid
 plain input bus of the BHC used only for catalysts, and one spacetime hatch; an Adapter on an
 ME part of each subnet — ingredients (behind the BHC's stocking bus/hatch) and supplies
 (spacetime, seeds, collapsers, kept stocked by the player). Before a hole opens the agent checks
-there is a seed, a collapser and `minSpacetime`.
+there is a seed, a collapser and `minSpacetime`. One dual interface may serve as both the item
+and the fluid side; if the supplies Adapter sits on it, the agent sets its stocking at start
+(`stock` in config.lua: slots and counts; a slot holding something else is left alone).
 
 ```
 gtnh-install factoryctl

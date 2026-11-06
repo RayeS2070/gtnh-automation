@@ -86,6 +86,55 @@ function rig.new(deps)
     return self
 end
 
+local function same(stack, want)
+    return type(stack) == 'table' and stack.name == want.name
+        and (want.damage == nil or stack.damage == want.damage)
+end
+
+---Makes the supplies interface stock seeds, collapsers and spacetime (config.stock). Leaves a
+---slot that holds something else alone. Returns false and why when it could not.
+---@param log table
+---@return boolean, string?
+function rig:stock(log)
+    local me, c = self.suppliesMe, self.config.stock
+    if not c then
+        return true
+    end
+    if not (me.setInterfaceConfiguration and me.setFluidInterfaceConfiguration) then
+        return false, 'the supplies component is not an interface: stock it by hand'
+    end
+    local items = {
+        { what = 'seed', want = rig.kSeed, slot = c.seedSlot, size = c.seeds },
+        { what = 'collapser', want = rig.kCollapser, slot = c.collapserSlot,
+            size = c.collapsers },
+    }
+    for _, it in ipairs(items) do
+        local now = me.getInterfaceConfiguration(it.slot)
+        if same(now, it.want) and math.floor(now.size or 0) == it.size then
+            -- as it should be
+        elseif type(now) == 'table' and now.name and not same(now, it.want) then
+            return false, ('interface slot %d stocks %s, not %ss: free it or change stock')
+                :format(it.slot, tostring(now.label or now.name), it.what)
+        else
+            me.setInterfaceConfiguration(it.slot, { name = it.want.name, damage = it.want.damage,
+                size = it.size })
+            log.inf('interface slot %d now stocks %d %ss', it.slot, it.size, it.what)
+        end
+    end
+    local name = self.config.spacetime or rig.kSpacetime
+    local now = me.getFluidInterfaceConfiguration(c.spacetimeSlot)
+    if same(now, { name = name }) then
+        return true
+    elseif type(now) == 'table' and now.name then
+        return false, ('fluid slot %d stocks %s, not spacetime: free it or change stock')
+            :format(c.spacetimeSlot, tostring(now.label or now.name))
+    end
+    -- throws "fluid not found" when the name is wrong
+    me.setFluidInterfaceConfiguration(c.spacetimeSlot, { name = name })
+    log.inf('interface fluid slot %d now stocks %s', c.spacetimeSlot, name)
+    return true
+end
+
 ---Is this redstone_changed signal the pulse's rising edge?
 function rig:isPulse(address, side, old, new)
     return address == self.redstone.address and side == self.sides.pulse and new > 0 and old == 0
