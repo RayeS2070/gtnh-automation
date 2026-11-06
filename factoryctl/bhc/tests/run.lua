@@ -347,6 +347,18 @@ do
     check(m.status == 1, 'empty supplies: closed')
 end
 
+-- Restarted in each phase with the clocks gone, the hole meanwhile closed: no error, back to idle.
+for _, phase in ipairs({ 'opening', 'open', 'closing', 'collapsing' }) do
+    warnings = {}
+    local m = newMachine({})
+    local s = hole.new()
+    s.phase, s.session, s.since, s.lastPulse = phase, 1, 12345, 12345
+    hole.resume(s, 30)
+    local ok, err = pcall(run, m, s, 20)
+    check(ok, ('resumed in %s: %s'):format(phase, tostring(err)))
+    check(s.phase == 'idle', ('resumed in %s on a closed hole: idle, is %s'):format(phase, s.phase))
+end
+
 -- A seed nobody takes (wrong bus): back to idle, the bus is cleared, tried again.
 do
     warnings = {}

@@ -124,7 +124,7 @@ local function main()
         if beatSide and now >= nextBeat and failures < kFailuresToStopBeat then
             beatHigh = not beatHigh
             nextBeat = now + beatHalf
-            pcall(r.redstone.setOutput, beatSide, beatHigh and 15 or 0)
+            pcall(r.redstone.setOutput, beatSide, beatHigh and 255 or 0)
         end
     end
 

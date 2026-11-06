@@ -152,6 +152,11 @@ end
 function hole.step(s, obs, cfg)
     local out = {}
     local P = hole.Phase
+    if s.phase ~= P.kIdle then
+        -- After a restart the old clock means nothing: time the phase and the pulses from now.
+        s.since = s.since or obs.now
+        s.lastPulse = s.lastPulse or obs.now
+    end
 
     -- A pulse in any phase means the hole is open.
     if obs.pulse and (s.phase == P.kIdle) then
