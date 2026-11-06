@@ -160,8 +160,12 @@ local function deps(m, clock)
         setWorkAllowed = function(v) m.allowed = v end,
     }
     local ingredients = {
-        getItemsInNetwork = function() return m.jobs > 0 and { { size = m.jobs } } or {} end,
-        getFluidsInNetwork = function() return {} end,
+        getItemInNetwork = function(name)
+            return name == 'job:item' and m.jobs > 0 and { size = m.jobs } or nil
+        end,
+        getFluidInNetwork = function(name)
+            return name == 'molten.spacetime' and { amount = m.ingredientFluid or 0 } or nil
+        end,
     }
     local supplies = {
         getItemInNetwork = function(_, damage)
@@ -178,7 +182,8 @@ local function deps(m, clock)
     return {
         list = function(kind) return byKind[kind] or {} end,
         proxy = function(address) return byAddress[address] end,
-        config = { ingredients = 'ing', supplies = 'sup', sides = sides, workEvery = 0 },
+        config = { ingredients = 'ing', supplies = 'sup', sides = sides, workEvery = 0,
+            work = { { { item = 'job:item', amount = 1 } } } },
         clock = clock,
     }
 end
@@ -357,6 +362,21 @@ for _, phase in ipairs({ 'opening', 'open', 'closing', 'collapsing' }) do
     local ok, err = pcall(run, m, s, 20)
     check(ok, ('resumed in %s: %s'):format(phase, tostring(err)))
     check(s.phase == 'idle', ('resumed in %s on a closed hole: idle, is %s'):format(phase, s.phase))
+end
+
+-- Strict work: less than a recipe in the subnet is no work, enough is.
+do
+    warnings = {}
+    local m = newMachine({})
+    local d = deps(m, function() return 0 end)
+    d.config.work = { { { fluid = 'molten.spacetime', amount = 72 } } }
+    local r = rig.new(d)
+    m.ingredientFluid = 71
+    check(not r:hasWork(0), 'strict work: 71 L is no work')
+    m.ingredientFluid = 72
+    check(r:hasWork(1), 'strict work: 72 L is work')
+    d.config.work = {}
+    check(not pcall(rig.new, d), 'strict work: an empty list is refused')
 end
 
 -- A seed nobody takes (wrong bus): back to idle, the bus is cleared, tried again.

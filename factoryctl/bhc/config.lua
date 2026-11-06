@@ -22,7 +22,7 @@ return {
         pulse = sides.bottom,   -- of the Redstone I/O: the Utility Hatch
         supplies = sides.east,  -- of the transposer: the supplies interface, seeds and collapsers
         bus = sides.west,       -- of the transposer: a plain input bus of the BHC, for catalysts
-        heartbeat = sides.top,  -- of the Redstone I/O: a square wave while the agent works (nil: off)
+        heartbeat = sides.top,  -- of the Redstone I/O: a square wave while the agent runs (nil: off)
     },
     -- s of the heartbeat's period: 255 for half of it, 0 for the other half. A watchdog should
     -- allow a few periods: a slow step or a disk write may delay a beat.
@@ -45,6 +45,12 @@ return {
     maxHolds = 120,
     -- Spacetime the supplies must have to open a hole, L.
     minSpacetime = 10000,
+    -- What counts as work: a hole is opened, and held for new work, only while the ingredients
+    -- subnet has all the inputs of one of these recipes. Inputs: { fluid = 'name', amount = L }
+    -- or { item = 'mod:name', damage = N, amount = N }. Anything else in the subnet is ignored.
+    work = {
+        { { fluid = 'molten.spacetime', amount = 72 } }, -- Eternal Singularity
+    },
     -- s between looks at the ingredients subnet.
     workEvery = 5,
     -- nil: /home/factoryctl/bhc/state.dat
