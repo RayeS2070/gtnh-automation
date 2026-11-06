@@ -311,3 +311,38 @@ OpenComputers mining system for the same modules: the parameter names on 2.9, th
 pitfalls of loading, the asteroid dump. No code of it is used; the asteroid dump is copied as it
 is (the repository is public domain).
 
+
+### Black hole agent (`bhc/`)
+
+Runs the black hole of a Pseudostable Black Hole Containment Field. It decides on its own, once a
+second: the server is not in the loop yet (planned: it keeps the session state and shows it).
+
+A hole lives 100 s, losing 1 % stability a second; at 0 it is unstable and voids running recipes,
+while a new recipe would still start. Below 20 % the parallels are ×4, and spacetime in the
+hatches behind the lasers stops the loss — at a cost that doubles every 30 s held. So the agent:
+opens a hole with a seed when the ingredients subnet has something; lets it fall to `holdAt`
+(5 %: 20 → 5 is free and already ×4); holds it there while work goes on, up to `maxHolds`; holds
+a running recipe to its end in any case; then stops work, puts a collapser in once the recipe is
+over, and takes the spacetime left in the hatch back. Work is gated with `setWorkAllowed`: it
+stays off while the hole is closed, so the stocking bus may keep auto-pull on.
+
+**Hardware**: an Adapter on the controller; a Redstone I/O at the Black Hole Utility Hatch in pulse
+mode (its pulse is the machine's second); a transposer touching an interface of the supplies
+subnet (seeds and collapsers in its slots), a tank of spacetime (a dual or fluid interface), a
+plain input bus of the BHC used only for catalysts, and one spacetime hatch; an Adapter on an
+ME part of each subnet — ingredients (behind the BHC's stocking bus/hatch) and supplies
+(spacetime, seeds, collapsers, kept stocked by the player). Before a hole opens the agent checks
+there is a seed, a collapser and `minSpacetime`.
+
+```
+gtnh-install factoryctl
+cd /home/factoryctl && bhc/tools/bhc-dump.lua --watch=30   # addresses, sides, the pulse
+cd bhc && edit config.lua && main
+```
+
+The session state is written to `bhc/state.dat` every pulse: after a restart the agent counts on
+from it (the gap by uptime, or by world time after a reboot); with the time lost it trusts
+nothing, holds the running recipe, finds the spacetime cost by doubling what it offers, and
+closes. Ctrl+C stops work; the running recipe is not held any more.
+
+Local tests against a fake BHC that follows the source: `cd bhc && lua tests/run.lua`.

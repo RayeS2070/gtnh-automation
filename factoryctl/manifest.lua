@@ -1,7 +1,7 @@
 -- Files installed by tools/gtnh-install.lua: the in-game agents; the server is not for OC.
 -- Installed into /home/factoryctl. The crafting agent runs from agent/, the pumping agent from
--- pumps/, the QFT agent from qft/, the mining agent from mining/ (they take the shared fc/
--- modules from ../agent).
+-- pumps/, the QFT agent from qft/, the mining agent from mining/, the black hole agent from bhc/
+-- (they take the shared fc/ modules from ../agent).
 return {
     code = {
         'agent/main.lua',
@@ -40,6 +40,11 @@ return {
         'mining/mm/module.lua',
         'mining/tools/mining-dump.lua', -- what the mining agent sees in game; changes nothing
         'nac/tools/nac-dump.lua', -- what OC sees of a Nanochip Assembly Complex; changes nothing
+        'bhc/main.lua',
+        'bhc/bhc/hole.lua',
+        'bhc/bhc/rig.lua',
+        'bhc/bhc/store.lua',
+        'bhc/tools/bhc-dump.lua', -- what OC sees around a black hole compressor; changes nothing
     },
     config = {
         'agent/config.lua',
@@ -47,7 +52,8 @@ return {
         'mining/config.lua',
         'qft/config/components.lua',
         'qft/config/catalysts.lua',
+        'bhc/config.lua',
     },
     run = 'cd agent && main   (pumping: cd pumps && main; QFT: cd qft && main setup;'
-        .. ' mining: cd mining && main)',
+        .. ' mining: cd mining && main; black hole: cd bhc && main)',
 }

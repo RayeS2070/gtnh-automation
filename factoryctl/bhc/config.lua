@@ -1,0 +1,39 @@
+-- The black hole agent's settings: what this computer has. Edited by hand; `gtnh-install
+-- factoryctl` keeps it unless --config is given. bhc-dump shows the addresses and the sides.
+return {
+    -- Address prefixes. nil: the only component of its kind (a BHC controller is found by its
+    -- name among the gt_machine adapters).
+    controller = nil,
+    redstone = nil,
+    transposer = nil,
+    -- The two subnets look alike to OC: both must be given (fluid_interface, me_controller or
+    -- me_interface of each).
+    ingredients = nil, -- what the recipes eat, behind the stocking bus/hatch of the BHC
+    supplies = nil,    -- spacetime, seeds and collapsers
+    -- Sides (sides.* numbers, 0 bottom, 1 top, 2 north, 3 south, 4 west, 5 east).
+    sides = {
+        pulse = nil,    -- of the Redstone I/O: the Utility Hatch
+        supplies = nil, -- of the transposer: the supplies interface, seeds and collapsers in it
+        tank = nil,     -- of the transposer: where spacetime comes from and goes back to
+        bus = nil,      -- of the transposer: a plain input bus of the BHC, only for catalysts
+        hatch = nil,    -- of the transposer: a spacetime hatch (behind a laser)
+    },
+    -- The spacetime fluid's internal name.
+    spacetime = 'molten.spacetime',
+    -- Stability at which holding starts: below 20 the parallels are x4 already, so lower is
+    -- cheaper; the gap to 0 is the margin for a missed fill.
+    holdAt = 5,
+    -- Work stops if the stability gets this low anyway.
+    floor = 2,
+    -- Holds per session while there is new work; a running recipe is held to its end anyway.
+    -- 120 holds cost 450 L; every 30 more double the cost per second.
+    maxHolds = 120,
+    -- Spacetime the supplies must have to open a hole, L.
+    minSpacetime = 10000,
+    -- s between looks at the ingredients subnet.
+    workEvery = 5,
+    -- nil: /home/factoryctl/bhc/state.dat
+    statePath = nil,
+    -- 'dbg' shows every pulse; 'inf' only what happens.
+    logLevel = 'inf',
+}
