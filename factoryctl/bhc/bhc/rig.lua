@@ -6,8 +6,7 @@
 ---  transposer   touches the supplies interface (seeds, collapsers) and the catalyst input bus
 ---  hatch        me_inputhatch: a stocking hatch of the supplies subnet in a spacetime place;
 ---               its slot set to spacetime is a hold
----  ingredients  ME component of the ingredients subnet: is there enough for a recipe of
----               config.work
+---  ingredients  ME component of the ingredients subnet: is there work
 ---  supplies     ME component of the supplies subnet: seeds, collapsers, spacetime
 local network = require('fc.network')
 
@@ -86,17 +85,6 @@ function rig.new(deps)
         end
     end
     self.sides = c.sides
-    if type(c.work) ~= 'table' or #c.work == 0 then
-        error('config.lua: work lists no recipe: the agent opens a hole only for one of them', 0)
-    end
-    for i, recipe in ipairs(c.work) do
-        for _, input in ipairs(recipe) do
-            if not (input.fluid or input.item) or (input.amount or 1) < 1 then
-                error(('config.lua: work[%d]: an input needs fluid or item and an amount')
-                    :format(i), 0)
-            end
-        end
-    end
     self.workCheckedAt = nil
     self.work = false
     return self
@@ -187,32 +175,24 @@ function rig:busy()
     return (self.controller.getWorkMaxProgress() or 0) > 0
 end
 
----How much of one input the ingredients subnet has.
-local function have(me, input)
-    if input.fluid then
-        local f = me.getFluidInNetwork(input.fluid)
-        return f and math.floor(f.amount or 0) or 0
-    end
-    local stack = me.getItemInNetwork(input.item, input.damage or 0)
-    return stack and math.floor(stack.size or 0) or 0
-end
-
----Is there enough for at least one recipe of `config.work`? Read at most every `workEvery` s.
+---Anything in the ingredients subnet; read at most every `workEvery` s.
 function rig:hasWork(now)
     if self.workCheckedAt and now - self.workCheckedAt < self.config.workEvery then
         return self.work
     end
     self.workCheckedAt = now
+    local items = self.ingredientsMe.getItemsInNetwork() or {}
+    local fluids = self.ingredientsMe.getFluidsInNetwork and self.ingredientsMe.getFluidsInNetwork()
+        or {}
     local work = false
-    for _, recipe in ipairs(self.config.work) do
-        local enough = true
-        for _, input in ipairs(recipe) do
-            if have(self.ingredientsMe, input) < (input.amount or 1) then
-                enough = false
-                break
-            end
+    for _, stack in ipairs(items) do
+        if (stack.size or 0) > 0 then
+            work = true
+            break
         end
-        if enough then
+    end
+    for _, stack in ipairs(fluids) do
+        if (stack.amount or 0) > 0 then
             work = true
             break
         end

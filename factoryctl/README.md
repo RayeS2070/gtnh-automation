@@ -320,9 +320,8 @@ second: the server is not in the loop yet (planned: it keeps the session state a
 A hole lives 100 s, losing 1 % stability a second; at 0 it is unstable and voids running recipes,
 while a new recipe would still start. Below 20 % the parallels are ×4, and spacetime in the
 hatches behind the lasers stops the loss — at a cost that doubles every 30 s held. So the agent:
-opens a hole with a seed when the ingredients subnet has all the inputs of one recipe listed in
-`work` (config.lua; anything else there is ignored, and less than a recipe is no work); lets it
-fall to `holdAt` (5 %: 20 → 5 is free and already ×4); holds it there while work goes on, up to `maxHolds`; holds
+opens a hole with a seed when the ingredients subnet has something; lets it fall to `holdAt`
+(5 %: 20 → 5 is free and already ×4); holds it there while work goes on, up to `maxHolds`; holds
 a running recipe to its end in any case; then stops work, puts a collapser in once the recipe is
 over, and takes the spacetime left in the hatch back. Work is gated with `setWorkAllowed`: it
 stays off while the hole is closed, so the stocking bus may keep auto-pull on.
