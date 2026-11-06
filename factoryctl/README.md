@@ -341,7 +341,9 @@ something else is left alone).
 
 A slot left set drains the supplies at a cost doubling every 30 s: the agent clears it on start
 and on Ctrl+C, but not if the computer dies. Keep only a bounded amount of spacetime in the
-supplies subnet.
+supplies subnet, and/or use the heartbeat: while the agent works, the Redstone I/O puts a square
+wave on `sides.heartbeat` (period `heartbeatEvery`, 1 s); it stops on Ctrl+C and after 5 failed
+steps in a row (the hold is let go then too). A watchdog on it can cut the spacetime hatch off.
 
 ```
 gtnh-install factoryctl

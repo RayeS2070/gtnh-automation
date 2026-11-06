@@ -22,7 +22,11 @@ return {
         pulse = sides.bottom,   -- of the Redstone I/O: the Utility Hatch
         supplies = sides.east,  -- of the transposer: the supplies interface, seeds and collapsers
         bus = sides.west,       -- of the transposer: a plain input bus of the BHC, for catalysts
+        heartbeat = sides.top,  -- of the Redstone I/O: a square wave while the agent works (nil: off)
     },
+    -- s of the heartbeat's period: 15 for half of it, 0 for the other half. A watchdog should
+    -- allow a few periods: a slow step or a disk write may delay a beat.
+    heartbeatEvery = 1,
     -- The spacetime fluid's internal name.
     spacetime = 'molten.spacetime',
     -- What the agent makes the supplies interface stock at start (slots from 1). A slot holding

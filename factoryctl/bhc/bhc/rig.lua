@@ -68,7 +68,8 @@ function rig.new(deps)
 
     for _, role in ipairs({ 'ingredients', 'supplies' }) do
         if not c[role] then
-            error(('config.lua: %s must be an address prefix: two subnets look alike'):format(role), 0)
+            error(('config.lua: %s must be an address prefix: two subnets look alike')
+                :format(role), 0)
         end
         local address, kind = network.find(deps.list, c[role])
         if not address then

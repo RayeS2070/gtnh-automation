@@ -29,6 +29,8 @@ local config = require('config')
 local kIdleEvery = 5      -- s between checks while closed
 local kOpenEvery = 0.5    -- s: how soon a missing pulse is noticed
 local kCostReportEvery = 300 -- saves between reports of what a save costs
+local kFailuresToStopBeat = 5 -- failed steps in a row that stop the heartbeat: a stuck agent
+                              -- must not keep the watchdog quiet
 
 local function settings()
     return {
@@ -114,26 +116,59 @@ local function main()
     local first = r:observe(false, s.phase)
     log.inf('start: %s, holding %s, busy %s, work %s, catalyst in bus %s', s.phase,
         tostring(s.holding), tostring(first.busy), tostring(first.work), tostring(first.catalyst))
+    -- Heartbeat: a square wave on a side of the Redstone I/O while the agent runs, for a hardware
+    -- watchdog that cuts the spacetime hatch off when it stops.
+    local beatSide, beatHalf = config.sides.heartbeat, (config.heartbeatEvery or 1) / 2
+    local beatHigh, nextBeat, failures = false, 0, 0
+    local function beat(now)
+        if beatSide and now >= nextBeat and failures < kFailuresToStopBeat then
+            beatHigh = not beatHigh
+            nextBeat = now + beatHalf
+            pcall(r.redstone.setOutput, beatSide, beatHigh and 15 or 0)
+        end
+    end
+
     log.inf('black hole agent; Ctrl+C to stop')
     local nextCheck = 0
     while true do
-        local wait = s.phase == hole.Phase.kIdle and kIdleEvery or kOpenEvery
+        local every = s.phase == hole.Phase.kIdle and kIdleEvery or kOpenEvery
+        local wait = math.min(every, math.max(0.05, nextCheck - computer.uptime()))
+        if beatSide then
+            wait = math.min(wait, math.max(0.05, nextBeat - computer.uptime()))
+        end
         local name, address, side, old, new = event.pull(wait)
         if name == 'interrupted' then
             break
         end
+        beat(computer.uptime())
         local pulse = name == 'redstone_changed' and r:isPulse(address, side, old, new)
         local now = computer.uptime()
         if pulse or now >= nextCheck then
-            nextCheck = now + wait
+            nextCheck = now + every
             -- A bug in a step must not kill the agent; the traceback says where it was.
             local okStep, why = xpcall(step, debug.traceback, pulse)
-            if not okStep then
+            if okStep then
+                failures = 0
+            else
+                failures = failures + 1
                 log.err('step failed: %s', tostring(why))
+                if failures == kFailuresToStopBeat then
+                    log.err('%d steps failed in a row: the heartbeat stops, the hold is let go',
+                        failures)
+                    if pcall(r.hold, r, false) then
+                        hole.settle(s, false)
+                    end
+                    if beatSide then
+                        pcall(r.redstone.setOutput, beatSide, 0)
+                    end
+                end
             end
         end
     end
 
+    if beatSide then
+        pcall(r.redstone.setOutput, beatSide, 0)
+    end
     pcall(r.controller.setWorkAllowed, false)
     -- A slot left set would drain the supplies at a cost doubling every 30 s.
     if pcall(r.hold, r, false) then
