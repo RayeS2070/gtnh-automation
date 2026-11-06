@@ -1,5 +1,7 @@
 -- The black hole agent's settings: what this computer has. Edited by hand; `gtnh-install
 -- factoryctl` keeps it unless --config is given. bhc-dump shows the addresses and the sides.
+local sides = require 'sides'
+
 return {
     -- Address prefixes. nil: the only component of its kind (a BHC controller is found by its
     -- name among the gt_machine adapters).
@@ -8,15 +10,15 @@ return {
     transposer = nil,
     -- The two subnets look alike to OC: both must be given (fluid_interface, me_controller or
     -- me_interface of each).
-    ingredients = nil, -- what the recipes eat, behind the stocking bus/hatch of the BHC
-    supplies = nil,    -- spacetime, seeds and collapsers
+    ingredients = 'e721', -- what the recipes eat, behind the stocking bus/hatch of the BHC
+    supplies = '99eb',    -- spacetime, seeds and collapsers
     -- Sides (sides.* numbers, 0 bottom, 1 top, 2 north, 3 south, 4 west, 5 east).
     sides = {
-        pulse = nil,    -- of the Redstone I/O: the Utility Hatch
-        supplies = nil, -- of the transposer: the supplies interface, seeds and collapsers in it
-        tank = nil,     -- of the transposer: where spacetime comes from and goes back to
-        bus = nil,      -- of the transposer: a plain input bus of the BHC, only for catalysts
-        hatch = nil,    -- of the transposer: a spacetime hatch (behind a laser)
+        pulse = sides.bottom,   -- of the Redstone I/O: the Utility Hatch
+        supplies = sides.east,  -- of the transposer: the supplies interface, seeds and collapsers
+        tank = sides.east,      -- of the transposer: where spacetime comes from and goes back to
+        bus = sides.west,       -- of the transposer: a plain input bus of the BHC, for catalysts
+        hatch = sides.south,    -- of the transposer: a spacetime hatch
     },
     -- The spacetime fluid's internal name.
     spacetime = 'molten.spacetime',

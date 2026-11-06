@@ -135,8 +135,11 @@ local function deps(m, clock)
                     return { name = 'gregtech:gt.metaitem.01',
                         damage = slot == 1 and kSeed or kCollapser, size = count }
                 end
+            elseif side == sides.bus and slot == 4 then
+                return { name = 'gregtech:gt.integrated_circuit', damage = 1, size = 1 }
             elseif side == sides.bus and m.bus[slot] then
-                return { name = 'gregtech:gt.metaitem.01', size = 1 }
+                return { name = 'gregtech:gt.metaitem.01',
+                    damage = m.bus[slot] == 'seed' and kSeed or kCollapser, size = 1 }
             end
         end,
         transferItem = function(src, dst, n, slot)

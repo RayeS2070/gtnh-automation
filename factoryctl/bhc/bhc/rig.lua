@@ -139,11 +139,16 @@ function rig:supplies()
     }
 end
 
+local function isCatalyst(stack)
+    return stack and (stack.size or 0) > 0 and stack.name == rig.kSeed.name
+        and (stack.damage == rig.kSeed.damage or stack.damage == rig.kCollapser.damage)
+end
+
+---A seed or collapser in the bus; anything else there (a circuit) is not ours.
 function rig:catalyst()
     local t, side = self.transposer, self.sides.bus
     for slot = 1, t.getInventorySize(side) or 0 do
-        local stack = t.getStackInSlot(side, slot)
-        if stack and (stack.size or 0) > 0 then
+        if isCatalyst(t.getStackInSlot(side, slot)) then
             return true
         end
     end
@@ -218,7 +223,7 @@ function rig:apply(actions, s, hole, log)
         elseif a.clearBus then
             for slot = 1, t.getInventorySize(sides.bus) or 0 do
                 local stack = t.getStackInSlot(sides.bus, slot)
-                if stack and (stack.size or 0) > 0 then
+                if isCatalyst(stack) then
                     t.transferItem(sides.bus, sides.supplies, stack.size, slot)
                 end
             end
