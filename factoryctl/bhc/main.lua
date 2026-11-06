@@ -153,8 +153,10 @@ local function main()
                 failures = failures + 1
                 log.err('step failed: %s', tostring(why))
                 if failures == kFailuresToStopBeat then
-                    log.err('%d steps failed in a row: the heartbeat stops, the hold is let go',
-                        failures)
+                    log.err('%d steps failed in a row: work stopped, the hold let go, the heartbeat'
+                        .. ' stops', failures)
+                    -- Nobody counts the pulses now: no recipe may start on a hole left to decay.
+                    pcall(r.controller.setWorkAllowed, false)
                     if pcall(r.hold, r, false) then
                         hole.settle(s, false)
                     end
