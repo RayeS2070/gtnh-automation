@@ -253,9 +253,13 @@ function rig:apply(actions, s, hole, log)
                 log.wrn('no %s in the supplies interface to put in the bus', a.insert)
             end
         elseif a.fill then
-            local need = a.fill - self:level()
+            local before = self:level()
+            local need = a.fill - before
             if need > 0 then
-                t.transferFluid(sides.tank, sides.hatch, need)
+                local _, moved = t.transferFluid(sides.tank, sides.hatch, need)
+                log.dbg('fill to %d L (%s, stability ~%d%s): hatch had %d, moved %s', a.fill,
+                    s.phase, hole.stability(s), s.unknown and (', probe ' .. tostring(s.probe))
+                    or '', before, tostring(moved))
             end
             local level = self:level()
             hole.settle(s, level)
@@ -266,7 +270,8 @@ function rig:apply(actions, s, hole, log)
         elseif a.empty then
             local level = self:level()
             if level > 0 then
-                t.transferFluid(sides.hatch, sides.tank, level)
+                local _, moved = t.transferFluid(sides.hatch, sides.tank, level)
+                log.dbg('empty %d L (%s): moved %s', level, s.phase, tostring(moved))
             end
             hole.settle(s, self:level())
         elseif a.clearBus then

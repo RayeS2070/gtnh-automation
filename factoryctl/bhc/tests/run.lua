@@ -301,6 +301,20 @@ do
     check(m.status == 1, 'foreign hole closed')
 end
 
+-- An unstable hole found with a recipe running: the machine takes nothing, the offer stops.
+do
+    warnings = {}
+    local m = newMachine({ jobs = 1, duration = 200 })
+    m.status, m.stab, m.allowed = 3, -50, true
+    m.jobs = 0
+    m.recipe = { left = 200, void = true }
+    local s = hole.new()
+    run(m, s, 60)
+    check(m.hatch == 0 and m.spacetime == 100000, ('unstable hole: nothing poured (hatch %d, %d L)')
+        :format(m.hatch, 100000 - m.spacetime))
+    check(#warnings >= 1, 'unstable hole: warned')
+end
+
 -- A seed nobody takes (wrong bus): back to idle, the bus is cleared, tried again.
 do
     warnings = {}

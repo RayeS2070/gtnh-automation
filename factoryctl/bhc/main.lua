@@ -105,6 +105,9 @@ local function main()
         end
     end
 
+    local first = r:observe(false, s.phase)
+    log.inf('start: %s, hatch %d L, busy %s, work %s, catalyst in bus %s', s.phase, first.level,
+        tostring(first.busy), tostring(first.work), tostring(first.catalyst))
     log.inf('black hole agent; Ctrl+C to stop')
     local nextCheck = 0
     while true do

@@ -84,6 +84,9 @@ end
 ---@field warn string?
 ---@field info string?
 
+-- The most offered for one hold with the count lost: 2^8 L is 240 holds deep.
+hole.kProbeMax = 256
+
 local function enter(s, phase, now)
     s.phase = phase
     s.since = now
@@ -160,7 +163,7 @@ function hole.step(s, obs, cfg)
     -- A pulse in any phase means the hole is open.
     if obs.pulse and (s.phase == P.kIdle) then
         s.unknown = true
-        s.pulses, s.holds, s.spent, s.level, s.probe = 0, 0, 0, obs.level, 1
+        s.pulses, s.holds, s.spent, s.level, s.probe, s.gaveUp = 0, 0, 0, obs.level, 1, nil
         enter(s, P.kClosing, obs.now)
         out[#out + 1] = { allow = false }
         out[#out + 1] = { warn = 'the hole is open but the agent did not open it: winding down' }
@@ -178,7 +181,7 @@ function hole.step(s, obs, cfg)
         end
         if obs.work and suppliesOk(obs.supplies, cfg) then
             s.session = s.session + 1
-            s.pulses, s.holds, s.spent, s.level, s.unknown = 0, 0, 0, 0, nil
+            s.pulses, s.holds, s.spent, s.level, s.unknown, s.gaveUp = 0, 0, 0, 0, nil, nil
             enter(s, P.kOpening, obs.now)
             out[#out + 1] = { insert = 'seed' }
             out[#out + 1] = { allow = true }
@@ -239,7 +242,18 @@ function hole.step(s, obs, cfg)
     if s.phase == P.kClosing then
         if obs.busy then
             if s.unknown then
-                if obs.level < nextCost(s) then
+                if s.probe > hole.kProbeMax then
+                    -- Never taken: the hole is unstable (no drain at 0) or the hatch is not
+                    -- a spacetime hatch. Holding is pointless.
+                    if not s.gaveUp then
+                        s.gaveUp = true
+                        out[#out + 1] = { warn = ('%d L a hold not taken: not holding'):format(
+                            hole.kProbeMax) }
+                    end
+                    if obs.level > 0 then
+                        out[#out + 1] = { empty = true }
+                    end
+                elseif obs.level < nextCost(s) then
                     out[#out + 1] = { fill = nextCost(s) } -- count lost: hold to the end
                 end
             else
