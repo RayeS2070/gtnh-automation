@@ -144,6 +144,42 @@
   }
 
   const percent = (a: number, t: number) => `${Math.round((1000 * a) / t) / 10}%`
+
+  // Recipes show their outputs only when unfolded: folded by default, the unfolded ones kept in
+  // this browser. Editing unfolds them all: the fields are on the output rows.
+  const kOpenKey = 'factoryctl.qft.open'
+  function loadOpen(): string[] {
+    try {
+      const v = JSON.parse(localStorage.getItem(kOpenKey) ?? '[]')
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  }
+  let open = $state<string[]>(loadOpen())
+  function setOpen(keys: string[]) {
+    open = keys
+    try {
+      localStorage.setItem(kOpenKey, JSON.stringify(keys))
+    } catch {
+      // No storage (private window and the like): it lasts until the page is reloaded.
+    }
+  }
+  const foldKey = (s: QftSetup, id: string) => `${s.name}/${id}`
+  const isOpen = (s: QftSetup, id: string) => editing[s.name] !== undefined || open.includes(foldKey(s, id))
+  const fold = (s: QftSetup, id: string) =>
+    setOpen(open.includes(foldKey(s, id)) ? open.filter((k) => k !== foldKey(s, id)) : [...open, foldKey(s, id)])
+  const anyOpen = (s: QftSetup) => s.catalog.some((r) => open.includes(foldKey(s, r.id)))
+  function foldAll(s: QftSetup) {
+    const mine = new Set(s.catalog.map((r) => foldKey(s, r.id)))
+    const rest = open.filter((k) => !mine.has(k))
+    setOpen(anyOpen(s) ? rest : [...rest, ...mine])
+  }
+  // Tracked outputs of a deficit recipe below their target.
+  const belowCount = (s: QftSetup, id: string) =>
+    triggerOf(s, id) === 'surplus'
+      ? 0
+      : (recipeState(s, id)?.outputs ?? []).filter((o) => o.target != null && o.amount < o.target).length
 </script>
 
 <section>
@@ -192,6 +228,9 @@
         </form>
       {:else if s.settings}
         <button onclick={() => startEdit(s)}>Edit settings</button>
+        <button onclick={() => foldAll(s)}>{anyOpen(s) ? 'Fold all' : 'Unfold all'}</button>
+      {:else}
+        <button onclick={() => foldAll(s)}>{anyOpen(s) ? 'Fold all' : 'Unfold all'}</button>
       {/if}
 
       <table>
@@ -206,7 +245,17 @@
                   <button class="small" title="Switch the recipe off or on: off, it never runs; running, it finishes its cycle and yields"
                     onclick={() => toggle(s, r.id)}>{enabled(s, r.id) ? 'Off' : 'On'}</button>
                 {/if}
-                {r.name}
+                {#if editing[s.name]}
+                  {r.name}
+                {:else}
+                  {@const below = belowCount(s, r.id)}
+                  <button class="fold" aria-expanded={isOpen(s, r.id)} onclick={() => fold(s, r.id)}>
+                    <span class="arrow">{isOpen(s, r.id) ? '▾' : '▸'}</span>
+                    {r.name}
+                    {#if !isOpen(s, r.id)}<span class="muted small">{r.outputs.length} outputs</span>{/if}
+                    {#if below > 0}<span class="tag warn" title="Tracked outputs below their target">{below} below</span>{/if}
+                  </button>
+                {/if}
                 {#if !enabled(s, r.id)}<span class="tag">off</span>{/if}
                 {#if editing[s.name]}
                   <select class="small" bind:value={editing[s.name].trigger[r.id]}
@@ -223,6 +272,7 @@
                 {#if st?.cycles != null}<span class="muted small">· inputs for {st.cycles.toFixed(1)} cycles</span>{/if}
               </th>
             </tr>
+            {#if isOpen(s, r.id)}
             {#each r.outputs as o (o.circuit)}
               {@const cur = outputSettings(s, r.id, o.circuit)}
               {@const os = outputState(s, r.id, o.circuit)}
@@ -252,6 +302,7 @@
                 {/if}
               </tr>
             {/each}
+            {/if}
           {/each}
         </tbody>
       </table>
@@ -323,6 +374,22 @@
     flex-wrap: wrap;
     gap: 0.4rem 0.8rem;
     align-items: center;
+  }
+  button.fold {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .arrow {
+    display: inline-block;
+    width: 0.8rem;
+    color: var(--muted);
   }
   .tag {
     font-size: 0.7rem;
