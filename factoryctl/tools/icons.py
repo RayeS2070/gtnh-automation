@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Builds the web's item icons from an NEI item panel dump made in the game client.
 
-In the game: NEI Options -> Inventory -> Collapsible Items -> Disabled (or the groups dump only
-their first item), clear the search, then Tools -> Data Dumps -> Item Panel three times, changing
+In the game: config/GregTech/GregTech.cfg B:doShowAllItemsInCreative=true and a restart (else GT
+hides tool heads such as drill tips from NEI); NEI Options -> Inventory -> Collapsible Items ->
+Disabled (or the groups dump only their first item); clear the search, then Tools -> Data Dumps -> Item Panel three times, changing
 nothing between them: CSV, JSON, PNG at 32x32. They land in .minecraft/dumps/.
 
     tools/icons.py <.minecraft/dumps> [out-dir]    (out-dir: factoryctl/icons)
