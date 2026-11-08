@@ -53,7 +53,7 @@ TEST(Compression, OnlyTextOfSomeSize) {
   EXPECT_TRUE(compressible("text/plain; charset=utf-8", 2000));
   EXPECT_FALSE(compressible("application/json", 100)) << "too small to pay";
   EXPECT_FALSE(compressible("image/webp", 2000));
-  EXPECT_FALSE(compressible("application/octet-stream", 2000)) << "data.bin";
+  EXPECT_FALSE(compressible("application/octet-stream", 2000)) << "index.bin";
   EXPECT_FALSE(compressible("font/woff2", 2000));
   EXPECT_FALSE(compressible("", 2000));
 }

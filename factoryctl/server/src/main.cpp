@@ -70,7 +70,7 @@ auto main(int argc, char* argv[]) -> int {
           // above.
           .Append<userver::components::FsCache>("fs-cache-web")
           .Append<userver::server::handlers::HttpHandlerStatic>()
-          // Item icons: the GTNH Calculator's export (assets/data) at /data/.
+          // Item icons (tools/icons.py) at /data/.
           .Append<userver::components::FsCache>("fs-cache-data")
           .Append<userver::server::handlers::HttpHandlerStatic>(
               "handler-static-data");

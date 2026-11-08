@@ -19,7 +19,7 @@ auto name(Encoding e) -> std::string_view;
 // before gzip, none for what the client does not take (or takes with q=0).
 auto chooseEncoding(std::string_view acceptEncoding) -> std::optional<Encoding>;
 
-// Text compresses ten times; images, fonts and data.bin are compressed already.
+// Text compresses ten times; images, fonts and the icon index are compressed already.
 auto compressible(std::string_view contentType, std::size_t size) -> bool;
 
 auto compress(Encoding e, std::string_view data) -> std::string;

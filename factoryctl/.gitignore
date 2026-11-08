@@ -15,3 +15,6 @@ CLAUDE.md
 
 # The dynamic config of a server started here (dynamic-config-path)
 dynamic_config.yaml
+
+# Item icons built by tools/icons.py from an NEI dump (about 20 MB): not kept in git
+icons/

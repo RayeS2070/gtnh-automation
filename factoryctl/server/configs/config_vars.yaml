@@ -16,5 +16,5 @@ dynamic-config-path: dynamic_config.yaml
 
 # The built web client (factoryctl/web: npm run build); relative to where the server starts.
 web-dir: web/dist
-# The GTNH Calculator's export (the assets submodule): item icons for the web client.
-data-dir: ../assets/data
+# Item icons for the web client, built from an NEI dump by tools/icons.py.
+data-dir: icons

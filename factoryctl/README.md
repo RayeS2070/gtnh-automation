@@ -88,9 +88,11 @@ network's stock, target, fill, what is in flight and what was pumped in 24 h; ta
 threshold edited there); the QFT tab (each setup: what it runs, its recipes and outputs, the
 mode and the targets or weights edited there); the Logs tab and each order's history (events: what our code tells on purpose, not the
 server's whole log). Lists refresh every 5 s. Targets are fresh within a poll, other stock with the scans.
-Item icons come from the GTNH Calculator's export (`../assets/data`, served at `/data/`): the
-page reads `data.bin` the way the calculator does and draws icons from `atlas.webp`. The export
-is of another game version, so a few goods have no icon.
+Item icons are rendered by the game client: NEI dumps its item panel (CSV, JSON and a PNG per
+item), and `tools/icons.py` builds `icons/icons.webp` (the atlas) and `icons/index.bin` (what
+icon each item and fluid has) from the dump; the steps are in its header. `icons/` is not in
+git; it is served at `/data/`. Items go by name and damage, fluids by label: the dump has no
+fluid names. Rebuild after a modpack update. Goods NEI does not show have no icon.
 
 **HTTP API**
 
@@ -152,7 +154,7 @@ that asks for a password (below); behind the proxy, the server takes the person'
 The server runs next to the game server, in Docker; nothing is compiled there.
 `deploy/deploy.sh` builds the image here (`Dockerfile`: the web client in Node, the server on
 Ubuntu 26.04 with the `linux_clang_release` preset; CPM and ccache caches make a rebuild quick),
-copies the icons (`../assets/data`) and `deploy/compose.yaml` to `~/factoryctl` on the host,
+copies the icons (`icons/`, see above) and `deploy/compose.yaml` to `~/factoryctl` on the host,
 checks it (`deploy/check.sh`: the server natively and the image in a local container, both against
 the test database, must answer every page and log no errors; nothing is sent if they fail), sends
 the image over SSH (`docker save | docker load`, no registry) and runs `docker compose up -d`:

@@ -231,7 +231,7 @@ components_manager:
             method: GET
             task_processor: main-task-processor
 
-        # The icon atlas and the data that numbers the icons, as the GTNH Calculator reads
+        # The icon atlas and the index that numbers the icons (tools/icons.py,
         # them (factoryctl/web/src/lib/icons.svelte.ts). Read once at startup.
         fs-cache-data:
             dir: $data-dir

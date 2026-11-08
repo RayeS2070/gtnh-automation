@@ -15,6 +15,8 @@ ssh_opts=()
 [[ -n $port ]] && ssh_opts=(-p "$port")
 remote=factoryctl  # in the remote home
 here=$(cd "$(dirname "$0")/.." && pwd)
+[[ -f $here/icons/icons.webp && -f $here/icons/index.bin ]] \
+    || { echo "no icons: build them with tools/icons.py (see its header)" >&2; exit 1; }
 
 on_host() { ssh "${ssh_opts[@]}" "$host" "$@"; }
 rsync_to() { rsync -a -e "ssh ${ssh_opts[*]}" "$@"; }
@@ -25,8 +27,8 @@ docker build --build-context smc="$here/../smc" -t factoryctl:latest "$here"
 "$here/deploy/check.sh"
 
 on_host mkdir -p "$remote/data" "$remote/config"
-# Icons: the calculator's export, about 42 MB; rsync sends it only when it changed.
-rsync_to --delete --exclude .git "$here/../assets/data/" "$host:$remote/data/"
+# Icons (tools/icons.py), about 20 MB; rsync sends them only when they changed.
+rsync_to --delete "$here/icons/" "$host:$remote/data/"
 rsync_to "$here/deploy/compose.yaml" "$host:$remote/compose.yaml"
 # Hand-tuned on the host: sent once, never overwritten.
 rsync_to --ignore-existing "$here/deploy/host_config_vars.yaml" "$host:$remote/config/config_vars.yaml"

@@ -35,7 +35,7 @@ probe() {
     [[ -n $ok ]] || { $log 2>&1 | tail -5 >&2; fail "no answer on :$port"; }
     for path in / /health /api/v1/stock /api/v1/targets /api/v1/target-groups /api/v1/orders \
         /api/v1/cpus /api/v1/events /api/v1/pumps /api/v1/qft /api/v1/mining /api/v1/me \
-        /data/data.bin; do
+        /data/index.bin /data/icons.webp; do
         local code
         code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$port$path")
         [[ $code == 200 ]] || fail ":$port$path answered $code"
@@ -113,7 +113,7 @@ printf 'server-port: %s\ndb-connection: %s\n' "$image_port" "$db" > "$tmp/config
 cp "$tmp/dynamic_config.yaml" "$tmp/config/"
 # Not --rm: a container that dies at start keeps its log for probe to show.
 container=$(docker run -d --network host -v "$tmp/config:/app/config:ro" \
-    -v "$here/../assets/data:/app/data:ro" factoryctl:latest)
+    -v "$here/icons:/app/data:ro" factoryctl:latest)
 probe "$image_port" image_log
 
 echo "check: ok"
