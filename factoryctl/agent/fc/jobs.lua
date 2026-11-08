@@ -106,7 +106,9 @@ function jobs:start(proxy, task)
         self:report(task.id, 'failed', ('ambiguous: %d craftables'):format(#craftables))
         return
     end
-    local okReq, job = pcall(craftables[1].request, task.amount)
+    -- prioritizePower = false: AE2 takes the smallest idle CPU the job fits in; OC's default (true)
+    -- takes the one with the most co-processors and storage (CraftingGridCache.submitJob).
+    local okReq, job = pcall(craftables[1].request, task.amount, false)
     if not okReq or not job then
         self:report(task.id, 'failed', 'request: ' .. tostring(job))
         return

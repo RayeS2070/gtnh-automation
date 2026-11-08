@@ -257,8 +257,9 @@ function fake.crafting(byName)
         local list = {}
         for _, c in ipairs(byName[filter.name] or {}) do
             list[#list + 1] = {
-                request = function(amount)
+                request = function(amount, prioritizePower)
                     me.requests[#me.requests + 1] = amount
+                    me.prioritizePower = prioritizePower
                     if type(c.job) == 'string' then error(c.job) end
                     return c.job
                 end,
@@ -288,6 +289,7 @@ suite('jobs', function()
     j:start(ae, { id = 18, amount = 1000, filter = stickFilter })
     eq(ae.lastFilter, stickFilter, 'the filter goes to getCraftables as is')
     eq(ae.requests[1], 1000, 'requested the amount')
+    eq(ae.prioritizePower, false, 'the smallest CPU that fits, not the biggest')
     eq(results(j), '18:accepted', 'accepted')
     j:confirm()
     eq(results(j), '', 'confirmed results are gone')
