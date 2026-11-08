@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import {
     deleteMiningTarget,
     fetchMining,
@@ -58,6 +59,7 @@
     ores: Record<string, boolean> // "name:damage" -> taken
   }
   let form = $state<Form | null>(null)
+  let formEl = $state<HTMLFormElement | null>(null)
   let search = $state('')
   let oreSearch = $state('')
   let ores = $state<MiningOreInfo[] | null>(null)
@@ -88,6 +90,8 @@
     search = ''
     oreSearch = ''
     loadOres()
+    // The form is above the list: Edit on a row far below would open it out of sight.
+    tick().then(() => formEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
   }
 
   // The outputs that are the product or that processing turns into it.
@@ -147,6 +151,28 @@
   }
 
   const fill = (t: MiningTarget) => Math.min(t.amount / t.threshold, 1)
+  const below = (t: MiningTarget) => t.enabled && t.amount < t.threshold
+
+  // Folded lists, kept in this browser (as on the Targets tab).
+  type Fold = 'targets' | 'modules'
+  const kFoldedKey = 'factoryctl.mining.folded'
+  function loadFolded(): Fold[] {
+    try {
+      const v = JSON.parse(localStorage.getItem(kFoldedKey) ?? '[]')
+      return Array.isArray(v) ? v.filter((x) => x === 'targets' || x === 'modules') : []
+    } catch {
+      return []
+    }
+  }
+  let folded = $state<Fold[]>(loadFolded())
+  function toggle(which: Fold) {
+    folded = folded.includes(which) ? folded.filter((f) => f !== which) : [...folded, which]
+    try {
+      localStorage.setItem(kFoldedKey, JSON.stringify(folded))
+    } catch {
+      // No storage (private window and the like): it lasts until the page is reloaded.
+    }
+  }
 
   // --- setups --------------------------------------------------------------------------------
   const online = (seenAt: string) => Date.now() - new Date(seenAt).getTime() < kOffline
@@ -175,35 +201,18 @@
       mined at {compact(mining.bufferLimit)} in the buffer before processing
     </p>
 
-    <h2>Targets</h2>
-    <table>
-      <tbody>
-        {#each mining.targets as t (t.goodsId)}
-          <tr class:off={!t.enabled}>
-            <td class="icon"><Icon goods={t} /></td>
-            <td>
-              {shownLabel(t)}
-              {#if !t.enabled}<span class="tag">paused</span>{/if}
-              <div class="muted small">from {t.ores.map((o) => plainLabel(o.label)).join(', ') || 'no ore'}</div>
-            </td>
-            <td class="num">{amount(t.amount)} <span class="muted">/ {compact(t.threshold)}, {Math.round(fill(t) * 100)}%</span></td>
-            <td class="num muted">priority {t.priority}</td>
-            <td class="actions">
-              <button class="small" onclick={() => open(t, t)}>Edit</button>
-              <button class="small" onclick={() => act(() => putMiningTarget(t.goodsId, { threshold: t.threshold, priority: t.priority, enabled: !t.enabled, ores: t.ores }))}>
-                {t.enabled ? 'Pause' : 'Resume'}
-              </button>
-              <button class="link" title="Remove the target" onclick={() => act(() => deleteMiningTarget(t.goodsId))}>✕</button>
-            </td>
-          </tr>
-        {:else}
-          <tr><td class="muted" colspan="5">No target yet: what dust (or fluid) should mining keep stocked?</td></tr>
-        {/each}
-      </tbody>
-    </table>
+    {@const short = mining.targets.filter(below).length}
+    <h2>
+      <button class="fold" aria-expanded={!folded.includes('targets')} onclick={() => toggle('targets')}>
+        <span class="arrow">{folded.includes('targets') ? '▸' : '▾'}</span>
+        Targets
+        <span class="muted count">{mining.targets.length}</span>
+        {#if short > 0}<span class="tag warn" title="Enabled targets below their threshold">{short} below</span>{/if}
+      </button>
+    </h2>
 
     {#if form}
-      <form class="panel" onsubmit={save}>
+      <form class="panel" onsubmit={save} bind:this={formEl}>
         <div class="title">
           <Icon goods={form.product} /> {shownLabel(form.product)}
           {#if form.amount !== null}<span class="muted">· now {amount(form.amount)}</span>{/if}
@@ -238,14 +247,54 @@
       </form>
     {:else}
       <div class="add">
-        <input placeholder="Add a target: any item or fluid" bind:value={search} />
+        <input placeholder="Add a target: any item" bind:value={search} />
         {#each found as g (`${g.name}:${g.damage}:${g.variant}`)}
           <button class="found" onclick={() => open(g)}><Icon goods={g} /> {plainLabel(g.label)}</button>
         {/each}
       </div>
     {/if}
 
-    <h2>Modules</h2>
+    {#if !folded.includes('targets')}
+    <table>
+      <tbody>
+        {#each mining.targets as t (t.goodsId)}
+          <tr class:off={!t.enabled}>
+            <td class="icon"><Icon goods={t} /></td>
+            <td>
+              {shownLabel(t)}
+              {#if !t.enabled}<span class="tag">paused</span>{/if}
+              <div class="muted small">from {t.ores.map((o) => plainLabel(o.label)).join(', ') || 'no ore'}</div>
+            </td>
+            <td class="num">{amount(t.amount)} <span class="muted">/ {compact(t.threshold)}, {Math.round(fill(t) * 100)}%</span></td>
+            <td class="num muted">priority {t.priority}</td>
+            <td class="actions">
+              <button class="small" onclick={() => open(t, t)}>Edit</button>
+              <button class="small" onclick={() => act(() => putMiningTarget(t.goodsId, { threshold: t.threshold, priority: t.priority, enabled: !t.enabled, ores: t.ores }))}>
+                {t.enabled ? 'Pause' : 'Resume'}
+              </button>
+              <button class="link" title="Remove the target" onclick={() => act(() => deleteMiningTarget(t.goodsId))}>✕</button>
+            </td>
+          </tr>
+        {:else}
+          <tr><td class="muted" colspan="5">No target yet: what dust (or fluid) should mining keep stocked?</td></tr>
+        {/each}
+      </tbody>
+    </table>
+    {/if}
+
+    {@const modules = mining.setups.flatMap((s) => s.status.modules ?? [])}
+    {@const troubled = modules.filter((m) => m.state === 'failed' || m.state === 'held').length}
+    {@const away = mining.setups.filter((s) => !online(s.seenAt)).length}
+    <h2>
+      <button class="fold" aria-expanded={!folded.includes('modules')} onclick={() => toggle('modules')}>
+        <span class="arrow">{folded.includes('modules') ? '▸' : '▾'}</span>
+        Modules
+        <span class="muted count">{modules.length}</span>
+        {#if troubled > 0}<span class="tag warn">{troubled} failed or held</span>{/if}
+        {#if away > 0}<span class="tag warn">{away} offline</span>{/if}
+      </button>
+    </h2>
+    {#if !folded.includes('modules')}
     {#each mining.setups as s (s.name)}
       <article class:offline={!online(s.seenAt)}>
         <header>
@@ -283,6 +332,7 @@
     {:else}
       <p class="muted">No mining agent yet: one shows here after its first poll (factoryctl/mining).</p>
     {/each}
+    {/if}
   {/if}
 </section>
 
@@ -339,12 +389,32 @@
     gap: 0.4rem;
     align-items: baseline;
   }
+  button.fold {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .arrow {
+    display: inline-block;
+    width: 0.8rem;
+    color: var(--muted);
+  }
+  .count {
+    font-weight: normal;
+    font-size: 0.85rem;
+  }
   .buttons,
   .add {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
-    margin-top: 0.4rem;
+    margin: 0.4rem 0;
   }
   .found {
     display: flex;
