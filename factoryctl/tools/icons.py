@@ -3,7 +3,8 @@
 
 In the game: config/GregTech/GregTech.cfg B:doShowAllItemsInCreative=true and a restart (else GT
 hides tool heads such as drill tips from NEI); config/GregTech/Client.cfg "Transcendent Metal
-Rendering"=false (else such items spin with the game's ticks and are dumped edge-on); NEI Options -> Inventory -> Collapsible Items ->
+Rendering"=false and "Six-Phased Copper Rendering"=false (else such items are dumped spun edge-on
+or mid-glitch; Universium's shader looks right in any frame); NEI Options -> Inventory -> Collapsible Items ->
 Disabled (or the groups dump only their first item); clear the search, then Tools -> Data Dumps -> Item Panel three times, changing
 nothing between them: CSV, JSON, PNG at 32x32. They land in .minecraft/dumps/.
 
