@@ -85,7 +85,7 @@
     editing[s.name] = { mode: s.settings?.mode ?? 'auto', enabled: on, trigger, fields }
   }
 
-  // A typed value: empty is none (an output without a target is not tracked); k/M/G as elsewhere.
+  // A typed value: empty is none (an output without a target is not tracked); k/M/G/T/P as elsewhere.
   function value(text: string): number | undefined | null {
     const t = text.trim()
     if (t === '') return undefined
@@ -280,7 +280,7 @@
                 <td class="label"><span class="muted">{o.circuit}.</span> {plainLabel(o.label)}</td>
                 <td class="num">
                   {#if os}
-                    {amount(os.amount)}{o.kind === 'fluid' ? ' mB' : ''}
+                    <span title={amount(os.amount)}>{compact(os.amount)}</span>{o.kind === 'fluid' ? ' L' : ''}
                     <span class="muted">/ {compact(os.target)}, {percent(os.amount, os.target)}</span>
                   {/if}
                 </td>

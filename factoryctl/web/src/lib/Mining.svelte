@@ -265,7 +265,7 @@
               {#if !t.enabled}<span class="tag">paused</span>{/if}
               <div class="muted small">from {t.ores.map((o) => plainLabel(o.label)).join(', ') || 'no ore'}</div>
             </td>
-            <td class="num">{amount(t.amount)} <span class="muted">/ {compact(t.threshold)}, {Math.round(fill(t) * 100)}%</span></td>
+            <td class="num"><span title={amount(t.amount)}>{compact(t.amount)}</span> <span class="muted">/ {compact(t.threshold)}, {Math.round(fill(t) * 100)}%</span></td>
             <td class="num muted">priority {t.priority}</td>
             <td class="actions">
               <button class="small" onclick={() => open(t, t)}>Edit</button>

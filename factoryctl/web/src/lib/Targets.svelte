@@ -10,7 +10,7 @@
     type Target,
     type TargetGroup,
   } from './api'
-  import { amount, shownLabel, unit } from './format'
+  import { amount, compact, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
   import TargetForm from './TargetForm.svelte'
@@ -180,9 +180,9 @@
               </div>
             </div>
           </td>
-          <td class="num" class:below={below(t)}>{amount(t.amount)}{unit(t)}</td>
-          <td class="num">{t.threshold === 0 ? 'always' : amount(t.threshold)}</td>
-          <td class="num">{amount(t.batch)}</td>
+          <td class="num" class:below={below(t)} title={amount(t.amount)}>{compact(t.amount)}{unit(t)}</td>
+          <td class="num" title={amount(t.threshold)}>{t.threshold === 0 ? 'always' : compact(t.threshold)}</td>
+          <td class="num" title={amount(t.batch)}>{compact(t.batch)}</td>
           <td class="actions">
             <button onclick={() => (editing = editing === t.goodsId ? null : t.goodsId)}>Edit</button>
             <button onclick={() => act(() => putTarget(t.goodsId, { ...t, enabled: !t.enabled }))}>

@@ -191,11 +191,11 @@
                     {f.label}
                     {#if f.target && f.target.priority !== 1}<span class="tag">priority {f.target.priority}</span>{/if}
                   </div>
-                  <div class="note">planet {f.planet}, gas {f.gas} · {compact(f.rate)} mB/s a parallel</div>
+                  <div class="note">planet {f.planet}, gas {f.gas} · {compact(f.rate)} L/s a parallel</div>
                 </div>
               </div>
             </td>
-            <td class="num" class:low={low(f)}>{f.amount === null ? '—' : amount(f.amount)}</td>
+            <td class="num" class:low={low(f)} title={f.amount === null ? '' : amount(f.amount)}>{f.amount === null ? '—' : compact(f.amount)}</td>
             <td class="num">{f.target ? compact(f.target.target) : ''}</td>
             <td class="num" class:low={low(f)}>{fill(f) === null ? '' : percent(fill(f)!)}</td>
             <td class="num">{f.inFlight ? compact(f.inFlight) : ''}</td>
@@ -221,8 +221,8 @@
                 <form class="inline" onsubmit={saveTarget}>
                   <label>
                     Keep
-                    <input bind:value={editing.target} placeholder="e.g. 10G" inputmode="numeric" size="10" />
-                    {#if targetValue !== null}<span class="muted">{amount(targetValue)} mB</span>{/if}
+                    <input bind:value={editing.target} placeholder="e.g. 10G, 1.5T" inputmode="numeric" size="10" />
+                    {#if targetValue !== null}<span class="muted">{amount(targetValue)} L</span>{/if}
                   </label>
                   <label>Priority <input bind:value={editing.priority} inputmode="decimal" size="3" /></label>
                   <label><input type="checkbox" bind:checked={editing.enabled} /> enabled</label>

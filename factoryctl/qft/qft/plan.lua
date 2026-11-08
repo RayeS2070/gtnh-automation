@@ -50,7 +50,7 @@ function plan.usePlasma(a)
     end
     local need = rate * seconds
     local verdict = a.stock >= need and 'enough' or 'not enough'
-    return a.stock >= need, ('%s: %.0f mB, need %.0f (%.1f L/s for %.0fs)'):format(
+    return a.stock >= need, ('%s: %.0f L, need %.0f (%.1f L/s for %.0fs)'):format(
         verdict, a.stock, need, rate, seconds)
 end
 

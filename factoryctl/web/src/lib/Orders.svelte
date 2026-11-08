@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cancelOrder, fetchEvents, fetchOrders, openStatuses, type FactoryEvent, type Order } from './api'
   import EventList from './EventList.svelte'
-  import { amount, left, shownLabel, unit } from './format'
+  import { amount, compact, left, shownLabel, unit } from './format'
   import Icon from './Icon.svelte'
   import { every, kRefreshMs } from './refresh'
 
@@ -84,7 +84,7 @@
               </div>
             </div>
           </td>
-          <td class="num">{amount(o.amount)}{unit(o.goods)}</td>
+          <td class="num" title={amount(o.amount)}>{compact(o.amount)}{unit(o.goods)}</td>
           <td>
             <span class="status {o.status}">{o.status}</span>
             {#if o.status === 'crafting'}
