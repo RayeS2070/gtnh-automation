@@ -254,12 +254,11 @@ export type QftOutputSettings = { circuit: number; target?: number; priority?: n
 export type QftSettings = {
   version: number
   mode: QftMode
-  // Absent: enabled true, trigger deficit, countInputs true (a surplus recipe always counts them).
+  // Absent: enabled true, trigger deficit. The inputs are always counted.
   recipes: {
     id: string
     enabled?: boolean
     trigger?: QftTrigger
-    countInputs?: boolean
     outputs: QftOutputSettings[]
   }[]
 }

@@ -17,7 +17,7 @@ local kModes = { auto = true, deficit = true, surplus = true }
 ---@class qft.LinkSettings
 ---@field version integer # The server's; 0: never had any from it.
 ---@field mode qft.Mode
----@field recipes { id: string, enabled: boolean?, trigger: qft.Trigger?, countInputs: boolean?, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
+---@field recipes { id: string, enabled: boolean?, trigger: qft.Trigger?, outputs: { circuit: integer, target: number?, priority: number?, weight: number? }[] }[]
 
 ---The settings the recipes stand for: what the agent offers a server that has none.
 ---@param recipes table<string, qft.Recipe>
@@ -36,7 +36,7 @@ function link.defaults(recipes, mode)
         end
         table.sort(outputs, function(a, b) return a.circuit < b.circuit end)
         out.recipes[#out.recipes + 1] = { id = id, enabled = true, trigger = recipes[id].trigger,
-            countInputs = recipes[id].countInputs, outputs = outputs }
+            outputs = outputs }
     end
     return out
 end
@@ -65,9 +65,6 @@ function link.check(raw)
         if r.trigger ~= nil and r.trigger ~= 'deficit' and r.trigger ~= 'surplus' then
             return nil, ('recipes[%d]: trigger must be deficit or surplus'):format(i)
         end
-        if r.countInputs ~= nil and type(r.countInputs) ~= 'boolean' then
-            return nil, ('recipes[%d]: countInputs must be true or false'):format(i)
-        end
         local outputs = {}
         for j, o in ipairs(type(r.outputs) == 'table' and r.outputs or {}) do
             local circuit = math.tointeger(o.circuit)
@@ -84,16 +81,16 @@ function link.check(raw)
                 weight = o.weight }
         end
         out.recipes[#out.recipes + 1] = { id = r.id, enabled = r.enabled ~= false,
-            trigger = r.trigger or 'deficit', countInputs = r.countInputs ~= false, outputs = outputs }
+            trigger = r.trigger or 'deficit', outputs = outputs }
     end
     return out
 end
 
 ---Puts the settings into the recipes in place: the trigger; a deficit output takes target and
----priority (no target: not tracked), a surplus output its weight; `countInputs = false` lets a
----deficit recipe run without counting its inputs (a surplus one always counts them);
----`enabled = false` switches the recipe off (recipe.off: plan treats it as disabled, a running one
----finishes its cycle and yields). A recipe the settings do not name stays as it is; a recipe or
+---priority (no target: not tracked), a surplus output its weight; the inputs are always
+---counted (an old `countInputs` in the settings is ignored); `enabled = false` switches the
+---recipe off (recipe.off: plan treats it as disabled, a running one finishes its cycle and
+---yields). A recipe the settings do not name stays as it is; a recipe or
 ---circuit this QFT does not have (config/catalysts.lua) is warned of and skipped.
 ---@param recipes table<string, qft.Recipe>
 ---@param s qft.LinkSettings
@@ -106,7 +103,6 @@ function link.apply(recipes, s, warn)
         else
             recipe.off = entry.enabled == false
             recipe.trigger = entry.trigger or 'deficit'
-            recipe.countInputs = recipe.trigger == 'surplus' or entry.countInputs ~= false
             local byCircuit = {}
             for _, o in ipairs(recipe.outputs) do byCircuit[o.circuit] = o end
             local given = {}

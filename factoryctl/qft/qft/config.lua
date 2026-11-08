@@ -12,7 +12,7 @@ local config = {}
 
 ---Builds the recipes the program runs from the catalog (qft/catalog.lua, generated) and the
 ---catalysts the QFT has (config/catalysts.lua: catalyst label -> count): every catalog recipe
----of a listed catalyst, with that many parallels. How a recipe runs (trigger, countInputs,
+---of a listed catalyst, with that many parallels. How a recipe runs (trigger,
 ---targets, weights) is a setting of the server (qft.link): until it is applied, a recipe is a
 ---deficit one that tracks nothing, so it never runs. In Fluid Mode (components.fluidMode) a
 ---dust output with a molten form is counted as that fluid.

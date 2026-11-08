@@ -707,13 +707,12 @@ do
         'enabled must be a boolean')
     check(link.check({ mode = 'auto', recipes = { { id = 'glue', trigger = 'often' } } }) == nil,
         'a bad trigger is refused')
-    check(link.check({ mode = 'auto', recipes = { { id = 'glue', countInputs = 1 } } }) == nil,
-        'countInputs must be a boolean')
+    check(link.check({ mode = 'auto', recipes = { { id = 'glue', countInputs = false } } }) ~= nil,
+        'an old countInputs is ignored, not refused')
     local checked = link.check({ mode = 'auto', recipes = { { id = 'glue' } } })
-    check(checked.recipes[1].trigger == 'deficit' and checked.recipes[1].countInputs == true,
-        'check: absent trigger = deficit, inputs counted')
+    check(checked.recipes[1].trigger == 'deficit', 'check: absent trigger = deficit')
 
-    -- countInputs: a deficit recipe may run without counting its inputs; a surplus one counts them
+    -- the inputs are counted: an old countInputs = false in the settings does not lift that
     local c = rs()
     c.glue.inputs = { { fluid = 'Water', amount = 100 } }
     assert(#config.normalize(c) == 0)
@@ -725,10 +724,7 @@ do
         return (plan.evaluate(c, fluids({ Glue = 0 }), dry)).glue
     end
     check(not counted({}).low, 'counted: no water, no start')
-    check(counted({ countInputs = false }).low, 'not counted: starts without water')
-    check(c.glue.countInputs == false, '... countInputs = false on the recipe')
-    counted({ trigger = 'surplus', countInputs = false })
-    check(c.glue.countInputs == true, 'surplus always counts its inputs')
+    check(not counted({ countInputs = false }).low, 'an old countInputs = false: still counted')
 
     -- a poll: offer and catalog first; the server's settings are taken and saved
     local saved, requests, replies = nil, {}, {}

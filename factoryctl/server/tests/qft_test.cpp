@@ -103,17 +103,17 @@ TEST(QftProtocol, Settings) {
                 .error()
                 .find("enabled"),
             std::string::npos);
-  EXPECT_TRUE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "trigger": "surplus",
-      "countInputs": false}]})")
+  EXPECT_TRUE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "trigger": "surplus"}]})")
                   .has_value());
   EXPECT_NE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "trigger": "often"}]})")
                 .error()
                 .find("trigger"),
             std::string::npos);
-  EXPECT_NE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "countInputs": 0}]})")
+  EXPECT_NE(check(R"({"mode": "auto", "recipes": [{"id": "glue", "countInputs": true}]})")
                 .error()
-                .find("countInputs"),
-            std::string::npos);
+                .find("unknown field"),
+            std::string::npos)
+      << "countInputs is gone: the inputs are always counted";
   // Without a catalog the ids are not checked.
   EXPECT_TRUE(checkQftSettings(json::FromString(R"({"mode": "auto", "recipes": [{"id": "x"}]})"),
                                json::Value{})

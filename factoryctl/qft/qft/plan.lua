@@ -91,9 +91,8 @@ local function inputCycles(recipe, source)
     end
     local cycles = math.huge
     for _, input in ipairs(recipe.inputs) do
-        -- Not counted (countInputs = false, or no amount): in the bus or the hatch, but supplied
-        -- without limit.
-        if input.amount and recipe.countInputs ~= false then
+        -- Not counted without an amount: in the bus or the hatch, but supplied without limit.
+        if input.amount then
             local amount, err, absent = resource.amount(source, input.resource)
             if not amount then
                 return nil, err, missing

@@ -33,11 +33,9 @@ struct Coords {
 //                 "cycles", "outputs": [{"circuit", "amount", "target"}]}],
 //    "plasma": {"neptunium", "fermium"}, "log": [...]}
 // settings: {"mode": "auto|deficit|surplus", "recipes": [{"id", "enabled",
-//   "trigger", "countInputs", "outputs": [{"circuit", "target", "priority",
+//   "trigger", "outputs": [{"circuit", "target", "priority",
 //   "weight"}]}]} (version aside); "enabled": false keeps a recipe from
-//   running (absent: true); "trigger": "deficit|surplus" (absent: deficit);
-//   "countInputs": false lets a deficit recipe run without counting its
-//   inputs (absent: true).
+//   running (absent: true); "trigger": "deficit|surplus" (absent: deficit).
 // catalog recipe: {"id", "name", "tier", "catalysts", "inputs",
 //   "outputs": [{"circuit", "kind", "label"}]}; an older agent adds the
 //   trigger and the values of the outputs.

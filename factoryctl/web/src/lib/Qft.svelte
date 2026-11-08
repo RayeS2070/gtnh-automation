@@ -22,7 +22,6 @@
         mode: QftMode
         enabled: Record<string, boolean>
         trigger: Record<string, QftTrigger>
-        count: Record<string, boolean>
         fields: Record<string, Record<number, Record<string, string>>>
       }
     >
@@ -54,7 +53,6 @@
   const recipeSettings = (s: QftSetup, recipe: string) => s.settings?.recipes.find((r) => r.id === recipe)
   const enabled = (s: QftSetup, recipe: string) => recipeSettings(s, recipe)?.enabled !== false
   const triggerOf = (s: QftSetup, recipe: string): QftTrigger => recipeSettings(s, recipe)?.trigger ?? 'deficit'
-  const counts = (s: QftSetup, recipe: string) => recipeSettings(s, recipe)?.countInputs !== false
   const outputSettings = (s: QftSetup, recipe: string, circuit: number): QftOutputSettings | undefined =>
     s.settings?.recipes.find((r) => r.id === recipe)?.outputs.find((o) => o.circuit === circuit)
   const recipeState = (s: QftSetup, recipe: string) => s.status.recipes.find((r) => r.id === recipe)
@@ -70,11 +68,9 @@
     const fields: Record<string, Record<number, Record<string, string>>> = {}
     const on: Record<string, boolean> = {}
     const trigger: Record<string, QftTrigger> = {}
-    const count: Record<string, boolean> = {}
     for (const r of s.catalog) {
       on[r.id] = enabled(s, r.id)
       trigger[r.id] = triggerOf(s, r.id)
-      count[r.id] = counts(s, r.id)
       fields[r.id] = {}
       for (const o of r.outputs) {
         const cur = outputSettings(s, r.id, o.circuit)
@@ -86,7 +82,7 @@
         }
       }
     }
-    editing[s.name] = { mode: s.settings?.mode ?? 'auto', enabled: on, trigger, count, fields }
+    editing[s.name] = { mode: s.settings?.mode ?? 'auto', enabled: on, trigger, fields }
   }
 
   // A typed value: empty is none (an output without a target is not tracked); k/M/G as elsewhere.
@@ -105,7 +101,6 @@
       id: r.id,
       enabled: e.enabled[r.id],
       trigger: e.trigger[r.id],
-      countInputs: e.count[r.id],
       outputs: r.outputs.map((o) => {
         const out: QftOutputSettings = { circuit: o.circuit }
         for (const f of fieldsOf(e.trigger[r.id])) {
@@ -219,13 +214,8 @@
                     <option value="deficit">deficit</option>
                     <option value="surplus">surplus</option>
                   </select>
-                  {#if editing[s.name].trigger[r.id] === 'deficit'}
-                    <label class="small" title="off: the inputs are supplied without limit, not counted">
-                      <input type="checkbox" bind:checked={editing[s.name].count[r.id]} /> count inputs</label>
-                  {/if}
                 {:else}
                   <span class="tag">{triggerOf(s, r.id)}</span>
-                  {#if triggerOf(s, r.id) === 'deficit' && !counts(s, r.id)}<span class="tag">inputs not counted</span>{/if}
                 {/if}
                 <span class="muted small">tier {r.tier}, {r.catalysts} catalysts</span>
                 {#if st?.disabled}<span class="tag">no catalysts</span>

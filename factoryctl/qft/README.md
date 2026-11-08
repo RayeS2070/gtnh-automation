@@ -255,7 +255,6 @@ The rest is set on the QFT tab of the server, per recipe:
 | Setting | Meaning |
 | --- | --- |
 | trigger | `deficit` keeps products stocked: runs when a tracked output is below its target. `surplus` processes raw materials: runs while its inputs are in stock. |
-| count inputs | Deficit only. Off: the inputs are supplied without limit and not counted; on (the default) the recipe waits for stock for a cycle. A surplus recipe always counts them. |
 | `target` | Deficit. Amount to keep in the products network; an output without one is not tracked. |
 | `priority` | Deficit. Default 1. Higher means more urgent at the same fill level. |
 | `weight` | Surplus. How much the output is wanted, for Neptunium. Only the ratio matters; none = 0. |
