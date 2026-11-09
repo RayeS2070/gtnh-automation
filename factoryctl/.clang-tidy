@@ -211,3 +211,6 @@ CheckOptions:
     value: none
   - key: bugprone-unused-return-value.AllowCastToVoid
     value: true
+  # The views a temporary must not outlive: the defaults and userver's null-terminated one.
+  - key: bugprone-dangling-handle.HandleClasses
+    value: 'std::basic_string_view;std::experimental::basic_string_view;std::span;userver::utils::zstring_view'
