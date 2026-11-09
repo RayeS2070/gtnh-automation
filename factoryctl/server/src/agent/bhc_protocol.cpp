@@ -83,7 +83,10 @@ auto checkBhcSettings(const json::Value& settings) -> Result<void> {
       return fail(std::format("settings.{}", name), "unknown field");
     }
   }
-  std::int64_t holdAt = 0, floor = 0, maxHolds = 0, minSpacetime = 0;
+  std::int64_t holdAt = 0;
+  std::int64_t floor = 0;
+  std::int64_t maxHolds = 0;
+  std::int64_t minSpacetime = 0;
   for (const auto& [field, out] :
        {std::pair{"holdAt", &holdAt}, std::pair{"floor", &floor},
         std::pair{"maxHolds", &maxHolds},

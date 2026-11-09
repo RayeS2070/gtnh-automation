@@ -55,6 +55,8 @@ find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET libzstd)
 target_include_directories(factoryctl_lib PUBLIC src)
+# zlib's z_stream.next_in as const: no const_cast for input it only reads.
+target_compile_definitions(factoryctl_lib PUBLIC ZLIB_CONST)
 target_link_libraries(factoryctl_lib
         PUBLIC
         userver::core

@@ -13,6 +13,7 @@
 #include <userver/storages/postgres/transaction.hpp>
 #include <userver/utils/datetime.hpp>
 
+#include "agent/fields.hpp"
 #include "agent/qft_protocol.hpp"
 #include "agent/scan_handler.hpp"
 #include "config/dynamic.hpp"
@@ -78,7 +79,7 @@ auto QftPollHandler::HandleRequestThrow(
   auto tx = db_->Begin(pg::ClusterHostType::kMaster, {});
   auto setup = db::lockQftSetup(tx, name);
   std::vector<db::Event> events;
-  auto told = [&](std::string text, std::string level = "info") {
+  const auto told = [&](std::string text, std::string level = "info") {
     events.push_back({.at = now,
                       .level = std::move(level),
                       .source = "qft",
@@ -127,10 +128,7 @@ auto QftPollHandler::HandleRequestThrow(
   }
   for (const auto& l : report->log) {
     events.push_back({.at = now,
-                      .level = l.level == "err"   ? "error"
-                               : l.level == "wrn" ? "warning"
-                               : l.level == "dbg" ? "debug"
-                                                  : "info",
+                      .level = std::string(fields::eventLevel(l.level)),
                       .source = "qft",
                       .text = std::format("[{}] {}", name, l.text),
                       .agentUptime = l.t});

@@ -186,6 +186,7 @@ auto miningWhitelist(std::span<const MiningTarget> targets,
     }
   }
   std::vector<std::pair<double, ItemKey>> ranked;
+  ranked.reserve(weight.size());
   for (const auto& [ore, w] : weight) ranked.emplace_back(w, ore);
   std::ranges::sort(ranked, [](const auto& a, const auto& b) {
     if (a.first != b.first) return a.first > b.first;
@@ -215,7 +216,8 @@ auto miningDrillParts(const MiningCatalog& catalog,
   std::vector<MiningItem> out;
   std::set<ItemKey> seen;
   for (const auto& [tier, count] : drones) {
-    if (count <= 0 || tier < 0 || tier >= static_cast<int>(catalog.drones.size())) {
+    if (count <= 0 || tier < 0 ||
+        std::cmp_greater_equal(tier, catalog.drones.size())) {
       continue;
     }
     const auto& d = catalog.drones[static_cast<std::size_t>(tier)];
@@ -249,7 +251,7 @@ auto miningUsableDrones(const MiningCatalog& catalog,
   MiningUsable out;
   std::set<ItemKey> told;
   for (const auto& [tier, count] : drones) {
-    if (tier < 0 || tier >= static_cast<int>(catalog.drones.size())) {
+    if (tier < 0 || std::cmp_greater_equal(tier, catalog.drones.size())) {
       out.drones[tier] = count;  // not in the catalog: the plan has no recipe
       continue;
     }

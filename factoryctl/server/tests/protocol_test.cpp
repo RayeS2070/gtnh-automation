@@ -6,7 +6,6 @@
 namespace {
 
 using factoryctl::agent::parseScan;
-using factoryctl::domain::ScannedStack;
 namespace json = userver::formats::json;
 
 auto scan(std::string_view text) { return parseScan(json::FromString(text)); }

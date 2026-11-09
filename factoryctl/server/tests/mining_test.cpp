@@ -127,6 +127,7 @@ TEST(BestPlasma, HighestInStock) {
 // One need per ore, of that weight.
 auto needs(std::map<ItemKey, double> weights) -> std::vector<MiningNeed> {
   std::vector<MiningNeed> out;
+  out.reserve(weights.size());
   for (const auto& [o, w] : weights) out.push_back({.product = o, .weight = w, .ores = {o}});
   return out;
 }
@@ -309,6 +310,7 @@ TEST(MiningCatalog, PlanIsQuick) {
   std::map<int, int> drones;
   for (const auto& d : c.drones) drones[d.tier] = 2;
   std::vector<MiningModule> modules;
+  modules.reserve(12);
   for (int i = 0; i < 12; ++i) {
     modules.push_back({.id = std::to_string(i), .tier = 3});
   }
@@ -371,10 +373,12 @@ TEST(MiningProtocol, RefusesWithAPath) {
 
 TEST(MiningProtocol, Replies) {
   const auto& c = factoryctl::mining::catalog();
-  factoryctl::agent::MiningReply reply{
+  const factoryctl::agent::MiningReply reply{
       .modules = {{.at = {169, 33, -36},
-                   .setting = MiningSetting{.droneTier = 9, .distance = 121,
-                                            .plasmaTier = 3, .parallel = 4}},
+                   .setting = MiningSetting{.droneTier = 9,
+                                            .distance = 121,
+                                            .plasmaTier = 3,
+                                            .parallel = 4}},
                   {.at = {1, 2, 3}}},
       .keep = {ore(2982)},
       .bufferLimit = 100000};

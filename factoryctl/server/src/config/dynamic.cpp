@@ -103,7 +103,7 @@ auto scanOf(std::int32_t domain::ScanParams::* member, std::int32_t min) {
 }
 
 auto pollFields() -> const Fields<domain::Settings>& {
-  static const Fields<domain::Settings> fields{
+  static const Fields<domain::Settings> kFields{
       {"poll-interval", periodOf(&domain::Settings::poll)},
       {"scan-every", periodOf(&domain::Settings::scanEvery)},
       {"scan-give-up", periodOf(&domain::Settings::scanGiveUp)},
@@ -124,17 +124,17 @@ auto pollFields() -> const Fields<domain::Settings>& {
       {"scan-slow-to", scanOf(&domain::ScanParams::slowTo, 0)},
       {"scan-slow-chunk", scanOf(&domain::ScanParams::slowChunk, 1)},
   };
-  return fields;
+  return kFields;
 }
 
 auto eventsFields() -> const Fields<EventsSettings>& {
-  static const Fields<EventsSettings> fields{
+  static const Fields<EventsSettings> kFields{
       {"keep",
        [](EventsSettings& e, const json::Value& v, std::string_view field) {
          e.keep = period(v, kEventsName, field);
        }},
   };
-  return fields;
+  return kFields;
 }
 
 auto miningInt(std::int64_t MiningSettings::* member, std::int64_t min) {
@@ -145,7 +145,7 @@ auto miningInt(std::int64_t MiningSettings::* member, std::int64_t min) {
 }
 
 auto miningFields() -> const Fields<MiningSettings>& {
-  static const Fields<MiningSettings> fields{
+  static const Fields<MiningSettings> kFields{
       {"buffer-limit",
        [](MiningSettings& m, const json::Value& v, std::string_view field) {
          m.bufferLimit = static_cast<double>(integer(v, kMiningName, field, 1));
@@ -158,13 +158,14 @@ auto miningFields() -> const Fields<MiningSettings>& {
       {"drill-batch", miningInt(&MiningSettings::drillBatch, 1)},
       {"plasma",
        [](MiningSettings& m, const json::Value& v, std::string_view field) {
-         if (!v.IsString()) fail(kMiningName, field, "a fluid name like plasma.radon");
+         if (!v.IsString())
+           fail(kMiningName, field, "a fluid name like plasma.radon");
          m.plasma = v.As<std::string>();
        }},
       {"plasma-threshold", miningInt(&MiningSettings::plasmaThreshold, 0)},
       {"plasma-batch", miningInt(&MiningSettings::plasmaBatch, 1)},
   };
-  return fields;
+  return kFields;
 }
 
 }  // namespace

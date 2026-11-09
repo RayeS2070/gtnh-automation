@@ -21,7 +21,7 @@ namespace json = userver::formats::json;
 // there, reported with its path.
 template <typename T>
 auto field(const json::Value& v, std::string_view name) -> T {
-  const auto& f = v[std::string(name)];
+  const auto& f = v[name];
   if (f.IsMissing()) {
     throw std::runtime_error(std::format("{}.{}: missing", v.GetPath(), name));
   }
@@ -102,17 +102,17 @@ auto parseCatalog(const json::Value& json)
 }
 
 auto catalog() -> const domain::MiningCatalog& {
-  static const domain::MiningCatalog c = [] {
+  static const domain::MiningCatalog kCatalog = [] {
     auto parsed = parseCatalog(
         json::FromString(userver::utils::FindResource("mining_catalog")));
     if (!parsed) throw std::runtime_error("mining catalog: " + parsed.error());
     return std::move(*parsed);
   }();
-  return c;
+  return kCatalog;
 }
 
 auto labelOf(const domain::ItemKey& key) -> std::string {
-  static const auto labels = [] {
+  static const auto kLabels = [] {
     std::map<domain::ItemKey, std::string> out;
     const auto add = [&](const domain::MiningItem& i) {
       out.try_emplace(i.key, i.label);
@@ -131,9 +131,9 @@ auto labelOf(const domain::ItemKey& key) -> std::string {
     }
     return out;
   }();
-  const auto it = labels.find(key);
-  return it != labels.end() ? it->second
-                            : std::format("{}:{}", key.name, key.damage);
+  const auto it = kLabels.find(key);
+  return it != kLabels.end() ? it->second
+                             : std::format("{}:{}", key.name, key.damage);
 }
 
 }  // namespace factoryctl::mining

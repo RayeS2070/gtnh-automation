@@ -2,6 +2,7 @@
 
 #include <format>
 #include <userver/formats/json/value_builder.hpp>
+#include <utility>
 
 #include "agent/fields.hpp"
 #include "agent/lua.hpp"
@@ -180,9 +181,9 @@ auto replyMiningPoll(const MiningReply& reply,
     } else {
       const auto& s = *m.setting;
       if (s.droneTier < 0 ||
-          s.droneTier >= static_cast<int>(catalog.drones.size()) ||
+          std::cmp_greater_equal(s.droneTier, catalog.drones.size()) ||
           s.plasmaTier < 1 ||
-          s.plasmaTier > static_cast<int>(catalog.plasmas.size())) {
+          std::cmp_greater(s.plasmaTier, catalog.plasmas.size())) {
         return fail("reply", std::format("no drone or plasma for {}", settingId(s)));
       }
       const auto& d = catalog.drones[static_cast<std::size_t>(s.droneTier)];

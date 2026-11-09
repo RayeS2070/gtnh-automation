@@ -42,6 +42,7 @@ class ManualTest : public DbTest {
       if (o.id == id) {
         o.status = status;
         o.cpu = std::move(cpu);
+        break;  // ids are unique
       }
     }
     saveOrders(tx, orders);

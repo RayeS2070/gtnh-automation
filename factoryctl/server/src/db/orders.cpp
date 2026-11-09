@@ -208,7 +208,8 @@ auto saveCraftability(pg::Transaction& tx,
   std::map<domain::ItemKey, bool> last;
   for (const auto& c : learned) last[c.item] = c.craftable;
   if (last.empty()) return;
-  std::vector<std::string> names, variants;
+  std::vector<std::string> names;
+  std::vector<std::string> variants;
   std::vector<std::int32_t> damages;
   std::vector<bool> craftable;
   for (const auto& [item, value] : last) {
@@ -230,7 +231,8 @@ auto saveCraftability(pg::Transaction& tx,
 auto applyProbes(pg::Transaction& tx, std::span<const ProbedAmount> probes,
                  domain::TimePoint now) -> void {
   if (probes.empty()) return;
-  std::vector<std::string> names, variants;
+  std::vector<std::string> names;
+  std::vector<std::string> variants;
   std::vector<std::int32_t> damages;
   std::vector<std::int64_t> amounts;
   for (const auto& p : probes) {

@@ -6,7 +6,7 @@ namespace factoryctl::db {
 
 namespace {
 
-auto kindName(GoodsKind kind) -> std::string {
+auto kindName(GoodsKind kind) -> std::string_view {
   switch (kind) {
     case GoodsKind::kItems: return "items";
     case GoodsKind::kFluids: return "fluids";

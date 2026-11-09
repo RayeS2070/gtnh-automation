@@ -11,7 +11,7 @@ namespace {
 constexpr std::size_t kMaxBytes = 100;
 
 auto continuation(char c) -> bool {
-  return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
+  return (static_cast<unsigned char>(c) & 0xC0U) == 0x80U;
 }
 
 }  // namespace

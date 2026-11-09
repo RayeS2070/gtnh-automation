@@ -15,7 +15,9 @@
 #include <userver/storages/postgres/component.hpp>
 #include <userver/storages/postgres/transaction.hpp>
 #include <userver/utils/datetime.hpp>
+#include <utility>
 
+#include "agent/fields.hpp"
 #include "agent/mining_protocol.hpp"
 #include "agent/scan_handler.hpp"
 #include "config/dynamic.hpp"
@@ -70,20 +72,15 @@ auto plannedOf(const json::Value& plan) -> std::map<std::string, Planned> {
 auto describe(const std::optional<domain::MiningSetting>& s) -> std::string {
   if (!s) return "idle";
   const auto& c = mining::catalog();
-  const auto drone =
-      s->droneTier < static_cast<int>(c.drones.size())
-          ? c.drones[static_cast<std::size_t>(s->droneTier)].name
-          : std::to_string(s->droneTier);
+  const auto drone = std::cmp_less(s->droneTier, c.drones.size())
+                         ? c.drones[static_cast<std::size_t>(s->droneTier)].name
+                         : std::to_string(s->droneTier);
   const auto plasma =
-      s->plasmaTier >= 1 && s->plasmaTier <= static_cast<int>(c.plasmas.size())
+      s->plasmaTier >= 1 && std::cmp_less_equal(s->plasmaTier, c.plasmas.size())
           ? c.plasmas[static_cast<std::size_t>(s->plasmaTier - 1)].label
           : std::to_string(s->plasmaTier);
   return std::format("{} drone, distance {}, {}, {} parallels", drone,
                      s->distance, plasma, s->parallel);
-}
-
-auto levelOf(const std::string& l) -> std::string {
-  return l == "err" ? "error" : l == "wrn" ? "warning" : l == "dbg" ? "debug" : "info";
 }
 
 }  // namespace
@@ -123,7 +120,7 @@ auto MiningPollHandler::HandleRequestThrow(
   const auto& name = report->name;
   auto tx = db_->Begin(pg::ClusterHostType::kMaster, {});
   std::vector<db::Event> events;
-  auto told = [&](std::string text, std::string level = "info") {
+  const auto told = [&](std::string text, std::string level = "info") {
     events.push_back({.at = now,
                       .level = std::move(level),
                       .source = "mining",
@@ -158,6 +155,7 @@ auto MiningPollHandler::HandleRequestThrow(
       domain::miningDemand(targets, stock, report->buffer, settings.bufferLimit);
 
   std::vector<std::string> plasmaNames;
+  plasmaNames.reserve(catalog.plasmas.size());
   for (const auto& p : catalog.plasmas) plasmaNames.push_back(p.fluid);
   const int plasma = domain::bestPlasma(catalog, db::fluidStock(tx, plasmaNames),
                                         settings.plasmaMinimum);
@@ -281,7 +279,7 @@ auto MiningPollHandler::HandleRequestThrow(
   setup->seenAt = now;
   for (const auto& l : report->log) {
     events.push_back({.at = now,
-                      .level = levelOf(l.level),
+                      .level = std::string(fields::eventLevel(l.level)),
                       .source = "mining",
                       .text = std::format("[{}] {}", name, l.text),
                       .agentUptime = l.t});

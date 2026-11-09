@@ -50,7 +50,9 @@ auto startScan(pg::Transaction& tx, domain::TimePoint now) -> std::int64_t {
 auto storeBatch(pg::Cluster& db, std::int64_t scan,
                 std::span<const domain::ScannedGoods> goods)
     -> std::expected<void, std::string> {
-  std::vector<std::string> names, variants, labels;
+  std::vector<std::string> names;
+  std::vector<std::string> variants;
+  std::vector<std::string> labels;
   std::vector<std::int32_t> damages;
   std::vector<std::int64_t> sizes;
   std::vector<bool> craftable;

@@ -116,16 +116,16 @@ TEST(ApiJson, TargetSettingsErrors) {
 
 TEST(ApiJson, CpuRow) {
   using namespace std::chrono;
-  CpuRow busy{.name = "CPU_014",
-              .busy = true,
-              .goods = StockRow{1267,
-                                {"gregtech:gt.blockcasings10", 11, ""},
-                                "Extreme Density Space-Bending Casing",
-                                1583,
-                                true},
-              .remaining = 138,
-              .seenAt = sys_days{October / 31 / 2026} + 11h + 500ms,
-              .order = 7};
+  const CpuRow busy{.name = "CPU_014",
+                    .busy = true,
+                    .goods = StockRow{1267,
+                                      {"gregtech:gt.blockcasings10", 11, ""},
+                                      "Extreme Density Space-Bending Casing",
+                                      1583,
+                                      true},
+                    .remaining = 138,
+                    .seenAt = sys_days{October / 31 / 2026} + 11h + 500ms,
+                    .order = 7};
   const auto v = toJson(busy).ExtractValue();
   EXPECT_EQ(v["name"].As<std::string>(), "CPU_014");
   EXPECT_TRUE(v["busy"].As<bool>());
@@ -141,16 +141,16 @@ TEST(ApiJson, CpuRow) {
 
 TEST(ApiJson, EventRow) {
   using namespace std::chrono;
-  EventRow row{.id = 41,
-               .at = sys_days{October / 31 / 2026} + 12h + 300ms,
-               .level = "warning",
-               .source = "agent",
-               .text = "probe x: boom",
-               .order = 7,
-               .goods = GoodsRef{1267,
-                                 {"gregtech:gt.blockcasings10", 11, ""},
-                                 "Extreme Density Space-Bending Casing"},
-               .agentUptime = 123.5};
+  const EventRow row{.id = 41,
+                     .at = sys_days{October / 31 / 2026} + 12h + 300ms,
+                     .level = "warning",
+                     .source = "agent",
+                     .text = "probe x: boom",
+                     .order = 7,
+                     .goods = GoodsRef{1267,
+                                       {"gregtech:gt.blockcasings10", 11, ""},
+                                       "Extreme Density Space-Bending Casing"},
+                     .agentUptime = 123.5};
   const auto v = toJson(row).ExtractValue();
   EXPECT_EQ(v["id"].As<int>(), 41);
   EXPECT_EQ(v["at"].As<std::string>(), "2026-10-31T12:00:00Z");

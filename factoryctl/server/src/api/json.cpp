@@ -63,7 +63,7 @@ auto parseTargetSettings(const json::Value& body)
     if (p == "low") {
       s.priority = domain::Priority::kLow;
     } else if (p != "high") {
-      return fail("priority", "must be \"high\" or \"low\"");
+      return fail("priority", R"(must be "high" or "low")");
     }
   }
   if (const auto& v = body["enabled"]; !v.IsMissing()) {

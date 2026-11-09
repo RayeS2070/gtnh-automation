@@ -59,7 +59,7 @@ auto targets(Executor& ex) -> std::vector<MiningTargetRow> {
       "JOIN factoryctl.goods g ON g.id = t.goods_id "
       "LEFT JOIN factoryctl.stock s ON s.goods_id = t.goods_id "
       "ORDER BY lower(g.label), t.goods_id";
-  pg::ResultSet rows = [&] {
+  const pg::ResultSet rows = [&] {
     if constexpr (std::is_same_v<Executor, pg::Cluster>) {
       return ex.Execute(kMaster, std::string(kSql));
     } else {
@@ -332,7 +332,8 @@ auto miningStock(pg::Transaction& tx, std::span<const domain::ItemKey> keys)
     -> std::map<domain::ItemKey, domain::MiningStock> {
   std::map<domain::ItemKey, domain::MiningStock> out;
   if (keys.empty()) return out;
-  std::vector<std::string> names, variants;
+  std::vector<std::string> names;
+  std::vector<std::string> variants;
   std::vector<std::int32_t> damages;
   for (const auto& k : keys) {
     names.push_back(k.name);

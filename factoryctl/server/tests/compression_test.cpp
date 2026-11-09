@@ -12,7 +12,7 @@ auto gunzip(std::string_view data, std::size_t size) -> std::string {
   z_stream z{};
   EXPECT_EQ(inflateInit2(&z, 15 + 32), Z_OK);
   std::string out(size + 64, '\0');
-  z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
+  z.next_in = reinterpret_cast<const Bytef*>(data.data());
   z.avail_in = static_cast<uInt>(data.size());
   z.next_out = reinterpret_cast<Bytef*>(out.data());
   z.avail_out = static_cast<uInt>(out.size());

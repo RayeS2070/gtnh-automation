@@ -13,6 +13,7 @@
 #include <userver/utils/datetime.hpp>
 
 #include "agent/bhc_protocol.hpp"
+#include "agent/fields.hpp"
 #include "agent/scan_handler.hpp"
 #include "db/bhc.hpp"
 #include "db/events.hpp"
@@ -29,13 +30,6 @@ auto withoutVersion(const json::Value& v) -> json::Value {
   json::ValueBuilder b(v);
   b.Remove("version");
   return b.ExtractValue();
-}
-
-auto levelOf(const std::string& agentLevel) -> std::string {
-  return agentLevel == "err"   ? "error"
-         : agentLevel == "wrn" ? "warning"
-         : agentLevel == "dbg" ? "debug"
-                               : "info";
 }
 
 }  // namespace
@@ -71,7 +65,7 @@ auto BhcPollHandler::HandleRequestThrow(
   auto tx = db_->Begin(pg::ClusterHostType::kMaster, {});
   auto setup = db::lockBhcSetup(tx, name);
   std::vector<db::Event> events;
-  auto told = [&](std::string text, std::string level = "info") {
+  const auto told = [&](std::string text, std::string level = "info") {
     events.push_back({.at = now,
                       .level = std::move(level),
                       .source = "bhc",
@@ -111,7 +105,7 @@ auto BhcPollHandler::HandleRequestThrow(
   }
   for (const auto& l : report->log) {
     events.push_back({.at = now,
-                      .level = levelOf(l.level),
+                      .level = std::string(fields::eventLevel(l.level)),
                       .source = "bhc",
                       .text = std::format("[{}] {}", name, l.text),
                       .agentUptime = l.t});

@@ -54,7 +54,9 @@ auto name(Encoding e) -> std::string_view {
 
 auto chooseEncoding(std::string_view acceptEncoding)
     -> std::optional<Encoding> {
-  std::optional<double> zstd, gzip, any;
+  std::optional<double> zstd;
+  std::optional<double> gzip;
+  std::optional<double> any;
   for (const auto part : std::views::split(acceptEncoding, ',')) {
     const auto [name, q] = coding(std::string_view{part});
     if (name == "zstd") zstd = q;
@@ -92,7 +94,7 @@ auto compress(Encoding e, std::string_view data) -> std::string {
     throw std::runtime_error("gzip: deflateInit2 failed");
   }
   out.resize(deflateBound(&z, static_cast<uLong>(data.size())));
-  z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
+  z.next_in = reinterpret_cast<const Bytef*>(data.data());
   z.avail_in = static_cast<uInt>(data.size());
   z.next_out = reinterpret_cast<Bytef*>(out.data());
   z.avail_out = static_cast<uInt>(out.size());

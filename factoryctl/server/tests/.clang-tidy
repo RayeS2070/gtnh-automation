@@ -1,0 +1,8 @@
+---
+# The tests: gtest fixtures keep their data in protected members, and the optional check does not
+# see ASSERT_TRUE(x) before *x.
+InheritParentConfig: true
+Checks: "-misc-non-private-member-variables-in-classes,-bugprone-unchecked-optional-access"
+CheckOptions:
+  - key: readability-identifier-naming.ProtectedMemberSuffix
+    value: ''

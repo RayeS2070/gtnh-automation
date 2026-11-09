@@ -65,7 +65,7 @@ auto markSent(OrderState& order, TimePoint now) -> bool;
 // A result from the agent. Fails, leaving the order as it is, when the
 // result does not fit the status (a result for a queued or closed order, a
 // late `failed` for a craft already on a CPU). The same status again is fine.
-auto applyResult(OrderState& order, AgentStatus status,
+auto applyResult(OrderState& order, AgentStatus result,
                  std::string_view message, TimePoint now)
     -> std::expected<void, std::string>;
 

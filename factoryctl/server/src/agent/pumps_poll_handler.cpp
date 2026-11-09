@@ -12,6 +12,7 @@
 #include <userver/storages/postgres/transaction.hpp>
 #include <userver/utils/datetime.hpp>
 
+#include "agent/fields.hpp"
 #include "agent/pumps_protocol.hpp"
 #include "agent/scan_handler.hpp"
 #include "config/dynamic.hpp"
@@ -77,10 +78,7 @@ auto PumpsPollHandler::HandleRequestThrow(
   events.insert(events.end(), told.begin(), told.end());
   for (const auto& l : report->log) {
     events.push_back({.at = now,
-                      .level = l.level == "err"   ? "error"
-                               : l.level == "wrn" ? "warning"
-                               : l.level == "dbg" ? "debug"
-                                                  : "info",
+                      .level = std::string(fields::eventLevel(l.level)),
                       .source = "pumps",
                       .text = l.text,
                       .agentUptime = l.t});
@@ -89,11 +87,7 @@ auto PumpsPollHandler::HandleRequestThrow(
   tx.Commit();
 
   for (const auto& l : report->log) {
-    using userver::logging::Level;
-    const auto level = l.level == "err"   ? Level::kError
-                       : l.level == "wrn" ? Level::kWarning
-                       : l.level == "dbg" ? Level::kDebug
-                                          : Level::kInfo;
+    const auto level = fields::logLevel(l.level);
     LOG(level) << userver::logging::LogExtra{{"source", "pumps"},
                                              {"agent_uptime", l.t}}
                << l.text;
@@ -103,7 +97,7 @@ auto PumpsPollHandler::HandleRequestThrow(
   if (!settings) {
     reply.offer = true;
   } else if (settings->version != report->settings) {
-    reply.settings = settings;
+    reply.settings = std::move(settings);
   }
   const auto lua = replyPumpsPoll(reply);
   if (!lua) {

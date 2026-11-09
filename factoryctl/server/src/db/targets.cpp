@@ -14,7 +14,7 @@ namespace {
 
 constexpr auto kMaster = pg::ClusterHostType::kMaster;
 
-auto priorityName(domain::Priority p) -> std::string {
+auto priorityName(domain::Priority p) -> std::string_view {
   return p == domain::Priority::kLow ? "low" : "high";
 }
 

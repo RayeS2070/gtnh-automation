@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <userver/formats/json/value.hpp>
+#include <userver/logging/level.hpp>
 
 #include "domain/poll.hpp"
 
@@ -74,6 +75,23 @@ inline auto logLine(const json::Value& v, std::string_view path)
   if (!body) return std::unexpected(body.error());
   l.text = *body;
   return l;
+}
+
+// The level of an agent's log line (dbg | inf | wrn | err) as an event's.
+inline auto eventLevel(std::string_view agentLevel) -> std::string_view {
+  if (agentLevel == "err") return "error";
+  if (agentLevel == "wrn") return "warning";
+  if (agentLevel == "dbg") return "debug";
+  return "info";
+}
+
+// ... and as the server log's.
+inline auto logLevel(std::string_view agentLevel) -> userver::logging::Level {
+  using userver::logging::Level;
+  if (agentLevel == "err") return Level::kError;
+  if (agentLevel == "wrn") return Level::kWarning;
+  if (agentLevel == "dbg") return Level::kDebug;
+  return Level::kInfo;
 }
 
 }  // namespace factoryctl::agent::fields

@@ -45,6 +45,14 @@ auto utc(domain::TimePoint t) -> std::string {
   return std::format("{:%FT%TZ}", std::chrono::floor<std::chrono::seconds>(t));
 }
 
+// The settings with their version; null when the setup has none yet.
+auto settingsJson(const db::BhcSetup& s) -> json::ValueBuilder {
+  if (!s.settings) return json::ValueBuilder{};
+  json::ValueBuilder out(*s.settings);
+  out["version"] = s.settingsVersion;
+  return out;
+}
+
 }  // namespace
 
 BhcSetupsHandler::BhcSetupsHandler(
@@ -85,13 +93,7 @@ auto BhcSetupsHandler::HandleRequestThrow(
       sessions.PushBack(std::move(x));
     }
     e["sessions"] = std::move(sessions);
-    if (s.settings) {
-      json::ValueBuilder settings(*s.settings);
-      settings["version"] = s.settingsVersion;
-      e["settings"] = std::move(settings);
-    } else {
-      e["settings"] = json::ValueBuilder{};
-    }
+    e["settings"] = settingsJson(s);
     items.PushBack(std::move(e));
   }
   json::ValueBuilder body;

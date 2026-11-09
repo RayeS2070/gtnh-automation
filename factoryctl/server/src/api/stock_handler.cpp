@@ -31,15 +31,19 @@ auto limitOf(const std::string& arg) -> std::optional<std::int64_t> {
   return n;
 }
 
+auto kindOf(std::string_view kind) -> db::GoodsKind {
+  if (kind == "items") return db::GoodsKind::kItems;
+  if (kind == "fluids") return db::GoodsKind::kFluids;
+  return db::GoodsKind::kAll;
+}
+
 // Unknown values mean the default, as an unusable limit does.
 auto queryOf(const userver::server::http::HttpRequest& request)
     -> db::StockQuery {
   const auto& kind = request.GetArg("kind");
   return {
       .text = request.GetArg("q"),
-      .kind = kind == "items"    ? db::GoodsKind::kItems
-              : kind == "fluids" ? db::GoodsKind::kFluids
-                                 : db::GoodsKind::kAll,
+      .kind = kindOf(kind),
       .order = request.GetArg("sort") == "amount" ? db::StockOrder::kAmount
                                                   : db::StockOrder::kLabel,
       .descending = request.GetArg("dir") == "desc",

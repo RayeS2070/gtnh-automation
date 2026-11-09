@@ -33,6 +33,12 @@ auto onlyFields(const json::Value& v, std::string_view path,
   return {};
 }
 
+auto isTrigger(const json::Value& v) -> bool {
+  if (!v.IsString()) return false;
+  const auto s = v.As<std::string>();
+  return s == "deficit" || s == "surplus";
+}
+
 auto optionalNumber(const json::Value& v, std::string_view path, double min,
                     bool strict) -> Result<void> {
   if (v.IsMissing() || v.IsNull()) return {};
@@ -84,10 +90,8 @@ auto checkQftSettings(const json::Value& settings, const json::Value& catalog)
     if (const auto& e = r["enabled"]; !e.IsMissing() && !e.IsBool()) {
       return fail(std::format("{}.enabled", path), "not a boolean");
     }
-    if (const auto& t = r["trigger"]; !t.IsMissing()) {
-      if (!t.IsString() || (t.As<std::string>() != "deficit" && t.As<std::string>() != "surplus")) {
-        return fail(std::format("{}.trigger", path), "not deficit or surplus");
-      }
+    if (const auto& t = r["trigger"]; !t.IsMissing() && !isTrigger(t)) {
+      return fail(std::format("{}.trigger", path), "not deficit or surplus");
     }
     const auto id = text(r["id"], std::format("{}.id", path));
     if (!id) return std::unexpected(id.error());

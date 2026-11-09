@@ -137,6 +137,7 @@ auto MiningHandler::HandleRequestThrow(
   }
   out["targets"] = std::move(targets);
   std::vector<std::string> names;
+  names.reserve(catalog.plasmas.size());
   for (const auto& p : catalog.plasmas) names.push_back(p.fluid);
   const int plasma = domain::bestPlasma(catalog, db::fluidStock(tx, names),
                                         settings.plasmaMinimum);
@@ -227,7 +228,7 @@ auto MiningOresHandler::HandleRequestThrow(
     userver::server::request::RequestContext&) const -> std::string {
   request.GetHttpResponse().SetContentType("application/json");
   // The same for every request: made once.
-  static const std::string answer = [] {
+  static const std::string kAnswer = [] {
     const auto& c = mining::catalog();
     struct Ore {
       std::set<std::string> asteroids;
@@ -242,7 +243,9 @@ auto MiningOresHandler::HandleRequestThrow(
       }
     }
     std::vector<std::pair<std::string, const domain::ItemKey*>> byLabel;
-    for (const auto& [key, ore] : ores) byLabel.emplace_back(mining::labelOf(key), &key);
+    byLabel.reserve(ores.size());
+    for (const auto& [key, ore] : ores)
+      byLabel.emplace_back(mining::labelOf(key), &key);
     std::ranges::sort(byLabel);
     json::ValueBuilder out(json::Type::kArray);
     for (const auto& [label, key] : byLabel) {
@@ -263,7 +266,7 @@ auto MiningOresHandler::HandleRequestThrow(
     }
     return json::ToString(out.ExtractValue());
   }();
-  return answer;
+  return kAnswer;
 }
 
 MiningSetupHandler::MiningSetupHandler(
