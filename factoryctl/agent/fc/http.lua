@@ -8,9 +8,9 @@ local kHeaders = { ['Content-Type'] = 'application/json' }
 
 ---Reads the card's request handle itself: OpenOS's iterator waits inside with no way out. The
 ---card connects and reads on its own threads; read() gives '' until data is there, nil at the end
----(OpenComputers InternetCard.HTTPRequest), close() cancels them. The wait is os.sleep, which is
----event.pull: signals that come meanwhile are thrown away (listeners still see them). Call it
----only when none matter: the black hole agent polls only while its hole is closed.
+---(OpenComputers InternetCard.HTTPRequest), close() cancels them. read() is an indirect call: it
+---takes a tick and yields meanwhile, so the loop needs no sleep, and without one (os.sleep is
+---event.pull) no signal is taken from the queue: they wait for the caller's own pull.
 local function postBefore(url, body, timeout)
     local component = require('component')
     local computer = require('computer')
@@ -32,8 +32,6 @@ local function postBefore(url, body, timeout)
                 parts[#parts + 1] = data
             elseif computer.uptime() >= deadline then
                 error(('no answer in %.1f s'):format(timeout), 0)
-            else
-                os.sleep(0.05)
             end
         end
     end)
