@@ -9,6 +9,8 @@ add_library(factoryctl_lib STATIC
         src/agent/pumps_poll_handler.cpp
         src/agent/qft_protocol.cpp
         src/agent/qft_poll_handler.cpp
+        src/agent/bhc_protocol.cpp
+        src/agent/bhc_poll_handler.cpp
         src/api/stock_handler.cpp
         src/api/json.cpp
         src/api/targets_handler.cpp
@@ -17,6 +19,7 @@ add_library(factoryctl_lib STATIC
         src/api/events_handler.cpp
         src/api/pumps_handler.cpp
         src/api/qft_handler.cpp
+        src/api/bhc_handler.cpp
         src/api/user.cpp
         src/domain/plan.cpp
         src/domain/order.cpp
@@ -35,6 +38,7 @@ add_library(factoryctl_lib STATIC
         src/db/events_cleanup.cpp
         src/db/pumps.cpp
         src/db/qft.cpp
+        src/db/bhc.cpp
         src/config/dynamic.cpp
         src/config/file_updater.cpp
         src/http/compression.cpp
@@ -86,6 +90,7 @@ add_executable(factoryctl_unittest
         tests/compression_test.cpp
         tests/pumps_test.cpp
         tests/qft_test.cpp
+        tests/bhc_test.cpp
         tests/user_test.cpp
         tests/mining_test.cpp
 )
@@ -113,6 +118,7 @@ add_executable(factoryctl_dbtest
         tests/db/events_dbtest.cpp
         tests/db/pumps_dbtest.cpp
         tests/db/qft_dbtest.cpp
+        tests/db/bhc_dbtest.cpp
 )
 target_link_libraries(factoryctl_dbtest
         PRIVATE

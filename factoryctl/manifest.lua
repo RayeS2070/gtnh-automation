@@ -42,6 +42,7 @@ return {
         'nac/tools/nac-dump.lua', -- what OC sees of a Nanochip Assembly Complex; changes nothing
         'bhc/main.lua',
         'bhc/bhc/hole.lua',
+        'bhc/bhc/link.lua',
         'bhc/bhc/rig.lua',
         'bhc/bhc/store.lua',
         'bhc/tools/bhc-dump.lua', -- what OC sees around a black hole compressor; changes nothing

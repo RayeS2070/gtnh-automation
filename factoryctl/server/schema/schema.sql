@@ -8,7 +8,7 @@ CREATE SCHEMA factoryctl;
 CREATE TABLE factoryctl.schema_version (
     version integer NOT NULL
 );
-INSERT INTO factoryctl.schema_version VALUES (11);
+INSERT INTO factoryctl.schema_version VALUES (12);
 
 -- Anything the ME network holds: an item, or a fluid of getFluidsInNetwork.
 -- Key as in domain::ItemKey: `variant` is the fluid's internal name for fluid
@@ -127,7 +127,7 @@ CREATE TABLE factoryctl.events (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     at           timestamptz NOT NULL,
     level        factoryctl.event_level NOT NULL,
-    source       text NOT NULL,  -- agent | server | order | scan | target | pumps | qft | mining
+    source       text NOT NULL,  -- agent | server | order | scan | target | pumps | qft | mining | bhc
     text         text NOT NULL,
     order_id     bigint REFERENCES factoryctl.orders ON DELETE SET NULL,
     goods_id     bigint REFERENCES factoryctl.goods ON DELETE SET NULL,
@@ -260,3 +260,39 @@ CREATE TABLE factoryctl.mining_supplies (
     goods_id bigint PRIMARY KEY REFERENCES factoryctl.goods ON DELETE CASCADE,
     added_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Black hole setups (factoryctl/bhc): one Pseudostable Black Hole Containment
+-- Field, one computer, one agent. It decides; the server keeps its settings
+-- (holdAt, floor, maxHolds, minSpacetime) and the last report, made while the
+-- hole was closed. Like qft_setups.
+CREATE TABLE factoryctl.bhc_setups (
+    name             text PRIMARY KEY,
+    x                bigint,
+    y                bigint,
+    z                bigint,
+    run              text NOT NULL,
+    status           jsonb NOT NULL DEFAULT '{}',  -- state, supplies
+    seen_at          timestamptz NOT NULL,
+    settings_version bigint NOT NULL DEFAULT 0,    -- 0: no settings yet
+    settings         jsonb,
+    settings_at      timestamptz
+);
+
+-- A hole from seed to close, as the agent summed it up. A session comes again
+-- until the poll with it got through: (setup, run, session) takes it once.
+-- The newest kBhcSessionsKept per setup are kept (db/bhc.cpp).
+CREATE TABLE factoryctl.bhc_sessions (
+    setup     text NOT NULL REFERENCES factoryctl.bhc_setups ON DELETE CASCADE,
+    run       text NOT NULL,
+    session   bigint NOT NULL,
+    closed_at timestamptz NOT NULL,
+    seconds   bigint NOT NULL,   -- open
+    holds     bigint NOT NULL,
+    spent     bigint NOT NULL,   -- L of spacetime the holds took
+    recipes   bigint NOT NULL,   -- started
+    ending    text NOT NULL,     -- collapsed | closed (not by the agent) | seed (not taken)
+    unknown   boolean NOT NULL,  -- the count was lost
+    blocked   boolean NOT NULL,  -- a hold went wrong
+    PRIMARY KEY (setup, run, session)
+);
+CREATE INDEX bhc_sessions_by_time ON factoryctl.bhc_sessions (setup, closed_at);

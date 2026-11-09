@@ -6,7 +6,7 @@
 
   const kPage = 200
   const kMaxShown = 1000 // what the server gives at once
-  const sources = ['', 'agent', 'order', 'scan', 'target', 'server']
+  const sources = ['', 'agent', 'order', 'scan', 'target', 'server', 'pumps', 'qft', 'mining', 'bhc']
 
   const view = logsView
   let events = $state<FactoryEvent[]>([])

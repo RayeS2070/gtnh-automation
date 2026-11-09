@@ -5,6 +5,7 @@ package.path = './?.lua;../agent/?.lua;' .. package.path
 
 local hole = require('bhc.hole')
 local rig = require('bhc.rig')
+local link = require('bhc.link')
 
 local failures = 0
 local function check(cond, what)
@@ -195,6 +196,13 @@ local function run(m, s, seconds, opts)
     hole.settle(s, r:prepareHatch(log))
     local lowest = 100
     local unsafe = 0
+    local sessions = {}
+    local function apply(actions)
+        r:apply(actions, s, hole, log)
+        for _, a in ipairs(actions) do
+            if a.session then sessions[#sessions + 1] = a.session end
+        end
+    end
     for _ = 1, seconds do
         m:tick()
         now = now + 1
@@ -205,12 +213,12 @@ local function run(m, s, seconds, opts)
             lowest = m.stab
         end
         if not opts.agentDown then
-            r:apply(hole.step(s, r:observe(m.pulse, s.phase), kCfg), s, hole, log)
+            apply(hole.step(s, r:observe(m.pulse, s.phase), kCfg))
             now = now + 0.001
-            r:apply(hole.step(s, r:observe(false, s.phase), kCfg), s, hole, log)
+            apply(hole.step(s, r:observe(false, s.phase), kCfg))
         end
     end
-    return { lowest = lowest, unsafe = unsafe, rig = r }
+    return { lowest = lowest, unsafe = unsafe, rig = r, sessions = sessions }
 end
 
 -- A queue of jobs: opens, holds low, closes after the last one, nothing voided.
@@ -228,6 +236,11 @@ do
     check(m.drained == hole.total(s.holds) and s.spent == m.drained,
         ('spent what the holds cost: %d / %d'):format(m.drained, hole.total(s.holds)))
     check(#warnings == 0, 'no warnings: ' .. table.concat(warnings, '; '))
+    local sum = res.sessions[1]
+    check(#res.sessions == 1 and sum.session == 1 and sum.ending == 'collapsed'
+        and sum.recipes == 10 and sum.holds == s.holds and sum.spent == m.drained
+        and sum.seconds == s.pulses and not sum.blocked and not sum.unknown,
+        'one session summary with what happened')
 end
 
 -- maxHolds reached with work left: the running recipe is held to its end, then it closes.
@@ -439,6 +452,80 @@ do
     check(not ok and why:find('slot 2') and cfgItems[2].name == 'minecraft:stone',
         'keeps a foreign item: ' .. tostring(why))
     d.config.stock = nil
+end
+
+-- The seed not taken: a summary says so.
+do
+    warnings = {}
+    local m = newMachine({ jobs = 3 })
+    m.seedPlace = true
+    local s = hole.new()
+    -- The machine takes nothing from the bus: catalysts are in the wrong one.
+    local tick = m.tick
+    m.tick = function(self)
+        local bus = self.bus
+        self.bus = {}
+        tick(self)
+        self.bus = bus
+    end
+    local res = run(m, s, 15)
+    check(#res.sessions == 1 and res.sessions[1].ending == 'seed', 'seed not taken: summarized')
+end
+
+-- link: settings checked like the server checks them.
+do
+    local good = { holdAt = 20, floor = 2, maxHolds = 120, minSpacetime = 10000, version = 3 }
+    check(link.check(good) and link.check(good).version == 3, 'link: good settings pass')
+    for field, bad in pairs({ holdAt = 2, floor = 0, maxHolds = 601, minSpacetime = -1 }) do
+        local s = copy(good)
+        s[field] = bad
+        local ok, why = link.check(s)
+        check(not ok and why:find(field, 1, true), 'link: refuses ' .. field .. '=' .. bad)
+    end
+    check(not link.check({ holdAt = 20.5, floor = 2, maxHolds = 1, minSpacetime = 0 }),
+        'link: refuses fractions')
+end
+
+-- link: offers config.lua's, takes the server's, saves them, keeps sessions until sent.
+do
+    local posts, replies, saved, clock = {}, {}, nil, 100
+    local json = require('fc.json')
+    local l = link.new({
+        post = function(path, body)
+            posts[#posts + 1] = { path = path, body = body }
+            local reply = table.remove(replies, 1)
+            if not reply then return nil, 'down' end
+            return reply
+        end,
+        decode = function(text) return load('return ' .. text)() end,
+        store = { read = function() return saved end,
+            write = function(text) saved = text; return true end,
+            encode = function(v) return 'return ' .. json.encode(v):gsub('[%[%]]', '') end,
+            decode = function() return nil end },
+        offer = { version = 0, holdAt = 20, floor = 2, maxHolds = 120, minSpacetime = 10000 },
+        name = 'bhc-test', run = 'r1', clock = function() return clock end,
+    })
+    l:ended({ session = 1, seconds = 200, holds = 120, spent = 450, recipes = 10,
+        ending = 'collapsed', unknown = false, blocked = false })
+    clock = 130
+    check(not l:poll({ state = { phase = 'idle' } }), 'link: server down')
+    check(posts[1].body:find('"ago":30', 1, true), 'link: the session ended 30 s ago')
+    check(#l.sessions == 1, 'link: a summary waits while the server is down')
+    check(posts[1].body:find('"offer":{', 1, true) and posts[1].body:find('"settings":-1', 1, true)
+        and posts[1].body:find('"sessions":[{', 1, true), 'link: offers, asks, sends the session')
+    replies[1] = '{poll=10, settings={version=1, holdAt=25, floor=3, maxHolds=90, minSpacetime=500}}'
+    local reply, changed = l:poll({ state = { phase = 'idle' } })
+    check(reply and changed and l.settings.holdAt == 25 and l.settings.version == 1,
+        'link: takes the server settings')
+    check(saved ~= nil, 'link: saves them')
+    check(#l.sessions == 0, 'link: the summary is gone once sent')
+    replies[1] = '{poll=10}'
+    l:poll({ state = { phase = 'idle' } })
+    check(not posts[3].body:find('offer', 1, true) and posts[3].body:find('"settings":1', 1, true)
+        and posts[3].body:find('"sessions":[]', 1, true), 'link: no offer once it has settings')
+    replies[1] = '{poll=10, settings={version=2, holdAt=1, floor=3, maxHolds=90, minSpacetime=500}}'
+    l:poll({ state = { phase = 'idle' } })
+    check(l.settings.version == 1, 'link: bad settings from the server are refused')
 end
 
 if failures == 0 then

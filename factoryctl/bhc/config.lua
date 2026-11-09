@@ -3,6 +3,14 @@
 local sides = require 'sides'
 
 return {
+    -- The factoryctl server; nil: none, the settings below are the agent's. OpenComputers refuses
+    -- private and local addresses by default (internet.filteringRules in its config on the game
+    -- server): allow the server's address. The agent talks to it only while the hole is closed.
+    server = 'http://127.0.0.1:8080',
+    -- The setup's name on the server; nil: bhc@x,y,z of the controller.
+    name = nil,
+    -- What also goes to the server's log, with the reports ('dbg', 'inf', 'wrn' or 'err').
+    forwardLevel = 'inf',
     -- Address prefixes. nil: the only component of its kind (a BHC controller is found by its
     -- name among the gt_machine adapters).
     controller = nil,
@@ -35,6 +43,8 @@ return {
         seedSlot = 1, seeds = 2,
         collapserSlot = 2, collapsers = 2,
     },
+    -- holdAt, floor, maxHolds and minSpacetime are offered to a server that has no settings yet;
+    -- once it has, its settings (the web, BHC tab) win, saved in settingsPath for restarts.
     -- Stability at which holding starts. Lower is cheaper, but a missed hold leaves only this many
     -- seconds to the running recipe: keep it above the longest recipe (Eternal Singularity: 20 s).
     holdAt = 20,
@@ -49,6 +59,8 @@ return {
     workEvery = 5,
     -- nil: /home/factoryctl/bhc/state.dat
     statePath = nil,
+    -- nil: /home/factoryctl/bhc/settings.dat (the server's settings)
+    settingsPath = nil,
     -- 'dbg' shows every pulse; 'inf' only what happens.
     logLevel = 'inf',
 }

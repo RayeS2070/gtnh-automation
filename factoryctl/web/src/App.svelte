@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Bhc from './lib/Bhc.svelte'
   import Cpus from './lib/Cpus.svelte'
   import Logs from './lib/Logs.svelte'
   import Mining from './lib/Mining.svelte'
@@ -17,6 +18,7 @@
     pumps: 'Pumping',
     qft: 'QFT',
     mining: 'Mining',
+    bhc: 'BHC',
     logs: 'Logs',
   } as const
   type Page = keyof typeof pages
@@ -54,6 +56,8 @@
     <Qft />
   {:else if page === 'mining'}
     <Mining />
+  {:else if page === 'bhc'}
+    <Bhc />
   {:else if page === 'logs'}
     <Logs />
   {:else}

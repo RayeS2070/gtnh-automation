@@ -10,6 +10,7 @@
 #include "agent/poll_handler.hpp"
 #include "agent/pumps_poll_handler.hpp"
 #include "agent/qft_poll_handler.hpp"
+#include "agent/bhc_poll_handler.hpp"
 #include "agent/scan_handler.hpp"
 #include "agent/mining_poll_handler.hpp"
 #include "api/cpus_handler.hpp"
@@ -18,6 +19,7 @@
 #include "api/orders_handler.hpp"
 #include "api/pumps_handler.hpp"
 #include "api/qft_handler.hpp"
+#include "api/bhc_handler.hpp"
 #include "api/stock_handler.hpp"
 #include "api/targets_handler.hpp"
 #include "api/user.hpp"
@@ -52,6 +54,7 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::PumpTargetHandler>()
           .Append<factoryctl::agent::PumpsPollHandler>()
           .Append<factoryctl::agent::QftPollHandler>()
+          .Append<factoryctl::agent::BhcPollHandler>()
           .Append<factoryctl::agent::MiningPollHandler>()
           .Append<factoryctl::api::MiningHandler>()
           .Append<factoryctl::api::MiningTargetHandler>()
@@ -61,6 +64,9 @@ auto main(int argc, char* argv[]) -> int {
           .Append<factoryctl::api::QftSetupsHandler>()
           .Append<factoryctl::api::QftSettingsHandler>()
           .Append<factoryctl::api::QftSetupHandler>()
+          .Append<factoryctl::api::BhcSetupsHandler>()
+          .Append<factoryctl::api::BhcSettingsHandler>()
+          .Append<factoryctl::api::BhcSetupHandler>()
           .Append<factoryctl::api::OrdersHandler>()
           .Append<factoryctl::api::OrderCancelHandler>()
           .Append<factoryctl::api::CpusHandler>()

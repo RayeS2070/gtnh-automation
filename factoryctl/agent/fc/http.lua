@@ -4,14 +4,55 @@ local internet = require('internet')
 
 local http = {}
 
+local kHeaders = { ['Content-Type'] = 'application/json' }
+
+---Reads the card's request handle itself: OpenOS's iterator waits inside with no way out. The
+---card connects and reads on its own threads; read() gives '' until data is there, nil at the end
+---(OpenComputers InternetCard.HTTPRequest), close() cancels them.
+local function postBefore(url, body, timeout)
+    local component = require('component')
+    local computer = require('computer')
+    local deadline = computer.uptime() + timeout
+    local handle, reason = component.internet.request(url, body, kHeaders, 'POST')
+    if not handle then
+        return nil, tostring(reason)
+    end
+    local parts = {}
+    local ok, err = pcall(function()
+        while true do
+            local data, why = handle.read()
+            if data == nil then
+                if why then
+                    error(why, 0)
+                end
+                return
+            elseif #data > 0 then
+                parts[#parts + 1] = data
+            elseif computer.uptime() >= deadline then
+                error(('no answer in %.1f s'):format(timeout), 0)
+            else
+                os.sleep(0.05)
+            end
+        end
+    end)
+    pcall(handle.close)
+    if not ok then
+        return nil, tostring(err)
+    end
+    return table.concat(parts)
+end
+
 ---@param url string
 ---@param body string # JSON
+---@param timeout number? # s to give up after; nil: as long as it takes
 ---@return string? text
 ---@return string? err
-function http.post(url, body)
+function http.post(url, body, timeout)
+    if timeout then
+        return postBefore(url, body, timeout)
+    end
     local ok, res = pcall(function()
-        local headers = { ['Content-Type'] = 'application/json' }
-        local handle = internet.request(url, body, headers, 'POST')
+        local handle = internet.request(url, body, kHeaders, 'POST')
         local parts = {}
         for chunk in handle do
             parts[#parts + 1] = chunk

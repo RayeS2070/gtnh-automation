@@ -408,3 +408,58 @@ export async function postMiningTarget(t: {
 export async function forgetMiningSetup(name: string): Promise<void> {
   await call('DELETE', `/api/v1/mining/setups/${encodeURIComponent(name)}`)
 }
+
+// Black hole setups (factoryctl/bhc): one Pseudostable Black Hole Containment Field and its agent
+// each. The agent reports only while its hole is closed.
+export type BhcSettings = {
+  version: number
+  holdAt: number
+  floor: number
+  maxHolds: number
+  minSpacetime: number
+}
+export type BhcSession = {
+  session: number
+  closedAt: string
+  seconds: number
+  holds: number
+  spent: number
+  recipes: number
+  ending: 'collapsed' | 'closed' | 'seed'
+  unknown: boolean
+  blocked: boolean
+}
+export type BhcSetup = {
+  name: string
+  coords: { x: number; y: number; z: number } | null
+  seenAt: string
+  status: {
+    state: {
+      phase?: string
+      session?: number
+      stability?: number
+      holds?: number
+      spent?: number
+      blocked?: boolean
+      low?: boolean
+      busy?: boolean
+      work?: boolean
+    } | null
+    supplies: { seeds?: number; collapsers?: number; spacetime?: number } | null
+  }
+  settings: BhcSettings | null
+  maxHolds: number
+  sessions: BhcSession[]
+}
+
+export async function fetchBhc(): Promise<BhcSetup[]> {
+  return (await call<{ items: BhcSetup[] }>('GET', '/api/v1/bhc')).items
+}
+
+export async function putBhcSettings(name: string, settings: Omit<BhcSettings, 'version'>): Promise<void> {
+  await call('PUT', `/api/v1/bhc/${encodeURIComponent(name)}/settings`, settings)
+}
+
+export async function forgetBhc(name: string): Promise<void> {
+  await call('DELETE', `/api/v1/bhc/${encodeURIComponent(name)}`)
+}

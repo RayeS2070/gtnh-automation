@@ -103,6 +103,8 @@ fluid names. Rebuild after a modpack update. Goods NEI does not show have no ico
 | `GET /api/v1/pumps`, `PUT /api/v1/pumps/settings`, `PUT|DELETE /api/v1/pumps/targets/{fluid}` | pumping: modules, fluids (stock, target, in flight, pumped in 24 h); edits raise the settings' version |
 | `POST /agent/v1/qft/poll` | a QFT agent: its setup (name, controller coordinates), state, recipes, plasma up; newer settings down. A second QFT under a taken name is refused |
 | `GET /api/v1/qft`, `PUT /api/v1/qft/{name}/settings`, `DELETE /api/v1/qft/{name}` | QFT setups: the last report, the recipes, the settings (mode; targets, priorities, weights); forget a setup |
+| `POST /agent/v1/bhc/poll` | a black hole agent, only while its hole is closed: setup, state, supplies, ended sessions up; newer settings down. A second BHC under a taken name is refused |
+| `GET /api/v1/bhc`, `PUT /api/v1/bhc/{name}/settings`, `DELETE /api/v1/bhc/{name}` | black hole setups: the last report, the newest sessions, the settings; forget a setup |
 | `GET /api/v1/stock?q=&kind=&sort=&dir=&limit=` | stock: every word of `q` in the label, any order; `kind` all/items/fluids; `sort` label/amount; `dir` asc/desc; everything without `limit` |
 | `GET /api/v1/cpus` | the CPUs of the agent's last poll: what each crafts, what is left, our open order of it; and `lowFreeCpus` |
 | `GET /api/v1/events?level=&source=&q=&order=&before=&limit=` | events, newest first: the agent's lines, every order status change, alarms, scans, targets (kept `FACTORYCTL_EVENTS.keep`, 30 days) |
@@ -317,7 +319,13 @@ is (the repository is public domain).
 ### Black hole agent (`bhc/`)
 
 Runs the black hole of a Pseudostable Black Hole Containment Field. It decides on its own, once a
-second: the server is not in the loop yet (planned: it keeps the session state and shows it).
+second. With `server` in config.lua it reports to factoryctl (the BHC tab) and takes its settings
+from there — `holdAt`, `floor`, `maxHolds`, `minSpacetime`; config.lua's are offered to a server
+that has none — but only while the hole is closed: every 30 s, right after a session (its summary:
+time open, recipes, holds, spacetime) and before a hole opens. With a hole open it hears nothing
+but its pulses: a wait for the network would miss one. A poll gives up after 1.5 s, so a watchdog
+on the heartbeat must allow a longer pause; without the server the agent runs on the settings in
+hand (the server's are kept in `bhc/settings.dat`).
 
 A hole lives 100 s, losing 1 % stability a second; at 0 it is unstable and voids running recipes,
 while a new recipe would still start. Below 20 % the parallels are ×4, and spacetime in the

@@ -169,6 +169,26 @@ components_manager:
             method: DELETE
             task_processor: main-task-processor
 
+        handler-agent-bhc-poll:
+            path: /agent/v1/bhc/poll
+            method: POST
+            task_processor: main-task-processor
+
+        handler-api-bhc:
+            path: /api/v1/bhc
+            method: GET
+            task_processor: main-task-processor
+
+        handler-api-bhc-settings:
+            path: /api/v1/bhc/{name}/settings
+            method: PUT
+            task_processor: main-task-processor
+
+        handler-api-bhc-setup:
+            path: /api/v1/bhc/{name}
+            method: DELETE
+            task_processor: main-task-processor
+
         handler-api-stock:
             path: /api/v1/stock
             method: GET

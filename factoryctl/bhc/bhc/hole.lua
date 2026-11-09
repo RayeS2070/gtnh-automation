@@ -49,10 +49,13 @@ hole.Phase = {
 ---@field blocked boolean? # a hold went wrong: no new hole until the agent restarts
 ---@field spent integer # L of spacetime drained by the machine this session
 ---@field session integer # sessions opened, for the log
+---@field recipes integer # recipes started this session
+---@field busy boolean? # a recipe ran at the last step: a new one is counted on the edge
 
 ---@return bhc.State
 function hole.new()
-    return { phase = hole.Phase.kIdle, pulses = 0, holds = 0, spent = 0, session = 0 }
+    return { phase = hole.Phase.kIdle, pulses = 0, holds = 0, spent = 0, session = 0,
+        recipes = 0 }
 end
 
 ---Spacetime for the next hold, after `holds` of them.
@@ -90,8 +93,25 @@ end
 ---@field insert ('seed'|'collapser')?
 ---@field hold boolean? # set (true) or clear (false) the stocking slot
 ---@field clearBus boolean? # move whatever is in the catalyst bus back to supplies
+---@field session bhc.Summary? # a session ended: for the server
 ---@field warn string?
 ---@field info string?
+
+---@class bhc.Summary
+---@field session integer
+---@field seconds integer # pulses: the seconds the hole was open
+---@field holds integer
+---@field spent integer # L of spacetime the holds took
+---@field recipes integer # recipes started
+---@field ending 'collapsed'|'closed'|'seed' # by the agent's collapser; not by it; seed not taken
+---@field unknown boolean # the count was lost (a restart without the time)
+---@field blocked boolean # a hold went wrong
+
+local function summary(s, ending)
+    return { session = s.session, seconds = s.pulses, holds = s.holds, spent = s.spent,
+        recipes = s.recipes or 0, ending = ending, unknown = s.unknown == true,
+        blocked = s.blocked == true }
+end
 
 local function enter(s, phase, now)
     s.phase = phase
@@ -197,12 +217,17 @@ function hole.step(s, obs, cfg)
         -- After a restart the old clock means nothing: time the phase and the pulses from now.
         s.since = s.since or obs.now
         s.lastPulse = s.lastPulse or obs.now
+        if obs.busy and not s.busy then
+            s.recipes = (s.recipes or 0) + 1
+        end
+        s.busy = obs.busy
     end
 
     -- A pulse in any phase means the hole is open.
     if obs.pulse and (s.phase == P.kIdle) then
         s.unknown = true
         s.pulses, s.holds, s.spent, s.spacetime = 0, 0, 0, nil
+        s.session, s.recipes, s.busy = s.session + 1, obs.busy and 1 or 0, obs.busy
         enter(s, P.kClosing, obs.now)
         out[#out + 1] = { allow = false }
         out[#out + 1] = { warn = 'the hole is open but the agent did not open it: winding down' }
@@ -222,6 +247,7 @@ function hole.step(s, obs, cfg)
         if obs.work and suppliesOk(obs.supplies, cfg) then
             s.session = s.session + 1
             s.pulses, s.holds, s.spent, s.unknown, s.spacetime, s.low = 0, 0, 0, nil, nil, nil
+            s.recipes, s.busy = 0, false
             enter(s, P.kOpening, obs.now)
             out[#out + 1] = { insert = 'seed' }
             out[#out + 1] = { allow = true }
@@ -243,6 +269,7 @@ function hole.step(s, obs, cfg)
             enter(s, P.kIdle, obs.now)
             out[#out + 1] = { allow = false }
             out[#out + 1] = { warn = 'the seed was not taken: is it in the right bus?' }
+            out[#out + 1] = { session = summary(s, 'seed') }
         end
         return out
     end
@@ -257,6 +284,7 @@ function hole.step(s, obs, cfg)
             out[#out + 1] = { [expected and 'info' or 'warn'] =
                 ('session %d closed after %d s, %d holds, %d L spacetime%s'):format(s.session,
                     s.pulses, s.holds, s.spent, expected and '' or ' (not by the agent)') }
+            out[#out + 1] = { session = summary(s, expected and 'collapsed' or 'closed') }
         end
         return out
     end
