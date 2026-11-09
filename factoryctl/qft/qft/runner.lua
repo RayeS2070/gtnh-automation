@@ -48,6 +48,7 @@ local kTicksPerSecond = 20
 ---A failing call is logged and reported, it does not kill the program.
 ---@return boolean ok
 ---@return any result
+---@return any err # the method's second result (a reason, by OC's convention)
 local function call(proxy, what, method, ...)
     local ok, res, err = pcall(proxy[method], ...)
     if not ok then
@@ -221,6 +222,7 @@ function runner.step(r, want, now)
             log.inf('stopping %s for %s', runner.describe(r.running), runner.describe(want))
             beginStop(r, now)
         else
+            ---@cast want -nil # runner.same is false for nil
             if want.neptunium ~= r.running.neptunium then
                 local id = r.running.recipe
                 if setCircuit(r.components.bus, 'bus', want.neptunium) then

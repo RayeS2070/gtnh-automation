@@ -96,7 +96,7 @@ local function sample()
     local state = jobState(job)
     local meta, final = findCpu(me)
     local row = { cpu = '-', busy = '-', final = '-', an = '-', as = '-', pn = '-', ps = '-' }
-    if meta then
+    if meta and final then -- findCpu gives both or neither
         row.cpu, row.busy = meta.name, tostring(meta.busy)
         row.final = tostring(final.size)
         finalSizes[#finalSizes + 1] = final.size

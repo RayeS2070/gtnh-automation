@@ -6,6 +6,42 @@ local slots = require('qft.slots')
 
 local config = {}
 
+---@alias qft.RecipeId string # a key of qft/catalog.lua
+---@alias qft.Trigger 'deficit' | 'surplus'
+
+---An input of a recipe: `item` or `fluid` is its label; amount per parallel per cycle.
+---@class qft.RecipeInput
+---@field item string?
+---@field fluid string?
+---@field name string
+---@field damage integer?
+---@field amount number
+---@field resource qft.Resource # set by config.normalize
+
+---An output: `circuit` focuses it with Neptunium; target, priority (deficit) and weight
+---(surplus) come from the server's settings (qft.link).
+---@class qft.RecipeOutput
+---@field item string?
+---@field fluid string?
+---@field name string
+---@field damage integer?
+---@field circuit integer
+---@field resource qft.Resource # set by config.normalize
+---@field target number?
+---@field priority number?
+---@field weight number?
+
+---A recipe as the program runs it (config.build, then config.normalize and qft.link).
+---@class qft.Recipe
+---@field name string
+---@field trigger qft.Trigger
+---@field tier integer
+---@field catalyst string # the label of its catalyst
+---@field catalysts integer # how many the QFT has
+---@field inputs qft.RecipeInput[]
+---@field outputs qft.RecipeOutput[]
+---@field off boolean? # switched off in the settings
+
 ---@class qft.Config
 ---@field components table
 ---@field recipes table<qft.RecipeId, qft.Recipe>

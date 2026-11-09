@@ -1,6 +1,9 @@
 ---Local tests of the pumping agent with fake pump modules, network, server and clock. Not
 ---installed in game.
 ---  cd factoryctl/pumps && lua tests/run.lua
+-- Tests run fakes and partial tables, swap methods mid-test, and a nil where a value is
+-- expected fails the test anyway: these checks only add noise here.
+---@diagnostic disable: missing-fields, need-check-nil, param-type-mismatch
 package.path = './?.lua;../agent/?.lua;' .. package.path
 
 local failures, total = 0, 0

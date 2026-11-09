@@ -185,6 +185,9 @@ local function main()
     -- Only while closed: no pulses come then, so the wait for the server misses none.
     local lastReport, serverDown = -math.huge, false
     local function report(obs)
+        if not server then
+            return
+        end
         lastReport = computer.uptime()
         local okSup, sup = pcall(r.supplies, r)
         local reply, why = server:poll({

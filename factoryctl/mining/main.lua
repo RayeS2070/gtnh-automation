@@ -47,6 +47,8 @@ local function main()
     end
 
     local m = miner.new({
+        -- OpenOS's component.list table is also its own iterator; the gtnh stub knows the table only.
+        ---@diagnostic disable-next-line: return-type-mismatch
         list = function(kind) return component.list(kind, true) end,
         proxy = component.proxy,
         post = function(path, body) return http.post(config.server .. path, body) end,

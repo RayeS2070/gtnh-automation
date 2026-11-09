@@ -1,6 +1,9 @@
 ---Local tests: the state machine and the rig against a fake BHC that follows the source
 ---(MTEBlackHoleCompressor) second by second. Not installed in game.
 ---  cd factoryctl/bhc && lua tests/run.lua
+-- Tests run fakes and partial tables, swap methods mid-test, and a nil where a value is
+-- expected fails the test anyway: these checks only add noise here.
+---@diagnostic disable: need-check-nil
 package.path = './?.lua;../agent/?.lua;' .. package.path
 
 local hole = require('bhc.hole')

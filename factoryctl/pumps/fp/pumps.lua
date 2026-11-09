@@ -20,7 +20,7 @@ local kRetry = 10     -- s before polling again after a failed poll
 local kPoll = 10      -- s between polls until the server says
 
 ---@class fp.Deps
----@field list fun(): table<string, boolean> # addresses of gt_machine components
+---@field list fun(): table<string, string> # gt_machine components: address -> type
 ---@field proxy fun(address: string): table
 ---@field fluids fun(): table[] # getFluidsInNetwork() of the pumping network
 ---@field post fun(path: string, body: string): string?, string?

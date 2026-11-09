@@ -50,10 +50,17 @@ function link.check(raw)
     return s
 end
 
+---Where the server's settings are kept for restarts.
+---@class bhc.SettingsStore
+---@field read fun(): string?
+---@field write fun(text: string): boolean?, string?
+---@field encode fun(v: table): string
+---@field decode fun(text: string): any
+
 ---@class bhc.LinkDeps
 ---@field post fun(path: string, body: string): string?, string?
 ---@field decode fun(text: string): any
----@field store { read: fun(): string?, write: fun(text: string): boolean?, string?, encode: fun(v: table): string, decode: fun(text: string): any }
+---@field store bhc.SettingsStore
 ---@field offer bhc.LinkSettings # config.lua's: what a server without settings gets
 ---@field name string # The setup: the server's key.
 ---@field coords { x: number, y: number, z: number }? # Of the controller: the server checks them.

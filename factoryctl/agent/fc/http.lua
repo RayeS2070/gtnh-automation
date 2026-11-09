@@ -22,6 +22,8 @@ local function postBefore(url, body, timeout)
     local parts = {}
     local ok, err = pcall(function()
         while true do
+            -- n is optional (InternetCard.HTTPRequest.read, optInteger); the gtnh stub says not.
+            ---@diagnostic disable-next-line: missing-parameter
             local data, why = handle.read()
             if data == nil then
                 if why then

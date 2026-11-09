@@ -151,7 +151,8 @@ function setup.run(config, opts)
             print(('[%s] ok: %s'):format(slot.path, entry.address))
         else
             local used = usedAddresses(saved, slot.path)
-            local address, why = picked[slot.path], nil
+            local address = picked[slot.path] ---@type string?
+            local why
             if address and used[address] then
                 address = nil -- a manual slot before it took it
             end
@@ -160,9 +161,13 @@ function setup.run(config, opts)
             else
                 address, why = waitForManual(slot.path, b, used)
             end
+            local ctype = address and component.type(address)
+            if address and not ctype then
+                address, why = nil, 'the component is gone'
+            end
 
-            if address then
-                saved[slot.path] = { address = address, type = component.type(address) }
+            if address and ctype then
+                saved[slot.path] = { address = address, type = ctype }
                 -- Save after every slot: a crash halfway must not lose what is already bound.
                 local ok, saveErr = store.save(path, saved)
                 if not ok then

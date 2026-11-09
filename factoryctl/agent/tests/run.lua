@@ -1,5 +1,8 @@
 ---Local tests of the agent with fake components built from real dumps. Not installed in game.
 ---  cd factoryctl/agent && lua tests/run.lua
+-- Tests run fakes and partial tables, swap methods mid-test, and a nil where a value is
+-- expected fails the test anyway: these checks only add noise here.
+---@diagnostic disable: duplicate-set-field, need-check-nil, param-type-mismatch, undefined-field
 package.path = './?.lua;' .. package.path
 
 local failures, total = 0, 0

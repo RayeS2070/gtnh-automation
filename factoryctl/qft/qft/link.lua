@@ -149,10 +149,17 @@ function link.catalog(recipes)
     return out
 end
 
+---Where the server's settings are kept for restarts.
+---@class qft.SettingsStore
+---@field read fun(): string?
+---@field write fun(text: string): boolean?, string?
+---@field encode fun(v: table): string
+---@field decode fun(text: string): any
+
 ---@class qft.LinkDeps
 ---@field post fun(path: string, body: string): string?, string?
 ---@field decode fun(text: string): any
----@field store { read: fun(): string?, write: fun(text: string): boolean?, string?, encode: fun(v: table): string, decode: fun(text: string): any }
+---@field store qft.SettingsStore
 ---@field recipes table<string, qft.Recipe> # Normalized; settings are applied to them in place.
 ---@field mode qft.Mode # The default mode (config / --mode).
 ---@field name string # The setup: the server's key.

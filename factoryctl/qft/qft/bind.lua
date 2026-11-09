@@ -48,7 +48,11 @@ end
 ---@param binding qft.Binding
 ---@return string[]
 function bind.types(binding)
-    return type(binding.type) == 'table' and binding.type or { binding.type }
+    local t = binding.type
+    if type(t) == 'table' then
+        return t
+    end
+    return { t }
 end
 
 ---@param binding qft.Binding

@@ -1,5 +1,8 @@
 ---Local tests for the pure logic and the runner, with fake components. Not installed in game.
 ---  lua tests/run.lua   (from the repository root)
+-- Tests run fakes and partial tables, swap methods mid-test, and a nil where a value is
+-- expected fails the test anyway: these checks only add noise here.
+---@diagnostic disable: cast-local-type, duplicate-set-field, missing-fields, need-check-nil, param-type-mismatch
 package.path = './?.lua;../agent/?.lua;' .. package.path
 
 local bind = require('qft.bind')

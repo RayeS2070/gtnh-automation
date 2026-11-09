@@ -120,8 +120,9 @@ local function decide(ctx, id, st, current)
             slots = { items = set.items, fluids = set.fluids, plasma = {} } }
     end
     local same = current ~= nil and current.recipe == id
+    local cur = same and current or nil -- the same recipe running now
 
-    local fermiumNow = same and current.fermium or false
+    local fermiumNow = cur and cur.fermium or false
     local fermium, fwhy = plasmaEnough(ctx, 'fermium', id, fermiumNow)
     if fermium == nil then
         fermium = fermiumNow
@@ -132,7 +133,7 @@ local function decide(ctx, id, st, current)
     -- Neptunium weighs the outputs: by urgency (deficit) or by `weight` (surplus);
     -- outputs nobody wants weigh 0.
     local weights = st.weights
-    local focusNow = same and current.neptunium or nil
+    local focusNow = cur and cur.neptunium or nil
     local focus, nwhy = plan.chooseFocus({
         n = #recipe.outputs, delta = delta, weights = weights,
         fermium = fermium, current = focusNow,

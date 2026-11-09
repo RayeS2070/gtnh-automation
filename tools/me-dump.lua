@@ -22,7 +22,7 @@ if not path then
 end
 local maxId = tonumber(opts.max) or 11500
 local chunk = tonumber(opts.chunk) or 1000
-local slowFrom, slowTo = 250, 320
+local slowFrom, slowTo = 250, 320 ---@type number?, number?
 if type(opts.slow) == 'string' then
     slowFrom, slowTo = opts.slow:match('^(%d+)%-(%d+)$')
     slowFrom, slowTo = tonumber(slowFrom), tonumber(slowTo)

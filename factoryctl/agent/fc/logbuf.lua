@@ -4,7 +4,7 @@
 local logbuf = {}
 logbuf.__index = logbuf
 
----@param o { capacity: integer?, maxLength: integer? } # lines kept; characters per line
+---@param o { capacity: integer?, maxLength: integer? }? # lines kept; characters per line
 function logbuf.new(o)
     o = o or {}
     return setmetatable({

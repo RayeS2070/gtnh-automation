@@ -7,12 +7,12 @@ local logbuf = require('fc.logbuf')
 local server, polls = arg[1] or 'http://localhost:8081', tonumber(arg[2]) or 3
 
 local function post(path, body)
-    local tmp = os.tmpname()
+    local tmp = assert(os.tmpname())
     local f = assert(io.open(tmp, 'w'))
     f:write(body)
     f:close()
-    local p = io.popen(('curl -sS -X POST -H "Content-Type: application/json" --data-binary @%s %s%s'):format(
-        tmp, server, path))
+    local p = assert(io.popen(('curl -sS -X POST -H "Content-Type: application/json" --data-binary @%s %s%s'):format(
+        tmp, server, path)))
     local text = p:read('a')
     local ok = p:close()
     os.remove(tmp)
